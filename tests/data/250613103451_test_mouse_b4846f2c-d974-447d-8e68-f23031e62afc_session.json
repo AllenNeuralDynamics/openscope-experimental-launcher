@@ -1,0 +1,80 @@
+{
+   "describedBy": "https://raw.githubusercontent.com/AllenNeuralDynamics/aind-data-schema/main/src/aind_data_schema/core/session.py",
+   "schema_version": "1.1.2",
+   "protocol_id": [],
+   "experimenter_full_name": [
+      "Unknown"
+   ],
+   "session_start_time": "2025-06-13T10:34:51.691640-07:00",
+   "session_end_time": "2025-06-13T10:34:58.312587-07:00",
+   "session_type": "SLAP2",
+   "iacuc_protocol": null,
+   "rig_id": "slap2_rig",
+   "calibrations": [],
+   "maintenance": [],
+   "subject_id": "test_mouse",
+   "animal_weight_prior": null,
+   "animal_weight_post": null,
+   "weight_unit": "gram",
+   "anaesthesia": null,
+   "data_streams": [],
+   "stimulus_epochs": [
+      {
+         "stimulus_start_time": "2025-06-13T10:34:51.691640-07:00",
+         "stimulus_end_time": "2025-06-13T10:34:58.312587-07:00",
+         "stimulus_name": "SLAP2 Oddball Stimulus",
+         "session_number": null,
+         "software": [
+            {
+               "name": "Bonsai",
+               "version": "Unknown",
+               "url": "https://bonsai-rx.org/",
+               "parameters": {
+                  "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
+                  "repository_commit_hash": "main",
+                  "local_repository_path": "C:/BonsaiDataPredictiveProcessingTest",
+                  "bonsai_path": "code/stimulus-control/src/Standard_oddball_slap2.bonsai",
+                  "bonsai_exe_path": "code/stimulus-control/bonsai/Bonsai.exe",
+                  "bonsai_setup_script": "code/stimulus-control/bonsai/setup.cmd",
+                  "mouse_id": "test_mouse",
+                  "user_id": "test_user",
+                  "output_path": "data\\250613103451_test_mouse_b4846f2c-d974-447d-8e68-f23031e62afc.pkl"
+               }
+            }
+         ],
+         "script": {
+            "name": "SLAP2 Stimulus Script",
+            "version": "1.0.0",
+            "url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
+            "parameters": {
+               "workflow_path": "code/stimulus-control/src/Standard_oddball_slap2.bonsai",
+               "mouse_id": "test_mouse",
+               "user_id": "test_user",
+               "session_uuid": "b4846f2c-d974-447d-8e68-f23031e62afc"
+            }
+         },
+         "stimulus_modalities": [
+            "Visual"
+         ],
+         "stimulus_parameters": null,
+         "stimulus_device_names": [],
+         "speaker_config": null,
+         "light_source_config": [],
+         "objects_in_arena": null,
+         "output_parameters": {},
+         "reward_consumed_during_epoch": null,
+         "reward_consumed_unit": "microliter",
+         "trials_total": 100,
+         "trials_finished": 100,
+         "trials_rewarded": null,
+         "notes": "SLAP2 experiment with oddball stimulus paradigm"
+      }
+   ],
+   "mouse_platform_name": "Fixed platform",
+   "active_mouse_platform": false,
+   "headframe_registration": null,
+   "reward_delivery": null,
+   "reward_consumed_total": null,
+   "reward_consumed_unit": "milliliter",
+   "notes": "SLAP2 experiment session for test_mouse by test_user - stimulus information only"
+}

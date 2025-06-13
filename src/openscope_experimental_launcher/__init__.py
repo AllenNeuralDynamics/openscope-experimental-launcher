@@ -1,2 +1,21 @@
-"""Init package"""
-__version__ = "0.0.0"
+"""
+OpenScope Experimental Launcher
+
+A Python package for launching OpenScope Bonsai workflows with advanced 
+metadata generation and session tracking capabilities.
+"""
+
+__version__ = "0.1.0"
+
+# Import main classes for easy access
+from .base.experiment import BaseExperiment
+from .base.bonsai_interface import BonsaiInterface
+from .slap2.launcher import SLAP2Experiment
+
+# Version info
+__all__ = [
+    "BaseExperiment",
+    "BonsaiInterface", 
+    "SLAP2Experiment",
+    "__version__"
+]

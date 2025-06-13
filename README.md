@@ -5,137 +5,190 @@
 [![semantic-release: angular](https://img.shields.io/badge/semantic--release-angular-e10079?logo=semantic-release)](https://github.com/semantic-release/semantic-release)
 ![Interrogate](https://img.shields.io/badge/interrogate-100.0%25-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen?logo=codecov)
-![Python](https://img.shields.io/badge/python->=3.10-blue?logo=python)
+![Python](https://img.shields.io/badge/python->=3.8-blue?logo=python)
+![Platform](https://img.shields.io/badge/platform-Windows-blue?logo=windows)
 
+**Windows-only experimental launcher for OpenScope Bonsai workflows with metadata generation and session tracking.**
 
+## Overview
 
-## Usage
- - To use this template, click the green `Use this template` button and `Create new repository`.
- - After github initially creates the new repository, please wait an extra minute for the initialization scripts to finish organizing the repo.
- - To enable the automatic semantic version increments: in the repository go to `Settings` and `Collaborators and teams`. Click the green `Add people` button. Add `svc-aindscicomp` as an admin. Modify the file in `.github/workflows/tag_and_publish.yml` and remove the if statement in line 65. The semantic version will now be incremented every time a code is committed into the main branch.
- - To publish to PyPI, enable semantic versioning and uncomment the publish block in `.github/workflows/tag_and_publish.yml`. The code will now be published to PyPI every time the code is committed into the main branch.
- - The `.github/workflows/test_and_lint.yml` file will run automated tests and style checks every time a Pull Request is opened. If the checks are undesired, the `test_and_lint.yml` can be deleted. The strictness of the code coverage level, etc., can be modified by altering the configurations in the `pyproject.toml` file and the `.flake8` file.
+This package provides a Windows-specific launcher for Bonsai-based neuroscience experiments in the OpenScope project. It handles:
+
+- **Bonsai Process Management**: Start, monitor, and manage Bonsai workflow execution
+- **Parameter Management**: Load and pass parameters to Bonsai workflows
+- **Session Tracking**: Generate unique session IDs and track experiment metadata
+- **Git Repository Management**: Clone and manage workflow repositories
+- **Process Monitoring**: Monitor memory usage and handle runaway processes
+- **Windows Integration**: Uses Windows-specific APIs for robust process control
+
+## System Requirements
+
+- **Operating System**: Windows 10 or Windows 11
+- **Python**: 3.8 or higher
+- **Dependencies**: 
+  - Bonsai (installed separately)
+  - Git (for repository management)
+  - Windows-specific libraries (pywin32)
 
 ## Installation
-To use the software, in the root directory, run
+
+To install for usage:
 ```bash
 pip install -e .
 ```
 
-To develop the code, run
+To install for development:
 ```bash
 pip install -e .[dev]
 ```
 
+**Note**: This package requires Windows and will not work on Linux or macOS due to its use of Windows-specific APIs and process management features.
+
+## Usage
+
+### Basic Experiment Launcher
+
+```python
+from openscope_experimental_launcher.base.experiment import BaseExperiment
+
+# Create experiment instance
+experiment = BaseExperiment()
+
+# Run with parameter file
+success = experiment.run("path/to/parameters.json")
+```
+
+### SLAP2 Experiment Launcher
+
+```python
+from openscope_experimental_launcher.slap2.launcher import SLAP2Experiment
+
+# Create SLAP2 experiment instance
+experiment = SLAP2Experiment()
+
+# Run with SLAP2-specific parameters
+success = experiment.run("path/to/slap2_parameters.json")
+```
+
+### Parameter File Format
+
+Create a JSON parameter file with your experiment configuration:
+
+```json
+{
+    "mouse_id": "test_mouse_001",
+    "user_id": "researcher_name",
+    "bonsai_path": "path/to/workflow.bonsai",
+    "output_directory": "C:/experiment_data",
+    "session_type": "behavior",
+    "rig_id": "behavior_rig_1"
+}
+```
+
+### Command Line Usage
+
+You can also run experiments directly from the command line:
+
+```bash
+python -m openscope_experimental_launcher.base.experiment --params parameters.json
+```
+
+## Features
+
+### Process Management
+- Uses Windows job objects for robust process control
+- Automatic memory monitoring and cleanup
+- Graceful shutdown with fallback to force termination
+
+### Session Tracking
+- Unique session UUIDs for each experiment
+- Automatic timestamp generation
+- Parameter and workflow file checksums for provenance
+
+### Git Integration
+- Automatic repository cloning and management
+- Version tracking for reproducibility
+- Branch and commit tracking
+
+### Metadata Generation
+- AIND-compatible metadata schemas
+- Automatic hardware configuration detection
+- Session and experiment metadata collection
+
+## Architecture
+
+The package consists of several key components:
+
+- **BaseExperiment**: Core experiment launcher with Bonsai process management
+- **SLAP2Experiment**: Specialized launcher for SLAP2 imaging experiments
+- **ConfigLoader**: CamStim-compatible configuration file handling
+- **GitManager**: Repository management and version control
+- **ProcessMonitor**: Memory monitoring and process health checks
+- **MetadataGenerator**: AIND schema-compliant metadata generation
+
 ## Contributing
 
-### Linters and testing
+### Development Setup
 
-There are several libraries used to run linters, check documentation, and run tests.
-
-- Please test your changes using the **coverage** library, which will run the tests and log a coverage report:
-
+1. Clone the repository
+2. Install in development mode:
 ```bash
-coverage run -m unittest discover && coverage report
+pip install -e .[dev]
 ```
 
-- Use **interrogate** to check that modules, methods, etc. have been documented thoroughly:
+### Testing
 
+Run the test suite:
 ```bash
-interrogate .
+pytest tests/ -v --cov=src/openscope_experimental_launcher
 ```
 
-- Use **flake8** to check that code is up to standards (no unused imports, etc.):
+### Linting and Formatting
+
+- **flake8** for code quality:
 ```bash
 flake8 .
 ```
 
-- Use **black** to automatically format the code into PEP standards:
+- **black** for code formatting:
 ```bash
 black .
 ```
 
-- Use **isort** to automatically sort import statements:
+- **isort** for import sorting:
 ```bash
 isort .
 ```
 
-### Pull requests
+### Pull Requests
 
-For internal members, please create a branch. For external members, please fork the repository and open a pull request from the fork. We'll primarily use [Angular](https://github.com/angular/angular/blob/main/CONTRIBUTING.md#commit) style for commit messages. Roughly, they should follow the pattern:
+We use [Angular](https://github.com/angular/angular/blob/main/CONTRIBUTING.md#commit) style commit messages:
+
 ```text
 <type>(<scope>): <short summary>
 ```
 
-where scope (optional) describes the packages affected by the code changes and type (mandatory) is one of:
-
-- **build**: Changes that affect build tools or external dependencies (example scopes: pyproject.toml, setup.py)
-- **ci**: Changes to our CI configuration files and scripts (examples: .github/workflows/ci.yml)
-- **docs**: Documentation only changes
-- **feat**: A new feature
-- **fix**: A bugfix
-- **perf**: A code change that improves performance
-- **refactor**: A code change that neither fixes a bug nor adds a feature
-- **test**: Adding missing tests or correcting existing tests
+**Types:**
+- **feat**: New feature
+- **fix**: Bug fix
+- **docs**: Documentation changes
+- **test**: Adding or updating tests
+- **refactor**: Code refactoring
+- **perf**: Performance improvements
+- **ci**: CI/CD changes
 
 ### Semantic Release
 
-The table below, from [semantic release](https://github.com/semantic-release/semantic-release), shows which commit message gets you which release type when `semantic-release` runs (using the default configuration):
+| Commit message | Release type |
+|----------------|--------------|
+| `fix(launcher): stop process hanging on shutdown` | Patch Release |
+| `feat(slap2): add new imaging parameter support` | Feature Release |
+| `feat(core): redesign parameter system`<br><br>`BREAKING CHANGE: Parameter format has changed.` | Breaking Release |
 
-| Commit message                                                                                                                                                                                   | Release type                                                                                                    |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| `fix(pencil): stop graphite breaking when too much pressure applied`                                                                                                                             | ~~Patch~~ Fix Release, Default release                                                                          |
-| `feat(pencil): add 'graphiteWidth' option`                                                                                                                                                       | ~~Minor~~ Feature Release                                                                                       |
-| `perf(pencil): remove graphiteWidth option`<br><br>`BREAKING CHANGE: The graphiteWidth option has been removed.`<br>`The default graphite width of 10mm is always used for performance reasons.` | ~~Major~~ Breaking Release <br /> (Note that the `BREAKING CHANGE: ` token must be in the footer of the commit) |
+## License
 
-### Documentation
-To generate the rst files source files for documentation, run
-```bash
-sphinx-apidoc -o docs/source/ src
-```
-Then to create the documentation HTML files, run
-```bash
-sphinx-build -b html docs/source/ docs/build/html
-```
-More info on sphinx installation can be found [here](https://www.sphinx-doc.org/en/master/usage/installation.html).
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-### Read the Docs Deployment
-Note: Private repositories require **Read the Docs for Business** account. The following instructions are for a public repo.
+## Support
 
-The following are required to import and build documentations on *Read the Docs*:
-- A *Read the Docs* user account connected to Github. See [here](https://docs.readthedocs.com/platform/stable/guides/connecting-git-account.html) for more details.
-- *Read the Docs* needs elevated permissions to perform certain operations that ensure that the workflow is as smooth as possible, like installing webhooks. If you are not the owner of the repo, you may have to request elevated permissions from the owner/admin. 
-- A **.readthedocs.yaml** file in the root directory of the repo. Here is a basic template:
-```yaml
-# Read the Docs configuration file
-# See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
-
-# Required
-version: 2
-
-# Set the OS, Python version, and other tools you might need
-build:
-  os: ubuntu-24.04
-  tools:
-    python: "3.13"
-
-# Path to a Sphinx configuration file.
-sphinx:
-  configuration: docs/source/conf.py
-
-# Declare the Python requirements required to build your documentation
-python:
-  install:
-    - method: pip
-      path: .
-      extra_requirements:
-        - dev
-```
-
-Here are the steps for building docs in *Read the Docs*. See [here](https://docs.readthedocs.com/platform/stable/intro/add-project.html) for detailed instructions:
-- From *Read the Docs* dashboard, click on **Add project**.
-- For automatic configuration, select **Configure automatically** and type the name of the repo. A repo with public visibility should appear as you type. 
-- Follow the subsequent steps.
-- For manual configuration, select **Configure manually** and follow the subsequent steps
-
-Once a project is created successfully, you will be able to configure/modify the project's settings; such as **Default version**, **Default branch** etc.
+For questions or support, please contact the Allen Institute for Neural Dynamics team or open an issue on the GitHub repository.
