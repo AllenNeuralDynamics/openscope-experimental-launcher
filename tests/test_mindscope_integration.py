@@ -117,34 +117,26 @@ class TestMindoscopeWithMinimalistParams:
             # Mock file operations
             mock_open.return_value.__enter__.return_value.read.return_value = b'mock_content'
             
-            try:
-                # Run the experiment with minimalist parameters
-                success = experiment.run(minimalist_params_path)
-                
-                if success:
-                    print(f"\n✅ {rig_name} EXPERIMENT COMPLETED SUCCESSFULLY")
-                    
-                    # Verify that the experiment was properly initialized
-                    assert hasattr(experiment, 'mouse_id'), f"{rig_name} should have mouse_id set"
-                    assert hasattr(experiment, 'session_output_path'), f"{rig_name} should have session_output_path set"
-                    
-                    # Check that stop was called during cleanup
-                    mock_stop.assert_called()
-                    
-                    print(f"🎯 Same Bonsai workflow successfully executed with {rig_name} launcher")
-                    
-                else:
-                    pytest.fail(f"{rig_name} experiment failed - check logs for details")
-                    
-            except Exception as e:
-                pytest.fail(f"{rig_name} experiment failed with exception: {e}")
+            # Run the experiment with minimalist parameters
+            success = experiment.run(minimalist_params_path)
             
-            finally:
-                # Ensure cleanup
-                try:
-                    experiment.stop()
-                except:
-                    pass  # Ignore cleanup errors in tests
+            if success:
+                print(f"\n✅ {rig_name} EXPERIMENT COMPLETED SUCCESSFULLY")
+                
+                # Verify that the experiment was properly initialized
+                assert hasattr(experiment, 'mouse_id'), f"{rig_name} should have mouse_id set"
+                assert hasattr(experiment, 'session_output_path'), f"{rig_name} should have session_output_path set"
+                
+                # Check that stop was called during cleanup
+                mock_stop.assert_called()
+                
+                print(f"🎯 Same Bonsai workflow successfully executed with {rig_name} launcher")
+                
+            else:
+                pytest.fail(f"{rig_name} experiment failed - check logs for details")
+                
+
+            experiment.stop()
 
 
 def test_all_mindscope_launchers():
