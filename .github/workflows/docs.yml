@@ -53,10 +53,11 @@ jobs:
       id: pages
       uses: actions/configure-pages@v5
       
-    - name: Build documentation
+    - name: Build documentation with Sphinx
       run: |
         cd docs
-        make html
+        # Use sphinx-build directly with proper source and build directories
+        sphinx-build -b html source build/html
         
     - name: Upload artifact
       uses: actions/upload-pages-artifact@v3
