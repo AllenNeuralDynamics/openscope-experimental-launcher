@@ -85,6 +85,18 @@ class TestMindoscopeWithMinimalistParams:
         # Create experiment
         experiment = launcher_class()
         
+        # Mock parameter data that includes required Bonsai workflow path
+        mock_params = {
+            "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
+            "repository_commit_hash": "main",
+            "local_repository_path": "C:/BonsaiDataPredictiveProcessingTest",
+            "bonsai_path": "code/stimulus-control/src/Standard_oddball_slap2.bonsai",
+            "bonsai_exe_path": "code/stimulus-control/bonsai/Bonsai.exe",
+            "bonsai_setup_script": "code/stimulus-control/bonsai/setup.cmd",
+            "mouse_id": "test_mouse",
+            "user_id": "test_user"
+        }
+        
         # Comprehensive mocking for CI environments
         with patch('subprocess.Popen') as mock_popen, \
              patch('psutil.virtual_memory') as mock_vmem, \
@@ -95,13 +107,14 @@ class TestMindoscopeWithMinimalistParams:
              patch('os.makedirs'), \
              patch('hashlib.md5') as mock_md5, \
              patch('builtins.open', create=True) as mock_open, \
-             patch('json.load', return_value={}), \
+             patch('json.load', return_value=mock_params), \
              patch('json.dump'), \
              patch('pickle.dump'), \
              patch('shutil.copy2'), \
              patch('tempfile.mkdtemp', return_value='/tmp/test_session'), \
              patch.object(experiment, 'post_experiment_processing', return_value=True), \
-             patch.object(experiment, 'stop') as mock_stop:
+             patch.object(experiment, 'stop') as mock_stop, \
+             patch('builtins.input', side_effect=['test_subject', 'test_experimenter']):
             
             # Configure mocks for successful Bonsai execution
             mock_process = Mock()
@@ -117,26 +130,34 @@ class TestMindoscopeWithMinimalistParams:
             # Mock file operations
             mock_open.return_value.__enter__.return_value.read.return_value = b'mock_content'
             
-            # Run the experiment with minimalist parameters
-            success = experiment.run(minimalist_params_path)
+            try:
+                # Run the experiment with minimalist parameters
+                success = experiment.run(minimalist_params_path)
+                
+                if success:
+                    print(f"\n✅ {rig_name} EXPERIMENT COMPLETED SUCCESSFULLY")
+                    
+                    # Verify that the experiment was properly initialized
+                    assert hasattr(experiment, 'mouse_id'), f"{rig_name} should have mouse_id set"
+                    assert hasattr(experiment, 'session_output_path'), f"{rig_name} should have session_output_path set"
+                    
+                    # Check that stop was called during cleanup
+                    mock_stop.assert_called()
+                    
+                    print(f"🎯 Same Bonsai workflow successfully executed with {rig_name} launcher")
+                    
+                else:
+                    pytest.fail(f"{rig_name} experiment failed - check logs for details")
+                    
+            except Exception as e:
+                pytest.fail(f"{rig_name} experiment failed with exception: {e}")
             
-            if success:
-                print(f"\n✅ {rig_name} EXPERIMENT COMPLETED SUCCESSFULLY")
-                
-                # Verify that the experiment was properly initialized
-                assert hasattr(experiment, 'mouse_id'), f"{rig_name} should have mouse_id set"
-                assert hasattr(experiment, 'session_output_path'), f"{rig_name} should have session_output_path set"
-                
-                # Check that stop was called during cleanup
-                mock_stop.assert_called()
-                
-                print(f"🎯 Same Bonsai workflow successfully executed with {rig_name} launcher")
-                
-            else:
-                pytest.fail(f"{rig_name} experiment failed - check logs for details")
-                
-
-            experiment.stop()
+            finally:
+                # Ensure cleanup
+                try:
+                    experiment.stop()
+                except:
+                    pass  # Ignore cleanup errors in tests
 
 
 def test_all_mindscope_launchers():

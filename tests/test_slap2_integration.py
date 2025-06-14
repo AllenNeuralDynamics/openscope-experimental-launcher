@@ -52,6 +52,18 @@ class TestSLAP2WithMinimalistParams:
         # Create SLAP2 experiment
         experiment = SLAP2Experiment()
         
+        # Mock parameter data that includes required Bonsai workflow path
+        mock_params = {
+            "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
+            "repository_commit_hash": "main",
+            "local_repository_path": "C:/BonsaiDataPredictiveProcessingTest",
+            "bonsai_path": "code/stimulus-control/src/Standard_oddball_slap2.bonsai",
+            "bonsai_exe_path": "code/stimulus-control/bonsai/Bonsai.exe",
+            "bonsai_setup_script": "code/stimulus-control/bonsai/setup.cmd",
+            "mouse_id": "test_mouse",
+            "user_id": "test_user"
+        }
+        
         # Comprehensive mocking for CI environments
         with patch('subprocess.Popen') as mock_popen, \
              patch('psutil.virtual_memory') as mock_vmem, \
@@ -62,13 +74,14 @@ class TestSLAP2WithMinimalistParams:
              patch('os.makedirs'), \
              patch('hashlib.md5') as mock_md5, \
              patch('builtins.open', create=True) as mock_open, \
-             patch('json.load', return_value={}), \
+             patch('json.load', return_value=mock_params), \
              patch('json.dump'), \
              patch('pickle.dump'), \
              patch('shutil.copy2'), \
              patch('tempfile.mkdtemp', return_value='/tmp/test_session'), \
              patch.object(experiment, 'post_experiment_processing', return_value=True), \
-             patch.object(experiment, 'stop') as mock_stop:
+             patch.object(experiment, 'stop') as mock_stop, \
+             patch('builtins.input', side_effect=['test_subject', 'test_experimenter', 'test_rig']):
             
             # Configure mocks for successful Bonsai execution
             mock_process = Mock()
