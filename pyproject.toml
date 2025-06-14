@@ -31,7 +31,7 @@ dependencies = [
     'pandas',
     'aind-data-schema',
     'psutil',
-    'pywin32',
+    'pywin32; sys_platform == "win32"',  # Only install on Windows
     'PyYAML'
 ]
 
