@@ -57,13 +57,13 @@ class SLAP2SessionBuilder(BaseSessionBuilder):
             script=script_software,
             trials_total=params.get("num_trials", 100),
             trials_finished=params.get("num_trials", 100),  # Placeholder - would come from actual results
-            notes=params.get("stimulus_notes", "SLAP2 experiment with oddball stimulus paradigm")
-        )
+            notes=params.get("stimulus_notes", "SLAP2 experiment with oddball stimulus paradigm")        )
     
     def _create_data_streams(self, params: Dict[str, Any], **kwargs) -> List[Stream]:
         """Create data streams for SLAP2 experiment."""
         # For now, return empty list to avoid POPhys validation issues
-        # This can be extended later when data stream requirements are clarified        return []
+        # This can be extended later when data stream requirements are clarified
+        return []
     
     # Removed unnecessary _get_additional_script_parameters override - base class returns {} by default
     

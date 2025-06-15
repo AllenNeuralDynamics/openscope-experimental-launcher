@@ -98,9 +98,12 @@ class BaseSessionBuilder(ABC):
             stimulus_epoch = self._create_stimulus_epoch(
                 start_time, end_time, params, bonsai_software, script_software, **kwargs
             )
-            
-            # Create data streams (rig-specific)
+              # Create data streams (rig-specific)
             data_streams = self._create_data_streams(params, **kwargs)
+            
+            # Ensure data_streams is always a list (defensive programming)
+            if data_streams is None:
+                data_streams = []
             
             # Create the session
             session = Session(
