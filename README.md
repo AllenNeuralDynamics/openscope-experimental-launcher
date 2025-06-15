@@ -95,6 +95,35 @@ python -m openscope_experimental_launcher.base.experiment --params parameters.js
 
 ## Features
 
+### Session Builder Architecture (New!)
+
+The package now includes a modular session builder architecture that allows reuse across different rigs:
+
+- **BaseSessionBuilder**: Core session building functionality that can be extended
+- **Rig-specific implementations**: Custom session builders for each rig type (e.g., SLAP2)
+- **Backward compatibility**: Existing code continues to work unchanged
+- **Easy extensibility**: Simple to add support for new rig types
+
+#### Creating a New Rig Session Builder
+
+```python
+from openscope_experimental_launcher.base.session_builder import BaseSessionBuilder
+
+class MyRigSessionBuilder(BaseSessionBuilder):
+    def __init__(self):
+        super().__init__("MyRig")
+    
+    def _create_stimulus_epoch(self, start_time, end_time, params, bonsai_software, script_software, **kwargs):
+        # Implement rig-specific stimulus epoch creation
+        pass
+    
+    def _create_data_streams(self, params, **kwargs):
+        # Implement rig-specific data stream creation
+        pass
+```
+
+See `docs/session_builder_refactoring.md` for detailed documentation and `examples/neuropixels_session_builder.py` for a complete example.
+
 ### Process Management
 - Uses Windows job objects for robust process control
 - Automatic memory monitoring and cleanup

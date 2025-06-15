@@ -11,11 +11,3 @@ __version__ = "0.1.0"
 from .base.experiment import BaseExperiment
 from .base.bonsai_interface import BonsaiInterface
 from .slap2.launcher import SLAP2Experiment
-
-# Version info
-__all__ = [
-    "BaseExperiment",
-    "BonsaiInterface", 
-    "SLAP2Experiment",
-    "__version__"
-]

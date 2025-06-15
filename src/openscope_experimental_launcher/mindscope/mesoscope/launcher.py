@@ -32,6 +32,10 @@ class MesoscopeExperiment(BaseExperiment):
         self.imaging_planes = []
         logging.info("Mesoscope experiment initialized")
     
+    def _get_experiment_type_name(self) -> str:
+        """Get the experiment type name for Mesoscope."""
+        return "Mesoscope"
+    
     def load_parameters(self, param_file: Optional[str]):
         """
         Load parameters and extract mesoscope-specific configuration.

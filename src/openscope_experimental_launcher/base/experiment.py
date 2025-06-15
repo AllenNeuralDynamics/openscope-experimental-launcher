@@ -499,6 +499,15 @@ class BaseExperiment:
         logging.info("No post-experiment processing defined for this rig type")
         return True
     
+    def _get_experiment_type_name(self) -> str:
+        """
+        Get the name of the experiment type for logging and error messages.
+        
+        Returns:
+            String name of the experiment type (default: "Bonsai")
+        """
+        return "Bonsai"
+    
     def run(self, param_file: Optional[str] = None) -> bool:
         """
         Run the experiment with the given parameters.
@@ -522,20 +531,18 @@ class BaseExperiment:
             
             # Start Bonsai
             self.start_bonsai()
-            
-            # Check for errors
+              # Check for errors
             if self.bonsai_process.returncode != 0:
-                logging.error("Bonsai experiment failed")
+                logging.error(f"{self._get_experiment_type_name()} experiment failed")
                 return False
             
-            # Perform rig-specific post-processing
-            if not self.post_experiment_processing():
+            # Perform rig-specific post-processing            if not self.post_experiment_processing():
                 logging.warning("Post-experiment processing failed, but experiment data was collected")
             
             return True
             
         except Exception as e:
-            logging.exception(f"Experiment failed: {e}")
+            logging.exception(f"{self._get_experiment_type_name()} experiment failed: {e}")
             return False
         finally:
             self.stop()

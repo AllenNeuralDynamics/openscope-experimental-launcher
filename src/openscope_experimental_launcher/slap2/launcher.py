@@ -284,6 +284,10 @@ class SLAP2Experiment(BaseExperiment):
             logging.error(f"Failed to create session.json: {e}")
             return False
     
+    def _get_experiment_type_name(self) -> str:
+        """Get the experiment type name for SLAP2."""
+        return "SLAP2"
+    
     def post_experiment_processing(self) -> bool:
         """
         Perform post-experiment processing specific to SLAP2:
@@ -313,45 +317,8 @@ class SLAP2Experiment(BaseExperiment):
             logging.error("SLAP2 post-experiment processing completed with errors")
         
         return success
-    
-    def run(self, param_file: Optional[str] = None) -> bool:
-        """
-        Run the SLAP2 experiment with the given parameters.
-        
-        Args:
-            param_file: Path to the JSON parameter file
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            # Load parameters
-            self.load_parameters(param_file)
-            
-            # Set up repository
-            if not self.git_manager.setup_repository(self.params):
-                logging.error("Repository setup failed")
-                return False
-            
-            # Start Bonsai
-            self.start_bonsai()
-            
-            # Check for errors
-            if self.bonsai_process.returncode != 0:
-                logging.error("SLAP2 Bonsai experiment failed")
-                return False
-            
-            # SLAP2-specific post-processing
-            if not self.post_experiment_processing():
-                logging.warning("Post-experiment processing failed, but experiment data was collected")
-            
-            return True
-            
-        except Exception as e:
-            logging.exception(f"SLAP2 experiment failed: {e}")
-            return False
-        finally:
-            self.stop()
+      # Remove the unnecessary run method override - the base class handles this correctly
+    # The base class already calls post_experiment_processing() which we've properly overridden
 
 
 def main():
