@@ -119,43 +119,40 @@ class TestBaseExperimentComprehensive:
             assert experiment.mouse_id == 'config_mouse'
             assert experiment.user_id == 'config_user'
 
-    def test_setup_output_path_specific_path(self):
-        """Test output path setup with specific path provided."""
+    def test_generate_output_directory_with_datetime(self):
+        """Test output directory generation with specific datetime."""
         experiment = BaseExperiment()
         
-        with tempfile.TemporaryDirectory() as temp_dir:
-            output_path = os.path.join(temp_dir, "specific_output.pkl")
-            
-            result = experiment.setup_output_path(output_path)
-            
-            assert result == output_path
-            assert experiment.session_output_path == output_path
+        root_folder = "C:/data"
+        subject_id = "test_mouse"
+        test_datetime = datetime.datetime(2023, 6, 15, 14, 30, 0)
+        
+        result = experiment.generate_output_directory(root_folder, subject_id, test_datetime)
+        
+        assert result.startswith(root_folder)
+        assert "test_mouse" in result
+        assert "2023-06-15" in result
 
-    @patch('os.makedirs')
-    def test_setup_output_path_create_directory(self, mock_makedirs):
-        """Test output path setup that creates new directory."""
+    def test_prepare_bonsai_parameters_migration(self):
+        """Test that RootFolder is properly migrated to OutputFolder."""
         experiment = BaseExperiment()
         experiment.mouse_id = "test_mouse"
+        experiment.params = {
+            "bonsai_parameters": {
+                "RootFolder": "C:/data",
+                "Subject": "test_mouse",
+                "OtherParam": "value"
+            }
+        }
         
-        with patch('os.path.isdir', return_value=False):
-            output_path = "/new/dir/output.pkl"
-            result = experiment.setup_output_path(output_path)
-            
-            mock_makedirs.assert_called_once()
-            assert result == output_path
-
-    def test_setup_output_path_auto_generate(self):
-        """Test automatic output path generation."""
-        experiment = BaseExperiment()
-        experiment.mouse_id = "test_mouse"
-        experiment.params = {"output_directory": "test_data"}
+        result = experiment._prepare_bonsai_parameters()
         
-        with patch('os.path.isdir', return_value=True):
-            result = experiment.setup_output_path()
-            
-            assert "test_mouse" in result
-            assert result.endswith(".pkl")
-            assert "test_data" in result
+        # Check that RootFolder was converted to OutputFolder
+        assert "OutputFolder" in result["bonsai_parameters"]
+        assert "RootFolder" not in result["bonsai_parameters"]
+        # Check that other parameters are preserved
+        assert result["bonsai_parameters"]["Subject"] == "test_mouse"
+        assert result["bonsai_parameters"]["OtherParam"] == "value"
 
     def test_create_bonsai_arguments_with_parameters(self):
         """Test Bonsai argument creation with custom parameters."""

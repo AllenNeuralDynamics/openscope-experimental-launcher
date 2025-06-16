@@ -8,25 +8,12 @@ session.json creation using aind-data-schema.
 
 import os
 import logging
-import datetime
-import pandas as pd
 from typing import Dict, List, Optional, Any
-from decimal import Decimal
+import sys
 
 # Import aind-data-schema components
 try:
-    from aind_data_schema.core.session import (
-        Session, 
-        Stream, 
-        StimulusEpoch, 
-        StimulusModality,
-        SlapFieldOfView,
-        SlapSessionType,
-        LaserConfig,
-        DetectorConfig
-    )
-    from aind_data_schema.components.devices import Software
-    from aind_data_schema_models.modalities import Modality
+    from aind_data_schema.core.session import Session
     AIND_SCHEMA_AVAILABLE = True
 except ImportError:
     AIND_SCHEMA_AVAILABLE = False
@@ -236,8 +223,9 @@ class SLAP2Experiment(BaseExperiment):
 
 def main():
     """Main function to run the SLAP2 Bonsai experiment."""
-    import sys
-    
+    logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s' )
     # Check if aind-data-schema is available
     if not AIND_SCHEMA_AVAILABLE:
         print("Warning: aind-data-schema is not installed. Session.json creation will be disabled.")

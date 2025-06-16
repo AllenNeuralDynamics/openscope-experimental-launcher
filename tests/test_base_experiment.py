@@ -54,27 +54,35 @@ class TestBaseExperiment:
         assert 'experimenter_name' in experiment.params
         assert experiment.params_checksum is None
 
-    def test_setup_output_path_with_path(self, temp_dir):
-        """Test output path setup with specific path."""
-        experiment = BaseExperiment()
-        output_path = os.path.join(temp_dir, "test_output.pkl")
-        
-        result = experiment.setup_output_path(output_path)
-        
-        assert result == output_path
-        assert experiment.session_output_path == output_path
-
-    def test_setup_output_path_auto_generate(self, temp_dir):
-        """Test automatic output path generation."""
+    def test_generate_output_directory(self):
+        """Test output directory generation using AIND data schema."""
         experiment = BaseExperiment()
         experiment.mouse_id = "test_mouse"
-        experiment.params = {"output_directory": temp_dir}
         
-        result = experiment.setup_output_path()
+        root_folder = "C:/data"
+        result = experiment.generate_output_directory(root_folder, "test_mouse")
         
-        assert result.startswith(temp_dir)
+        # Should contain the root folder and follow AIND naming pattern
+        assert result.startswith(root_folder)
         assert "test_mouse" in result
-        assert result.endswith(".pkl")
+        
+    def test_prepare_bonsai_parameters_output_folder(self):
+        """Test that _prepare_bonsai_parameters generates OutputFolder correctly."""
+        experiment = BaseExperiment()
+        experiment.mouse_id = "test_mouse"
+        experiment.params = {
+            "bonsai_parameters": {
+                "RootFolder": "C:/data",
+                "Subject": "test_mouse"
+            }
+        }
+        
+        result = experiment._prepare_bonsai_parameters()
+        
+        # Should have OutputFolder instead of RootFolder
+        assert "OutputFolder" in result["bonsai_parameters"]
+        assert "RootFolder" not in result["bonsai_parameters"]
+        assert result["bonsai_parameters"]["Subject"] == "test_mouse"
 
     def test_create_bonsai_arguments(self):
         """Test Bonsai argument creation through BonsaiInterface."""

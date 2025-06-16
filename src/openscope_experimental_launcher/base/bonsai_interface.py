@@ -339,7 +339,8 @@ class BonsaiInterface:
         
         # Set output directory if specified
         if output_path:
-            cmd_args.extend(["--output", output_path])
+            cmd_args.extend(["--OutputPath", output_path])
+            logging.info(f"Output will be saved to: {output_path}")
         
         logging.info(f"Starting Bonsai workflow: {' '.join(cmd_args)}")
         
@@ -386,8 +387,7 @@ class BonsaiInterface:
             else:
                 logging.error("Bonsai not found and no setup script provided")
                 return False
-        
-        # Verify packages if config file is provided
+          # Verify packages if config file is provided
         config_path = params.get('bonsai_config_path')
         if config_path and os.path.exists(config_path):
             logging.info("Verifying Bonsai packages...")
@@ -395,7 +395,7 @@ class BonsaiInterface:
                 logging.warning("Package verification failed, but continuing...")
         
         return True
-    
+
     def create_bonsai_property_arguments(self, params: Dict[str, Any]) -> List[str]:
         """
         Create command-line property arguments for Bonsai.
@@ -410,7 +410,7 @@ class BonsaiInterface:
             List of --property arguments for Bonsai
         """
         bonsai_args = []
-          # Only add parameters from bonsai_parameters section - no automatic defaults
+        # Only add parameters from bonsai_parameters section - no automatic defaults
         bonsai_parameters = params.get("bonsai_parameters", {})
             
         if bonsai_parameters:

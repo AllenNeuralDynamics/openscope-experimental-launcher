@@ -246,13 +246,11 @@ monitor_brightness = 50
         # Create minimal workflow file
         workflow_file = os.path.join(temp_dir, "test.bonsai")
         with open(workflow_file, 'w') as f:
-            f.write("<WorkflowBuilder>Minimal Test</WorkflowBuilder>")
-        
+            f.write("<WorkflowBuilder>Minimal Test</WorkflowBuilder>")        
         # Load parameters (without running Bonsai)
         experiment.load_parameters(param_file)
         
-        # Set up output path
-        experiment.setup_output_path()
+        # Note: Output path setup is now handled automatically in _prepare_bonsai_parameters
         
         # Test stimulus table generation
         result = experiment.create_stimulus_table()

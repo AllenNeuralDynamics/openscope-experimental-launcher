@@ -25,6 +25,14 @@ import yaml
 from typing import Dict, List, Optional, Any
 from decimal import Decimal
 
+# Import AIND data schema utilities for standardized folder naming
+try:
+    from aind_data_schema_models.data_name_patterns import build_data_name
+    AIND_DATA_SCHEMA_AVAILABLE = True
+except ImportError:
+    AIND_DATA_SCHEMA_AVAILABLE = False
+    logging.warning("aind-data-schema-models not available. Using fallback folder naming.")
+
 # Import Windows-specific modules for process management
 try:
     import win32job
@@ -202,49 +210,14 @@ class BaseExperiment:
             self.params["user_id"] = self.user_id
         
         logging.info(f"Using mouse_id: {self.mouse_id}, user_id: {self.user_id}")
-    
-    def setup_output_path(self, output_path: Optional[str] = None) -> str:
-        """
-        Set up the output path for experiment data.
-        
-        Args:
-            output_path: Specific output path to use
-            
-        Returns:
-            The output file path
-        """
-        if output_path:
-            output_folder = os.path.dirname(output_path)
-            if not os.path.isdir(output_folder):
-                os.makedirs(output_folder)
-            self.session_output_path = output_path
-        else:
-            # Generate output path based on datetime, mouse ID, and session UUID
-            dt_str = datetime.datetime.now().strftime('%y%m%d%H%M%S')
-            mouse_id = self.mouse_id if self.mouse_id else "unknown_mouse"
-            filename = f"{dt_str}_{mouse_id}_{self.session_uuid}.pkl"
-            
-            # Default output directory
-            output_dir = self.params.get("output_directory", "data")
-            if not os.path.isdir(output_dir):
-                os.makedirs(output_dir)
-                
-            self.session_output_path = os.path.join(output_dir, filename)
-        
-        logging.info(f"Session output path: {self.session_output_path}")
-        self.params["output_path"] = self.session_output_path
-        
-        return self.session_output_path
+  
 
     def start_bonsai(self):
         """Start the Bonsai workflow using BonsaiInterface."""
         logging.info(f"Mouse ID: {self.mouse_id}, User ID: {self.user_id}, Session UUID: {self.session_uuid}")
-        
-        # Store current memory usage
+          # Store current memory usage
         vmem = psutil.virtual_memory()
         self._percent_used = vmem.percent
-          # Ensure output path is set up
-        self.setup_output_path(self.params.get("output_path", None))
         
         try:
             # Resolve all Bonsai paths relative to repository
@@ -257,12 +230,14 @@ class BaseExperiment:
             # Setup Bonsai environment (including installation if needed)
             if not self.bonsai_interface.setup_bonsai_environment(bonsai_params):
                 raise RuntimeError("Failed to setup Bonsai environment")
-            
-            # Get workflow path
+              # Get workflow path
             workflow_path = self._get_workflow_path()
             
+            # Handle output directory generation (migrate from Bonsai GenerateRootLoggingPath)
+            params_for_bonsai = self._prepare_bonsai_parameters()
+            
             # Construct arguments using BonsaiInterface
-            workflow_args = self.bonsai_interface.construct_workflow_arguments(self.params)
+            workflow_args = self.bonsai_interface.construct_workflow_arguments(params_for_bonsai)
             
             # Start workflow using BonsaiInterface
             self.bonsai_process = self.bonsai_interface.start_workflow(
@@ -522,15 +497,16 @@ class BaseExperiment:
             if not self.git_manager.setup_repository(self.params):
                 logging.error("Repository setup failed")
                 return False
-            
-            # Start Bonsai
+              # Start Bonsai
             self.start_bonsai()
-              # Check for errors
+            
+            # Check for errors
             if self.bonsai_process.returncode != 0:
                 logging.error(f"{self._get_experiment_type_name()} experiment failed")
                 return False
             
-            # Perform rig-specific post-processing            if not self.post_experiment_processing():
+            # Perform rig-specific post-processing
+            if not self.post_experiment_processing():
                 logging.warning("Post-experiment processing failed, but experiment data was collected")
             
             return True
@@ -540,3 +516,83 @@ class BaseExperiment:
             return False
         finally:
             self.stop()
+    
+    def generate_output_directory(self, root_folder: str, subject_id: str, date_time_offset: Optional[datetime.datetime] = None) -> str:
+        """
+        Generate output directory path using AIND data schema standards.
+        
+        This replaces the functionality previously handled by the GenerateRootLoggingPath 
+        Bonsai workflow, moving the logic into Python for better maintainability.
+        Uses the aind-data-schema-models build_data_name function when available for
+        standardized folder naming that follows AIND conventions.
+        
+        Args:
+            root_folder: Base directory for output
+            subject_id: Subject identifier
+            date_time_offset: Optional datetime override (defaults to current time)
+            
+        Returns:
+            Full path to the generated output directory        """
+        if date_time_offset is None:
+            date_time_offset = datetime.datetime.now()
+        
+        if AIND_DATA_SCHEMA_AVAILABLE:
+            try:
+                # Use AIND standard naming: {subject_id}_{datetime}
+                # The build_data_name function handles the formatting according to AIND standards
+                folder_name = build_data_name(
+                    label=subject_id,
+                    creation_datetime=date_time_offset
+                )
+                logging.info(f"Generated AIND-compliant folder name: {folder_name}")
+            except Exception as e:
+                logging.warning(f"Failed to use AIND data schema naming, falling back to default: {e}")
+                # Fallback to default naming
+                folder_name = f"{subject_id}_{date_time_offset.strftime('%Y-%m-%d_%H-%M-%S')}"
+        else:
+            # Fallback naming when AIND data schema is not available
+            folder_name = f"{subject_id}_{date_time_offset.strftime('%Y-%m-%d_%H-%M-%S')}"
+            logging.info(f"Using fallback folder name: {folder_name}")
+        
+        # Create full output directory path
+        output_dir = os.path.join(root_folder, folder_name)
+        
+        # Create the directory if it doesn't exist
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            logging.info(f"Created output directory: {output_dir}")
+        else:
+            logging.info(f"Output directory already exists: {output_dir}")
+            
+        return output_dir
+    
+    def _prepare_bonsai_parameters(self) -> Dict[str, Any]:
+        """
+        Prepare parameters for Bonsai, handling output directory generation.
+        
+        This method migrates the output directory generation from Bonsai's 
+        GenerateRootLoggingPath to Python, replacing RootFolder with OutputFolder.
+        
+        Returns:
+            Modified parameters dictionary with OutputFolder instead of RootFolder
+        """
+        params_copy = self.params.copy()
+        bonsai_parameters = params_copy.get("bonsai_parameters", {}).copy()
+        
+        # Check if RootFolder is specified (old format)
+        if "RootFolder" in bonsai_parameters:
+            root_folder = bonsai_parameters["RootFolder"]
+            subject_id = bonsai_parameters.get("Subject", "unknown_subject")
+            
+            # Generate output directory using Python (replaces GenerateRootLoggingPath)
+            output_folder = self.generate_output_directory(root_folder, subject_id)
+            
+            # Replace RootFolder with OutputFolder
+            del bonsai_parameters["RootFolder"]
+            bonsai_parameters["OutputFolder"] = output_folder
+            
+            logging.info(f"Migrated RootFolder to OutputFolder: {output_folder}")
+        
+        # Update the parameters
+        params_copy["bonsai_parameters"] = bonsai_parameters
+        return params_copy
