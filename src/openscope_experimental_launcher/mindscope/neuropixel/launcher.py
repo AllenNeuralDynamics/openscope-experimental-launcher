@@ -64,34 +64,6 @@ class NeuropixelExperiment(BaseExperiment):
         if sampling_rate:
             logging.info(f"Neuropixel sampling rate: {sampling_rate} Hz")
     
-    def create_bonsai_arguments(self) -> List[str]:
-        """
-        Create command-line arguments for Bonsai with neuropixel-specific parameters.
-        
-        Returns:
-            List of --property arguments for Bonsai
-        """
-        bonsai_args = super().create_bonsai_arguments()
-        
-        # Pass neuropixel-specific parameters
-        if self.params.get("sampling_rate_hz"):
-            bonsai_args.extend(["--property", f"SamplingRate={self.params.get('sampling_rate_hz')}"])
-        
-        if self.params.get("gain_setting"):
-            bonsai_args.extend(["--property", f"GainSetting={self.params.get('gain_setting')}"])
-        
-        if self.params.get("reference_channel"):
-            bonsai_args.extend(["--property", f"ReferenceChannel={self.params.get('reference_channel')}"])
-        
-        # Pass probe configuration
-        if self.probes:
-            bonsai_args.extend(["--property", f"NumProbes={len(self.probes)}"])
-            for i, probe in enumerate(self.probes):
-                probe_serial = probe.get("serial_number", f"probe_{i}")
-                bonsai_args.extend(["--property", f"Probe{i}Serial={probe_serial}"])
-        
-        logging.info(f"Created {len(bonsai_args) // 2} Neuropixel Bonsai arguments")
-        return bonsai_args
     
     def post_experiment_processing(self) -> bool:
         """

@@ -41,8 +41,7 @@ class TestSLAP2SessionBuilderRefactored:
                 session_uuid="test-uuid-123",
                 slap_fovs=[]  # SLAP2-specific parameter
             )
-            
-            # Verify Session was called
+              # Verify Session was called
             mock_session.assert_called_once()
             call_args = mock_session.call_args[1]  # keyword arguments
             
@@ -51,7 +50,7 @@ class TestSLAP2SessionBuilderRefactored:
             assert call_args['rig_id'] == "slap2_rig"
             assert result == mock_session_instance
     
-    def test_rig_specific_methods(self):
+    def test_slap2_specific_methods(self):
         """Test SLAP2-specific helper methods."""
         builder = SLAP2SessionBuilder()
         params = {
@@ -62,26 +61,21 @@ class TestSLAP2SessionBuilderRefactored:
             "exposure_time": 2.0
         }
         
-        # Test light source creation
-        light_sources = builder._create_light_sources(params)
-        assert len(light_sources) == 1
-        # Note: In real test, you'd check the laser_config properties,
-        # but we're avoiding deep mocking of aind-data-schema objects
-        
-        # Test detector creation
-        detectors = builder._create_detectors(params)
-        assert len(detectors) == 1
+        # Test data stream creation (this is simpler and doesn't require complex mocking)
+        data_streams = builder._create_data_streams(params)
+        assert isinstance(data_streams, list)
+          # Verify the builder was initialized correctly
+        assert builder.rig_name == "SLAP2"
     
-    def test_empty_light_sources_and_detectors(self):
+    def test_empty_parameter_handling(self):
         """Test that empty configurations are handled correctly."""
         builder = SLAP2SessionBuilder()
         params = {}
         
-        light_sources = builder._create_light_sources(params)
-        assert len(light_sources) == 0
-        
-        detectors = builder._create_detectors(params)
-        assert len(detectors) == 0
+        # Test data streams with empty params
+        data_streams = builder._create_data_streams(params)
+        assert isinstance(data_streams, list)
+        assert len(data_streams) == 0
     
     def test_data_streams_creation(self):
         """Test that _create_data_streams returns an empty list."""

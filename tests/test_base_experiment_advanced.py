@@ -168,7 +168,7 @@ class TestBaseExperimentComprehensive:
             }
         }
         
-        args = experiment.create_bonsai_arguments()
+        args = experiment.bonsai_interface.create_bonsai_property_arguments(experiment.params)
         
         expected_args = [
             "--property", "StimType=gratings",
@@ -182,49 +182,45 @@ class TestBaseExperimentComprehensive:
         experiment = BaseExperiment()
         experiment.params = {}
         
-        args = experiment.create_bonsai_arguments()
+        args = experiment.bonsai_interface.create_bonsai_property_arguments(experiment.params)
         
         assert args == []
 
-    def test_get_bonsai_args_missing_path(self):
-        """Test Bonsai argument construction with missing workflow path."""
+    def test_get_workflow_path_missing_path(self):
+        """Test workflow path resolution with missing workflow path."""
         experiment = BaseExperiment()
         experiment.params = {}
         
         with pytest.raises(ValueError, match="No Bonsai workflow path specified"):
-            experiment._get_bonsai_args()
+            experiment._get_workflow_path()
 
-    def test_get_bonsai_args_missing_workflow_file(self):
-        """Test Bonsai argument construction with missing workflow file."""
+    def test_get_workflow_path_missing_workflow_file(self):
+        """Test workflow path resolution with missing workflow file."""
         experiment = BaseExperiment()
         experiment.params = {'bonsai_path': '/nonexistent/workflow.bonsai'}
         
         with patch('os.path.exists', return_value=False), \
              patch.object(experiment.git_manager, 'get_repository_path', return_value=None):
-            
-            with pytest.raises(ValueError, match="Bonsai workflow not found"):
-                experiment._get_bonsai_args()
+              with pytest.raises(FileNotFoundError, match="Workflow file not found"):
+                experiment._get_workflow_path()
 
     @patch('builtins.open', new_callable=mock_open, read_data=b'workflow content')
-    def test_get_bonsai_args_relative_paths(self, mock_file):
-        """Test Bonsai argument construction with relative paths."""
+    def test_get_workflow_path_relative_paths(self, mock_file):
+        """Test workflow path resolution with relative paths."""
         experiment = BaseExperiment()
         experiment.params = {
-            'bonsai_path': 'workflow.bonsai',
-            'bonsai_exe_path': 'Bonsai.exe'
+            'bonsai_path': 'workflow.bonsai'
         }
         
         with patch('os.path.exists', return_value=True), \
              patch('os.path.isabs', return_value=False), \
              patch.object(experiment.git_manager, 'get_repository_path', return_value='/repo'):
             
-            args = experiment._get_bonsai_args()
+            workflow_path = experiment._get_workflow_path()
             
             # Use os.path.join for cross-platform compatibility
-            expected_exe = os.path.join('/repo', 'Bonsai.exe')
             expected_workflow = os.path.join('/repo', 'workflow.bonsai')
-            assert expected_exe in args
-            assert expected_workflow in args
+            assert workflow_path == expected_workflow
 
     def test_get_bonsai_errors_no_errors(self):
         """Test getting Bonsai errors when none exist."""

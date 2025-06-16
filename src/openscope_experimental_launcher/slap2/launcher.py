@@ -107,101 +107,14 @@ class SLAP2Experiment(BaseExperiment):
         
         Args:
             param_file: Path to the JSON parameter file
-        """
-        # Call parent method to load base parameters (which includes runtime collection)
+        """        # Call parent method to load base parameters (which includes runtime collection)
         super().load_parameters(param_file)
         
         # Extract SLAP2-specific parameters from loaded params (runtime info is already merged)
         self.session_type = self.params.get("session_type", "SLAP2")
         self.rig_id = self.params.get("rig_id", "slap2_rig")
         self.experimenter_name = self.params.get("experimenter_name", "Unknown")
-        
-        # Extract SLAP FOV parameters if provided
-        slap_fov_params = self.params.get("slap_fovs", [])
-        if slap_fov_params:
-            self._parse_slap_fovs(slap_fov_params)
-        
         logging.info("SLAP2 parameters loaded successfully")
-    
-    def _parse_slap_fovs(self, slap_fov_params: List[Dict[str, Any]]):
-        """
-        Parse SLAP field of view parameters and create SlapFieldOfView objects.
-        
-        Args:
-            slap_fov_params: List of SLAP FOV parameter dictionaries
-        """
-        if not AIND_SCHEMA_AVAILABLE:
-            logging.warning("aind-data-schema not available, skipping SLAP FOV parsing")
-            return
-        
-        try:
-            for i, fov_params in enumerate(slap_fov_params):
-                slap_fov = SlapFieldOfView(
-                    index=fov_params.get("index", i),
-                    imaging_depth=fov_params.get("imaging_depth", 100),
-                    targeted_structure=fov_params.get("targeted_structure", "Unknown"),
-                    fov_coordinate_ml=Decimal(str(fov_params.get("fov_coordinate_ml", 0.0))),
-                    fov_coordinate_ap=Decimal(str(fov_params.get("fov_coordinate_ap", 0.0))),
-                    fov_reference=fov_params.get("fov_reference", "Bregma"),
-                    fov_width=fov_params.get("fov_width", 512),
-                    fov_height=fov_params.get("fov_height", 512),
-                    magnification=fov_params.get("magnification", "40x"),
-                    fov_scale_factor=Decimal(str(fov_params.get("fov_scale_factor", 1.0))),
-                    frame_rate=Decimal(str(fov_params.get("frame_rate", 30.0))),
-                    session_type=SlapSessionType(fov_params.get("session_type", "Parent")),
-                    dmd_dilation_x=fov_params.get("dmd_dilation_x", 1),
-                    dmd_dilation_y=fov_params.get("dmd_dilation_y", 1),
-                    target_neuron=fov_params.get("target_neuron"),
-                    target_branch=fov_params.get("target_branch"),
-                    path_to_array_of_frame_rates=fov_params.get("path_to_array_of_frame_rates", "")
-                )
-                self.slap_fovs.append(slap_fov)
-            
-            logging.info(f"Parsed {len(self.slap_fovs)} SLAP FOVs")
-            
-        except Exception as e:
-            logging.error(f"Error parsing SLAP FOV parameters: {e}")
-    
-    def create_bonsai_arguments(self) -> List[str]:
-        """
-        Create command-line arguments for Bonsai based on loaded parameters and config.
-        Extended for SLAP2-specific parameters.
-        
-        Override the base method to avoid passing properties that might not exist
-        in the workflow, similar to how the minimalist launcher works.
-        
-        Returns:
-            List of --property arguments for Bonsai
-        """
-        bonsai_args = []
-        
-        # Only add SLAP2-specific parameters if they exist
-        if self.params.get("num_trials"):
-            bonsai_args.extend(["--property", f"NumTrials={self.params.get('num_trials')}"])
-        
-        if self.params.get("laser_power"):
-            bonsai_args.extend(["--property", f"LaserPower={self.params.get('laser_power'):.2f}"])
-        
-        if self.params.get("frame_rate"):
-            bonsai_args.extend(["--property", f"FrameRate={self.params.get('frame_rate'):.2f}"])
-        
-        if self.params.get("session_type"):
-            bonsai_args.extend(["--property", f"SessionType={self.params.get('session_type')}"])
-        
-        # Add any custom bonsai_parameters from the parameters file
-        bonsai_parameters = self.params.get("bonsai_parameters", {})
-        if bonsai_parameters:
-            logging.info(f"Adding {len(bonsai_parameters)} custom Bonsai parameters")
-            for param_name, param_value in bonsai_parameters.items():
-                param_str = str(param_value)
-                bonsai_args.extend(["--property", f"{param_name}={param_str}"])
-                logging.info(f"Added Bonsai parameter: {param_name}={param_str}")
-        
-        if not bonsai_args:
-            logging.info("No SLAP2-specific Bonsai parameters to pass - running workflow with defaults")
-        
-        logging.info(f"Created {len(bonsai_args) // 2} SLAP2 Bonsai arguments")
-        return bonsai_args
     
     def create_stimulus_table(self) -> bool:
         """

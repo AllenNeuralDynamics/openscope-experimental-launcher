@@ -38,32 +38,6 @@ class TestExperiment(BaseExperiment):
         self.rig_type = "test"
         logging.info("Test experiment initialized")
     
-    def create_bonsai_arguments(self) -> List[str]:
-        """
-        Create minimal command-line arguments for Bonsai.
-        
-        Override the base method to avoid passing properties that might
-        not exist in the test workflow.
-        
-        Returns:
-            List of --property arguments for Bonsai
-        """
-        bonsai_args = []
-        
-        # Only add parameters that are explicitly defined in bonsai_parameters
-        bonsai_parameters = self.params.get("bonsai_parameters", {})
-        if bonsai_parameters:
-            logging.info(f"Adding {len(bonsai_parameters)} custom Bonsai parameters")
-            for param_name, param_value in bonsai_parameters.items():
-                param_str = str(param_value)
-                bonsai_args.extend(["--property", f"{param_name}={param_str}"])
-                logging.info(f"Added Bonsai parameter: {param_name}={param_str}")
-        else:
-            logging.info("No custom Bonsai parameters specified - running workflow with defaults")
-        
-        logging.info(f"Created {len(bonsai_args) // 2} Bonsai arguments")
-        return bonsai_args
-    
     def post_experiment_processing(self) -> bool:
         """
         No post-experiment processing for the test launcher.

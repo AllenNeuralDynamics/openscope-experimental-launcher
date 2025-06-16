@@ -38,6 +38,7 @@ except ImportError:
 from ..utils.config_loader import ConfigLoader
 from ..utils.git_manager import GitManager
 from ..utils.process_monitor import ProcessMonitor
+from .bonsai_interface import BonsaiInterface
 
 
 class BaseExperiment:
@@ -81,6 +82,7 @@ class BaseExperiment:
         self.config_loader = ConfigLoader()
         self.git_manager = GitManager()
         self.process_monitor = ProcessMonitor()
+        self.bonsai_interface = BonsaiInterface()
         
         # Windows job object for process management
         self.hJob = None
@@ -190,8 +192,7 @@ class BaseExperiment:
         
         # Load hardware configuration
         self.config = self.config_loader.load_config(self.params)
-        
-        # Update mouse_id and user_id from config if still not set
+          # Update mouse_id and user_id from config if still not set
         if not self.mouse_id:
             self.mouse_id = self.config.get("Behavior", {}).get("mouse_id", "test_mouse")
             self.params["mouse_id"] = self.mouse_id
@@ -234,58 +235,40 @@ class BaseExperiment:
         self.params["output_path"] = self.session_output_path
         
         return self.session_output_path
-    
-    def create_bonsai_arguments(self) -> List[str]:
-        """
-        Create command-line arguments for Bonsai.
-        
-        Only passes properties that are explicitly requested in bonsai_parameters
-        to avoid conflicts with workflows that don't have these properties defined.
-        
-        Returns:
-            List of --property arguments for Bonsai
-        """
-        bonsai_args = []
-        
-        # Only add parameters from bonsai_parameters section - no automatic defaults
-        bonsai_parameters = self.params.get("bonsai_parameters", {})
-        if bonsai_parameters:
-            logging.info(f"Adding {len(bonsai_parameters)} custom Bonsai parameters")
-            for param_name, param_value in bonsai_parameters.items():
-                # Convert parameter value to string for Bonsai
-                param_str = str(param_value)
-                bonsai_args.extend(["--property", f"{param_name}={param_str}"])
-                logging.info(f"Added Bonsai parameter: {param_name}={param_str}")
-        else:
-            logging.info("No custom Bonsai parameters specified - running workflow with defaults")
-        
-        logging.info(f"Created {len(bonsai_args) // 2} Bonsai arguments")
-        return bonsai_args
-    
+
     def start_bonsai(self):
-        """Start the Bonsai workflow as a subprocess."""
+        """Start the Bonsai workflow using BonsaiInterface."""
         logging.info(f"Mouse ID: {self.mouse_id}, User ID: {self.user_id}, Session UUID: {self.session_uuid}")
         
         # Store current memory usage
         vmem = psutil.virtual_memory()
         self._percent_used = vmem.percent
-        
-        # Ensure output path is set up
+          # Ensure output path is set up
         self.setup_output_path(self.params.get("output_path", None))
         
-        # Get command-line arguments
-        args = self._get_bonsai_args()
-        
-        logging.info(f"Starting Bonsai with arguments: {' '.join(args)}")
-        
         try:
-            # Start Bonsai as subprocess
-            self.bonsai_process = subprocess.Popen(
-                args,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                universal_newlines=True,
-                bufsize=1
+            # Resolve all Bonsai paths relative to repository
+            resolved_paths = self._resolve_bonsai_paths()
+            
+            # Create updated params with resolved paths
+            bonsai_params = self.params.copy()
+            bonsai_params.update(resolved_paths)
+            
+            # Setup Bonsai environment (including installation if needed)
+            if not self.bonsai_interface.setup_bonsai_environment(bonsai_params):
+                raise RuntimeError("Failed to setup Bonsai environment")
+            
+            # Get workflow path
+            workflow_path = self._get_workflow_path()
+            
+            # Construct arguments using BonsaiInterface
+            workflow_args = self.bonsai_interface.construct_workflow_arguments(self.params)
+            
+            # Start workflow using BonsaiInterface
+            self.bonsai_process = self.bonsai_interface.start_workflow(
+                workflow_path=workflow_path,
+                arguments=workflow_args,
+                output_path=self.output_path
             )
             
             # Create threads to read output streams
@@ -297,8 +280,7 @@ class BaseExperiment:
             
             self.start_time = datetime.datetime.now()
             logging.info(f"Bonsai started at {self.start_time}")
-            
-            # Log experiment start
+              # Log experiment start
             logging.info(f"MID, {self.mouse_id}, UID, {self.user_id}, Action, Executing, "
                         f"Checksum, {self.script_checksum}, Json_checksum, {self.params_checksum}")
             
@@ -308,45 +290,57 @@ class BaseExperiment:
         except Exception as e:
             logging.error(f"Failed to start Bonsai: {e}")
             raise
-    
-    def _get_bonsai_args(self) -> List[str]:
-        """Construct command-line arguments for Bonsai."""
+
+    def _resolve_bonsai_paths(self) -> Dict[str, str]:
+        """
+        Resolve all Bonsai-related paths relative to the repository.
+        
+        Returns:
+            Dictionary with resolved absolute paths for Bonsai components
+        """
+        repo_path = self.git_manager.get_repository_path(self.params)
+        resolved_params = {}
+        
+        # List of path parameters that should be resolved relative to repo
+        path_params = [
+            'bonsai_exe_path',
+            'bonsai_setup_script', 
+            'bonsai_config_path'
+        ]
+        
+        for param_name in path_params:
+            param_value = self.params.get(param_name)
+            if param_value:
+                if os.path.isabs(param_value):
+                    # Already absolute path
+                    resolved_params[param_name] = param_value
+                elif repo_path:
+                    # Resolve relative to repository
+                    resolved_params[param_name] = os.path.join(repo_path, param_value)
+                else:
+                    # No repository path available, use as-is
+                    resolved_params[param_name] = param_value
+                    
+        return resolved_params
+
+    def _get_workflow_path(self) -> str:
+        """Get the absolute path to the Bonsai workflow file."""
         bonsai_path = self.params.get('bonsai_path')
         if not bonsai_path:
             raise ValueError("No Bonsai workflow path specified in parameters")
         
-        # Get Bonsai executable path
-        bonsai_exe = self.params.get('bonsai_exe_path', 'Bonsai.exe')
-        if not os.path.isabs(bonsai_exe):
-            # Try to find Bonsai executable in repository
-            repo_path = self.git_manager.get_repository_path(self.params)
-            if repo_path:
-                bonsai_exe = os.path.join(repo_path, bonsai_exe)
-        
-        # Get workflow path
         workflow_path = bonsai_path
         if not os.path.isabs(workflow_path):
+            # Try to find workflow in repository
             repo_path = self.git_manager.get_repository_path(self.params)
             if repo_path:
-                workflow_path = os.path.join(repo_path, workflow_path)
+                workflow_path = os.path.join(repo_path, bonsai_path)
         
         if not os.path.exists(workflow_path):
-            raise ValueError(f"Bonsai workflow not found at: {workflow_path}")
+            raise FileNotFoundError(f"Workflow file not found: {workflow_path}")
         
-        # Generate workflow checksum
-        with open(workflow_path, 'rb') as f:
-            self.script_checksum = hashlib.md5(f.read()).hexdigest()
-        logging.info(f"Workflow file checksum: {self.script_checksum}")
-        
-        # Build command arguments
-        args = [bonsai_exe, workflow_path, "--start", "--no-editor"]
-        
-        # Add property arguments
-        bonsai_property_args = self.create_bonsai_arguments()
-        args.extend(bonsai_property_args)
-        
-        return args
-    
+        return workflow_path
+
     def _start_output_readers(self):
         """Start threads to read stdout and stderr in real-time."""
         self.stdout_data = []

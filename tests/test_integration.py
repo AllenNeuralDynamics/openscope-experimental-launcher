@@ -15,17 +15,22 @@ class TestWorkflowIntegration:
     """Integration tests for complete workflows."""
 
     def test_base_experiment_end_to_end(self, temp_dir):
-        """Test complete BaseExperiment workflow."""
-        # Create mock workflow file first
+        """Test complete BaseExperiment workflow."""        # Create mock workflow file first
         workflow_file = os.path.join(temp_dir, "test_workflow.bonsai")
         with open(workflow_file, 'w') as f:
             f.write("<WorkflowBuilder>Test Workflow</WorkflowBuilder>")
+        
+        # Create mock Bonsai executable
+        bonsai_exe = os.path.join(temp_dir, "mock_bonsai.exe")
+        with open(bonsai_exe, 'w') as f:
+            f.write("mock executable")
         
         # Create test parameter file with absolute path
         params = {
             "mouse_id": "integration_test_mouse",
             "user_id": "integration_test_user",
             "bonsai_path": workflow_file,  # Use absolute path
+            "bonsai_exe_path": os.path.join(temp_dir, "mock_bonsai.exe"),  # Add mock executable
             "output_directory": temp_dir
         }
         
@@ -62,11 +67,15 @@ class TestWorkflowIntegration:
 
     @pytest.mark.integration
     def test_slap2_experiment_end_to_end(self, temp_dir):
-        """Test complete SLAP2Experiment workflow with metadata generation."""
-        # Create mock workflow file first
+        """Test complete SLAP2Experiment workflow with metadata generation."""        # Create mock workflow file first
         workflow_file = os.path.join(temp_dir, "slap2_workflow.bonsai")
         with open(workflow_file, 'w') as f:
             f.write("<WorkflowBuilder>SLAP2 Test Workflow</WorkflowBuilder>")
+        
+        # Create mock Bonsai executable
+        bonsai_exe = os.path.join(temp_dir, "mock_bonsai.exe")
+        with open(bonsai_exe, 'w') as f:
+            f.write("mock executable")
         
         # Create comprehensive test parameters with absolute path
         params = {
@@ -80,6 +89,7 @@ class TestWorkflowIntegration:
             "laser_wavelength": 920,
             "frame_rate": 30.0,
             "bonsai_path": workflow_file,  # Use absolute path
+            "bonsai_exe_path": bonsai_exe,  # Add mock executable
             "output_directory": temp_dir,
             "slap_fovs": [{
                 "index": 0,

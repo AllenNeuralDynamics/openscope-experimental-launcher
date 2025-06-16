@@ -216,25 +216,3 @@ class BaseSessionBuilder(ABC):
         
         return base_notes
     
-    # Helper methods for common light source and detector configurations
-    def _create_laser_config(self,
-                            name: str,
-                            wavelength: Union[int, str],
-                            power: Union[float, str, Decimal]) -> LaserConfig:
-        """Create a laser configuration."""
-        return LaserConfig(
-            name=name,
-            wavelength=int(wavelength),
-            excitation_power=Decimal(str(power))
-        )
-    
-    def _create_detector_config(self,
-                               name: str,
-                               exposure_time: Union[float, str, Decimal],
-                               trigger_type: str = "External") -> DetectorConfig:
-        """Create a detector configuration."""
-        return DetectorConfig(
-            name=name,
-            exposure_time=Decimal(str(exposure_time)),
-            trigger_type=trigger_type
-        )

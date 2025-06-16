@@ -42,35 +42,40 @@ class TestSLAP2Experiment:
         assert experiment.session_type == params_with_fovs["session_type"]
         assert experiment.rig_id == params_with_fovs["rig_id"]
         assert experiment.experimenter_name == params_with_fovs["experimenter_name"]
-
+    
     @patch('openscope_experimental_launcher.slap2.launcher.AIND_SCHEMA_AVAILABLE', False)
-    def test_parse_slap_fovs_no_schema(self, sample_slap_fovs):
-        """Test SLAP FOV parsing when aind-data-schema is not available."""
+    def test_slap2_no_schema_available(self):
+        """Test SLAP2 experiment when aind-data-schema is not available."""
         experiment = SLAP2Experiment()
         
-        experiment._parse_slap_fovs(sample_slap_fovs)
-        
-        assert len(experiment.slap_fovs) == 0
-
+        # When schema is not available, experiment should still work
+        assert experiment is not None
+        assert hasattr(experiment, 'session_builder')
+        assert hasattr(experiment, 'stimulus_table_generator')
+    
     def test_create_bonsai_arguments_slap2(self):
-        """Test SLAP2-specific Bonsai argument creation."""
+        """Test SLAP2-specific Bonsai argument creation with real workflow parameters."""
         experiment = SLAP2Experiment()
         experiment.mouse_id = "test_mouse"
         experiment.session_uuid = "test-uuid"
         experiment.session_output_path = "/test/path/output.pkl"
         experiment.params = {
-            "num_trials": 100,
-            "laser_power": 15.0,
-            "frame_rate": 30.0,
-            "session_type": "SLAP2"
+            "bonsai_parameters": {
+                "PortName": "COM3",
+                "RootFolder": "C:/TestData",
+                "Subject": "test_subject",
+                "NbMismatchPerCondition": 5,
+                "NbBaselineGrating": 15,
+            }
         }
         
-        args = experiment.create_bonsai_arguments()
+        args = experiment.bonsai_interface.create_bonsai_property_arguments(experiment.params)
         
-        assert "NumTrials=100" in args
-        assert "LaserPower=15.00" in args
-        assert "FrameRate=30.00" in args
-        assert "SessionType=SLAP2" in args
+        assert "PortName=COM3" in args
+        assert "RootFolder=C:/TestData" in args
+        assert "Subject=test_subject" in args
+        assert "NbMismatchPerCondition=5" in args
+        assert "NbBaselineGrating=15" in args
 
     def test_create_stimulus_table_success(self, temp_dir):
         """Test successful stimulus table creation."""

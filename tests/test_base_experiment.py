@@ -77,15 +77,29 @@ class TestBaseExperiment:
         assert result.endswith(".pkl")
 
     def test_create_bonsai_arguments(self):
-        """Test Bonsai argument creation."""
+        """Test Bonsai argument creation through BonsaiInterface."""
         experiment = BaseExperiment()
-        experiment.mouse_id = "test_mouse"
-        experiment.session_uuid = "test-uuid"
-        experiment.session_output_path = "/test/path/output.pkl"
+        experiment.params = {
+            "mouse_id": "test_mouse",
+            "session_uuid": "test-uuid",
+            "bonsai_parameters": {
+                "SubjectID": "test_mouse",
+                "ExperimentID": "test_experiment"
+            }
+        }
         
-        # No bonsai_parameters means no arguments should be created
-        args = experiment.create_bonsai_arguments()
+        # Test BonsaiInterface can create property arguments
+        args = experiment.bonsai_interface.create_bonsai_property_arguments(experiment.params)
         
+        expected_args = [
+            "--property", "SubjectID=test_mouse",
+            "--property", "ExperimentID=test_experiment"
+        ]
+        assert args == expected_args
+        
+        # Test with no bonsai_parameters
+        experiment.params = {}
+        args = experiment.bonsai_interface.create_bonsai_property_arguments(experiment.params)
         assert args == []  # Should be empty when no bonsai_parameters specified
 
     @patch('openscope_experimental_launcher.base.experiment.psutil')
