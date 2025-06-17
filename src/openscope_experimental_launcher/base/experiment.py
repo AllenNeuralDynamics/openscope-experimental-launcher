@@ -234,8 +234,8 @@ class BaseExperiment:
             workflow_path = self._get_workflow_path()
             
             # Handle output directory generation (migrate from Bonsai GenerateRootLoggingPath)
-            params_for_bonsai = self._prepare_bonsai_parameters()
-            
+            params_for_bonsai = self.params.get("bonsai_parameters", {})
+
             # Construct arguments using BonsaiInterface
             workflow_args = self.bonsai_interface.construct_workflow_arguments(params_for_bonsai)
             
@@ -565,34 +565,3 @@ class BaseExperiment:
             logging.info(f"Output directory already exists: {output_dir}")
             
         return output_dir
-    
-    def _prepare_bonsai_parameters(self) -> Dict[str, Any]:
-        """
-        Prepare parameters for Bonsai, handling output directory generation.
-        
-        This method migrates the output directory generation from Bonsai's 
-        GenerateRootLoggingPath to Python, replacing RootFolder with OutputFolder.
-        
-        Returns:
-            Modified parameters dictionary with OutputFolder instead of RootFolder
-        """
-        params_copy = self.params.copy()
-        bonsai_parameters = params_copy.get("bonsai_parameters", {}).copy()
-        
-        # Check if RootFolder is specified (old format)
-        if "RootFolder" in bonsai_parameters:
-            root_folder = bonsai_parameters["RootFolder"]
-            subject_id = bonsai_parameters.get("Subject", "unknown_subject")
-            
-            # Generate output directory using Python (replaces GenerateRootLoggingPath)
-            output_folder = self.generate_output_directory(root_folder, subject_id)
-            
-            # Replace RootFolder with OutputFolder
-            del bonsai_parameters["RootFolder"]
-            bonsai_parameters["OutputFolder"] = output_folder
-            
-            logging.info(f"Migrated RootFolder to OutputFolder: {output_folder}")
-        
-        # Update the parameters
-        params_copy["bonsai_parameters"] = bonsai_parameters
-        return params_copy

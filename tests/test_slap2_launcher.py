@@ -62,7 +62,7 @@ class TestSLAP2Experiment:
         experiment.params = {
             "bonsai_parameters": {
                 "PortName": "COM3",
-                "RootFolder": "C:/TestData",
+                "OutputFolder": "C:/TestData",
                 "Subject": "test_subject",
                 "NbMismatchPerCondition": 5,
                 "NbBaselineGrating": 15,
@@ -72,7 +72,7 @@ class TestSLAP2Experiment:
         args = experiment.bonsai_interface.create_bonsai_property_arguments(experiment.params)
         
         assert "PortName=COM3" in args
-        assert "RootFolder=C:/TestData" in args
+        assert "OutputFolder=C:/TestData" in args
         assert "Subject=test_subject" in args
         assert "NbMismatchPerCondition=5" in args
         assert "NbBaselineGrating=15" in args

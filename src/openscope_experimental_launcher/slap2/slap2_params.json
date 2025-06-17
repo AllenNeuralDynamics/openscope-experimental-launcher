@@ -8,8 +8,7 @@
     "mouse_id": "test_mouse",
     "user_id": "test_user",    "bonsai_parameters": {
         "PortName": "COM3",
-        "RootFolder": "C:/BonsaiDataPredictiveProcessing",
-        "Subject": "769904",
+        "OutputFolder": "C:/BonsaiDataPredictiveProcessing",
         "NbMismatchPerCondition": 1,
         "NbBaselineGrating": 20,
         "NbReceptiveFieldRepeats": 1,

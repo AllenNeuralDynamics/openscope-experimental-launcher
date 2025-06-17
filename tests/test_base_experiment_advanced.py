@@ -133,27 +133,6 @@ class TestBaseExperimentComprehensive:
         assert "test_mouse" in result
         assert "2023-06-15" in result
 
-    def test_prepare_bonsai_parameters_migration(self):
-        """Test that RootFolder is properly migrated to OutputFolder."""
-        experiment = BaseExperiment()
-        experiment.mouse_id = "test_mouse"
-        experiment.params = {
-            "bonsai_parameters": {
-                "RootFolder": "C:/data",
-                "Subject": "test_mouse",
-                "OtherParam": "value"
-            }
-        }
-        
-        result = experiment._prepare_bonsai_parameters()
-        
-        # Check that RootFolder was converted to OutputFolder
-        assert "OutputFolder" in result["bonsai_parameters"]
-        assert "RootFolder" not in result["bonsai_parameters"]
-        # Check that other parameters are preserved
-        assert result["bonsai_parameters"]["Subject"] == "test_mouse"
-        assert result["bonsai_parameters"]["OtherParam"] == "value"
-
     def test_create_bonsai_arguments_with_parameters(self):
         """Test Bonsai argument creation with custom parameters."""
         experiment = BaseExperiment()

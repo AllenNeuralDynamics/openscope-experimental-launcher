@@ -66,24 +66,6 @@ class TestBaseExperiment:
         assert result.startswith(root_folder)
         assert "test_mouse" in result
         
-    def test_prepare_bonsai_parameters_output_folder(self):
-        """Test that _prepare_bonsai_parameters generates OutputFolder correctly."""
-        experiment = BaseExperiment()
-        experiment.mouse_id = "test_mouse"
-        experiment.params = {
-            "bonsai_parameters": {
-                "RootFolder": "C:/data",
-                "Subject": "test_mouse"
-            }
-        }
-        
-        result = experiment._prepare_bonsai_parameters()
-        
-        # Should have OutputFolder instead of RootFolder
-        assert "OutputFolder" in result["bonsai_parameters"]
-        assert "RootFolder" not in result["bonsai_parameters"]
-        assert result["bonsai_parameters"]["Subject"] == "test_mouse"
-
     def test_create_bonsai_arguments(self):
         """Test Bonsai argument creation through BonsaiInterface."""
         experiment = BaseExperiment()
@@ -91,7 +73,6 @@ class TestBaseExperiment:
             "mouse_id": "test_mouse",
             "session_uuid": "test-uuid",
             "bonsai_parameters": {
-                "SubjectID": "test_mouse",
                 "ExperimentID": "test_experiment"
             }
         }
