@@ -76,13 +76,13 @@ class BaseExperiment:
         self.session_directory = ""  # Store the session output directory
         self.script_checksum = None
         self.params_checksum = None
-        
-        # Process monitoring
+          # Process monitoring
         self._percent_used = None
         self._restarted = False
         self.stdout_data = []
         self.stderr_data = []
         self._output_threads = []
+        self._logging_finalized = False  # Flag to prevent duplicate logging
         
         # Initialize utility classes
         self.config_loader = ConfigLoader()
@@ -226,12 +226,10 @@ class BaseExperiment:
             
             # Get workflow path
             workflow_path = self._get_workflow_path()
+              # Handle output directory generation (migrate from Bonsai GenerateRootLoggingPath)
             
-            # Handle output directory generation (migrate from Bonsai GenerateRootLoggingPath)
-            params_for_bonsai = self.params.get("bonsai_parameters", {})
-
-            # Construct arguments using BonsaiInterface
-            workflow_args = self.bonsai_interface.construct_workflow_arguments(params_for_bonsai)
+            # Construct arguments using BonsaiInterface - pass full params dict
+            workflow_args = self.bonsai_interface.construct_workflow_arguments(self.params)
             
             # Start workflow using BonsaiInterface
             self.bonsai_process = self.bonsai_interface.start_workflow(
@@ -822,13 +820,19 @@ class BaseExperiment:
         except Exception as e:
             print(f"Failed to set up continuous logging: {e}")
             # Continue without file logging - at least console will work
-
+    
     def finalize_logging(self):
         """
         Finalize logging at the end of the experiment.
         
         Logs final session information and closes file handlers.
         """
+        # Prevent duplicate finalization
+        if self._logging_finalized:
+            return
+        
+        self._logging_finalized = True
+        
         try:
             # Log final session information
             logging.info("="*60)

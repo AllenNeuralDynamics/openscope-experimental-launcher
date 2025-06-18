@@ -339,8 +339,7 @@ class BonsaiInterface:
         
         # Split version into parts
         parts = version.split('.')
-        
-        # Remove trailing zeros
+          # Remove trailing zeros
         while len(parts) > 1 and parts[-1] == '0':
             parts.pop()
         
@@ -357,7 +356,7 @@ class BonsaiInterface:
             params: Parameter dictionary containing bonsai_parameters
             
         Returns:
-            List of --property arguments for Bonsai
+            List of -p arguments for Bonsai
         """
         bonsai_args = []
         # Only add parameters from bonsai_parameters section - no automatic defaults
@@ -368,7 +367,7 @@ class BonsaiInterface:
             for param_name, param_value in bonsai_parameters.items():
                 # Convert parameter value to string for Bonsai
                 param_str = str(param_value)
-                bonsai_args.extend(["--property", f"{param_name}={param_str}"])
+                bonsai_args.extend(["-p", f"{param_name}={param_str}"])
                 logging.info(f"Added Bonsai parameter: {param_name}={param_str}")
         else:
             logging.info("No custom Bonsai parameters specified - running workflow with defaults")
@@ -392,8 +391,7 @@ class BonsaiInterface:
         property_args = self.create_bonsai_property_arguments(params)
         if property_args:
             args.extend(property_args)
-        
-        # Add any custom command-line arguments (not properties)
+          # Add any custom command-line arguments (not properties)
         custom_args = params.get('bonsai_arguments', [])
         if custom_args:
             args.extend(custom_args)
@@ -414,23 +412,27 @@ class BonsaiInterface:
         """
         if not self.bonsai_exe_path:
             raise ValueError("Bonsai executable path not set")
-        
+
         if not os.path.exists(workflow_path):
             raise FileNotFoundError(f"Workflow file not found: {workflow_path}")
+        
+        # Normalize both paths for Windows compatibility - ensure consistent path separators
+        bonsai_exe_normalized = os.path.normpath(self.bonsai_exe_path)
+        workflow_path_normalized = os.path.normpath(workflow_path)
           # Build command arguments
-        cmd_args = [self.bonsai_exe_path, workflow_path]
+        cmd_args = [bonsai_exe_normalized, workflow_path_normalized]
         
         # Add essential arguments for non-interactive execution
         cmd_args.append("--start")
         cmd_args.append("--no-editor")
         
         if arguments:
-            cmd_args.extend(arguments)
-        
-        # Set output directory if specified
+            cmd_args.extend(arguments)        # Set output directory if specified
         if output_path:
-            cmd_args.extend(["--OutputPath", output_path])
-            logging.info(f"Output will be saved to: {output_path}")
+            # Normalize the output path as well
+            output_path_normalized = os.path.normpath(output_path)
+            cmd_args.extend(["-p", f"OutputFolder={output_path_normalized}"])
+            logging.info(f"Output will be saved to: {output_path_normalized}")
         
         logging.info(f"Starting Bonsai workflow: {' '.join(cmd_args)}")
         
