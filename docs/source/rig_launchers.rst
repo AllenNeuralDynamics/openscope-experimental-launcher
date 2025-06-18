@@ -104,100 +104,7 @@ Specialized launcher for Selective Plane Activation with Multiphoton microscopy 
                "fov_coordinate_ap": -2.0,
                "frame_rate": 30.0
            }
-       ]
-   }
-
-Mindscope Launchers
--------------------
-
-Three specialized launchers for different Mindscope rig configurations.
-
-Cluster Experiment Launcher
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-For experiments run on cluster computing resources.
-
-.. code-block:: python
-
-   from openscope_experimental_launcher.mindscope import ClusterExperiment
-
-   experiment = ClusterExperiment()
-   success = experiment.run("cluster_parameters.json")
-
-   # Access cluster-specific metadata
-   if success:
-       summary = experiment.get_pickle_data_summary()
-       print(f"Cluster metadata: {summary}")
-
-**Features:**
-- Cluster resource monitoring
-- Distributed computing metadata
-- Job queue integration tracking
-- Compute node information logging
-
-Mesoscope Experiment Launcher
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-For mesoscope (large field-of-view) imaging experiments.
-
-.. code-block:: python
-
-   from openscope_experimental_launcher.mindscope import MesoscopeExperiment
-
-   experiment = MesoscopeExperiment()
-   success = experiment.run("mesoscope_parameters.json")
-
-**Features:**
-- Imaging plane configuration tracking
-- Zoom level and magnification metadata
-- Frame rate and timing validation
-- Multi-plane acquisition monitoring
-
-**Mesoscope Data Summary:**
-
-.. code-block:: python
-
-   summary = experiment.get_pickle_data_summary()
-   # Returns: {
-   #   'rig_type': 'mesoscope',
-   #   'num_imaging_planes': 4,
-   #   'zoom_level': '2x',
-   #   'frame_rate_hz': 30.0,
-   #   'estimated_data_size_gb': 12.5
-   # }
-
-Neuropixel Experiment Launcher
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-For electrophysiology experiments using Neuropixels probes.
-
-.. code-block:: python
-
-   from openscope_experimental_launcher.mindscope import NeuropixelExperiment
-
-   experiment = NeuropixelExperiment()
-   success = experiment.run("neuropixel_parameters.json")
-
-**Features:**
-- Multi-probe configuration tracking
-- Channel mapping and validation
-- Sampling rate monitoring
-- Data rate estimation
-- LFP and spike detection parameters
-
-**Neuropixel Data Summary:**
-
-.. code-block:: python
-
-   summary = experiment.get_pickle_data_summary()
-   # Returns: {
-   #   'rig_type': 'neuropixel',
-   #   'num_probes': 2,
-   #   'num_recording_channels': 768,
-   #   'sampling_rate_hz': 30000,
-   #   'estimated_data_rate_mbps': 185.0,
-   #   'probe_types': ['Neuropixels 1.0', 'Neuropixels 2.0']
-   # }
+       ]   }
 
 Cross-Launcher Compatibility
 ----------------------------
@@ -216,10 +123,6 @@ One of the key features of the system is that the same Bonsai workflow can run a
    # SLAP2 launcher - adds stimulus table and session.json
    slap2_exp = SLAP2Experiment()
    slap2_exp.run(params_file)
-
-   # Mindscope launcher - adds rig-specific pickle metadata
-   cluster_exp = ClusterExperiment()
-   cluster_exp.run(params_file)
 
 **Benefits:**
 - Workflow portability across rig types
@@ -243,12 +146,6 @@ Choose the appropriate launcher based on your experimental setup:
 - Need AIND-compliant metadata
 - Require stimulus table generation
 - Want comprehensive session documentation
-
-**Use Mindscope Launchers when:**
-- Running on Mindscope infrastructure
-- Need rig-specific metadata tracking
-- Want standardized pickle output format
-- Require hardware configuration logging
 
 Custom Launcher Development
 ---------------------------
@@ -327,15 +224,8 @@ Automatically select launcher based on parameters:
        
        rig_type = params.get('rig_id', '').lower()
        session_type = params.get('session_type', '').lower()
-       
-       if 'slap2' in rig_type or 'slap2' in session_type:
+         if 'slap2' in rig_type or 'slap2' in session_type:
            return SLAP2Experiment()
-       elif 'cluster' in rig_type:
-           return ClusterExperiment()
-       elif 'mesoscope' in rig_type:
-           return MesoscopeExperiment()
-       elif 'neuropixel' in rig_type:
-           return NeuropixelExperiment()
        else:
            return BaseExperiment()
 

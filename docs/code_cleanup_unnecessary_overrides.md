@@ -139,5 +139,3 @@ All existing tests continue to pass, confirming that:
 - `src/openscope_experimental_launcher/base/experiment.py`
 - `src/openscope_experimental_launcher/slap2/launcher.py`
 - `src/openscope_experimental_launcher/slap2/session_builder.py`
-- `src/openscope_experimental_launcher/mindscope/mesoscope/launcher.py`
-- `src/openscope_experimental_launcher/mindscope/neuropixel/launcher.py`

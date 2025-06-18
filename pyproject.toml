@@ -117,9 +117,6 @@ exclude_lines = [
 fail_under = 65
 # Exclude launcher implementations from coverage requirements
 omit = [
-    "*/mindscope/cluster/*",
-    "*/mindscope/mesoscope/*", 
-    "*/mindscope/neuropixel/*",
     "*/slap2/launcher.py",
     "*/slap2/session_builder.py"
 ]

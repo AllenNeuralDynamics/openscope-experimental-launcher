@@ -43,7 +43,7 @@ Key Features
    Memory usage monitoring and automatic handling of runaway processes
 
 🎯 **Multi-Rig Support**
-   Specialized launchers for different experimental rigs (SLAP2, Mindscope, etc.)
+   Specialized launchers for different experimental rigs (SLAP2, etc.)
 
 Quick Start
 -----------
@@ -83,7 +83,6 @@ The package consists of several key components:
 
 - **BaseExperiment**: Core experiment launcher with Bonsai process management
 - **SLAP2Experiment**: Specialized launcher for SLAP2 imaging experiments  
-- **MindScope Launchers**: Cluster, Mesoscope, and Neuropixel rig launchers
 - **Utility Classes**: Configuration loading, Git management, process monitoring
 
 System Requirements
@@ -113,10 +112,8 @@ Contents
 .. toctree::
    :maxdepth: 2
    :caption: API Reference
-   
-   api/base
+     api/base
    api/slap2
-   api/mindscope
    api/utils
 
 .. toctree::

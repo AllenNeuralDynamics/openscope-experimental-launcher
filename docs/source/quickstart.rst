@@ -71,30 +71,8 @@ SLAP2 Imaging Experiments
 
    # Check generated outputs
    if success:
-       print(f"Experiment data: {experiment.session_output_path}")
-       print(f"Stimulus table: {experiment.stimulus_table_path}")
+       print(f"Experiment data: {experiment.session_output_path}")       print(f"Stimulus table: {experiment.stimulus_table_path}")
        print(f"Session metadata: {experiment.session_json_path}")
-
-Mindscope Experiments
-~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: python
-
-   from openscope_experimental_launcher.mindscope import (
-       ClusterExperiment, 
-       MesoscopeExperiment, 
-       NeuropixelExperiment
-   )
-
-   # Choose the appropriate launcher for your rig
-   experiment = MesoscopeExperiment()  # or ClusterExperiment(), NeuropixelExperiment()
-   success = experiment.run("mindscope_params.json")
-
-   # Check rig-specific outputs
-   if success:
-       print(f"Pickle metadata: {experiment.pickle_file_path}")
-       summary = experiment.get_pickle_data_summary()
-       print(f"Data summary: {summary}")
 
 Working with Sessions
 ---------------------
@@ -183,11 +161,8 @@ Integration Testing
 
 Test that different rig launchers work with the same Bonsai workflow:
 
-.. code-block:: python
-
-   # Test cross-launcher compatibility
+.. code-block:: python   # Test cross-launcher compatibility
    from openscope_experimental_launcher.slap2.launcher import SLAP2Experiment
-   from openscope_experimental_launcher.mindscope import ClusterExperiment
 
    # Same parameters, different launchers
    params_file = "shared_params.json"
@@ -196,11 +171,7 @@ Test that different rig launchers work with the same Bonsai workflow:
    slap2_exp = SLAP2Experiment()
    slap2_success = slap2_exp.run(params_file)
 
-   # Test Cluster launcher  
-   cluster_exp = ClusterExperiment()
-   cluster_success = cluster_exp.run(params_file)
-
-   print(f"Same workflow ran on both rigs: {slap2_success and cluster_success}")
+   print(f"SLAP2 launcher completed: {slap2_success}")
 
 Next Steps
 ----------

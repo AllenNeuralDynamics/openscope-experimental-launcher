@@ -106,13 +106,7 @@ Using the launcher from command line:
    # Basic experiment
    python -m openscope_experimental_launcher.base.experiment basic_params.json
 
-   # SLAP2 experiment
-   python -m openscope_experimental_launcher.slap2.launcher slap2_params.json
-
-   # Mindscope experiments
-   python -m openscope_experimental_launcher.mindscope.cluster cluster_params.json
-   python -m openscope_experimental_launcher.mindscope.mesoscope mesoscope_params.json
-   python -m openscope_experimental_launcher.mindscope.neuropixel neuropixel_params.json
+   # SLAP2 experiment   python -m openscope_experimental_launcher.slap2.launcher slap2_params.json
 
 Configuration File Usage
 -------------------------
@@ -258,15 +252,13 @@ Compare output from different launchers using the same workflow:
 
    from openscope_experimental_launcher.base.experiment import BaseExperiment
    from openscope_experimental_launcher.slap2.launcher import SLAP2Experiment
-   from openscope_experimental_launcher.mindscope import ClusterExperiment
 
    def compare_launchers(param_file):
        """Compare output from different launchers."""
        
        launchers = [
            ("Base", BaseExperiment()),
-           ("SLAP2", SLAP2Experiment()),
-           ("Cluster", ClusterExperiment())
+           ("SLAP2", SLAP2Experiment())
        ]
        
        results = {}
@@ -324,18 +316,7 @@ Compare output from different launchers using the same workflow:
            info['stimulus_table'] = launcher.stimulus_table_path
        if hasattr(launcher, 'session_json_path'):
            info['session_json'] = launcher.session_json_path
-       
-       # Mindscope specific
-       if hasattr(launcher, 'pickle_file_path'):
-           info['pickle_metadata'] = launcher.pickle_file_path
-           
-           try:
-               summary = launcher.get_pickle_data_summary()
-               info['rig_type'] = summary.get('rig_type', 'unknown')
-           except:
-               pass
-       
-       return info
+         return info
 
    # Usage
    results = compare_launchers("shared_params.json")
@@ -385,34 +366,12 @@ Examples of working with different output file types:
                session_json = json.load(f)
            
            print(f"  Session type: {session_json.get('session_type', 'N/A')}")
-           print(f"  Experimenter: {session_json.get('experimenter_full_name', ['N/A'])[0]}")
-           print(f"  Start time: {session_json.get('session_start_time', 'N/A')}")
+           print(f"  Experimenter: {session_json.get('experimenter_full_name', ['N/A'])[0]}")           print(f"  Start time: {session_json.get('session_start_time', 'N/A')}")
            print(f"  Rig ID: {session_json.get('rig_id', 'N/A')}")
-       
-       # Mindscope specific outputs
-       pickle_metadata_path = f"{base_path}_pickle_data.pkl"
-       
-       if os.path.exists(pickle_metadata_path):
-           print(f"\n🔬 Mindscope Metadata Analysis:")
-           with open(pickle_metadata_path, 'rb') as f:
-               pickle_metadata = pickle.load(f)
-           
-           print(f"  Rig type: {pickle_metadata.get('rig_type', 'N/A')}")
-           print(f"  Parameters: {pickle_metadata.get('num_parameters', 'N/A')}")
-           
-           # Rig-specific information
-           rig_type = pickle_metadata.get('rig_type')
-           if rig_type == 'mesoscope':
-               print(f"  Imaging planes: {pickle_metadata.get('num_imaging_planes', 'N/A')}")
-               print(f"  Frame rate: {pickle_metadata.get('frame_rate_hz', 'N/A')} Hz")
-           elif rig_type == 'neuropixel':
-               print(f"  Probes: {pickle_metadata.get('num_probes', 'N/A')}")
-               print(f"  Channels: {pickle_metadata.get('num_recording_channels', 'N/A')}")
 
    # Usage examples
    analyze_experiment_outputs("data/session_base.pkl", "base")
-   analyze_experiment_outputs("data/session_slap2.pkl", "slap2") 
-   analyze_experiment_outputs("data/session_mindscope.pkl", "mindscope")
+   analyze_experiment_outputs("data/session_slap2.pkl", "slap2")
 
 Parameter File Templates
 ------------------------

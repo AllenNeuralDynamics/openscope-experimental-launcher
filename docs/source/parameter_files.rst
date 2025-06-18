@@ -123,31 +123,6 @@ SLAP2 experiments support additional imaging-specific parameters:
        "num_trials": 200
    }
 
-Mindscope Parameters
-~~~~~~~~~~~~~~~~~~~~
-
-Mindscope experiments (Cluster, Mesoscope, Neuropixel) can include rig-specific metadata:
-
-.. code-block:: json
-
-   {
-       "mouse_id": "neuropixel_mouse_001",
-       "user_id": "ephys_researcher", 
-       "repository_url": "https://github.com/AllenNeuralDynamics/repo.git",
-       "bonsai_path": "ephys/neuropixel_workflow.bonsai",
-       "session_type": "neuropixel",
-       "rig_id": "neuropixel_rig_2",
-       "probe_configurations": [
-           {
-               "probe_id": "probe_1",
-               "probe_type": "Neuropixels 1.0",
-               "recording_channels": 384,
-               "sampling_rate_hz": 30000
-           }
-       ],
-       "estimated_duration_minutes": 60
-   }
-
 Configuration File Integration
 ------------------------------
 
@@ -260,19 +235,15 @@ The same parameter file can often be used across different rig types:
 
 This file can be used with:
 
-.. code-block:: python
-
-   # Works with any launcher
+.. code-block:: python   # Works with any launcher
    from openscope_experimental_launcher.base.experiment import BaseExperiment
    from openscope_experimental_launcher.slap2.launcher import SLAP2Experiment
-   from openscope_experimental_launcher.mindscope import ClusterExperiment
 
    params = "cross_rig_params.json"
    
    # All these will work with the same parameter file
    BaseExperiment().run(params)
    SLAP2Experiment().run(params)  # Adds stimulus table + session.json
-   ClusterExperiment().run(params)  # Adds cluster metadata pickle
 
 Best Practices
 --------------
