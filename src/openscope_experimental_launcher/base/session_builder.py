@@ -55,7 +55,6 @@ class BaseSessionBuilder(ABC):
                      params: Optional[Dict[str, Any]] = None,
                      subject_id: str = "",
                      user_id: str = "",
-                     experimenter_name: str = "",
                      session_uuid: str = "",
                      **kwargs) -> Optional[Session]:
         """

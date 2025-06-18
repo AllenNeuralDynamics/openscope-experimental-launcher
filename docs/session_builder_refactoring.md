@@ -91,7 +91,6 @@ class MyRigLauncher(BaseExperiment):
             params=self.params,
             mouse_id=self.mouse_id,
             user_id=self.user_id,
-            experimenter_name=self.experimenter_name,
             session_uuid=self.session_uuid,
             # Add any rig-specific parameters as kwargs
         )
@@ -112,7 +111,6 @@ session = builder.build_session(
     params=experiment_params,
     mouse_id="mouse123",
     user_id="user456",
-    experimenter_name="John Doe",
     session_uuid="uuid-123",
     slap_fovs=field_of_views  # SLAP2-specific parameter
 )
