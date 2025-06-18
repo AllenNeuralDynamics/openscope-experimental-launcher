@@ -191,22 +191,6 @@ class TestBonsaiInterface:
         assert hasattr(bonsai_interface, '__file__')
 
 
-class TestMetadataGenerator:
-    """Test metadata generation functionality that exists."""
-    
-    def test_import_metadata_generator(self):
-        """Test that metadata generator module can be imported."""
-        from openscope_experimental_launcher.base import metadata_generator
-        assert metadata_generator is not None
-    
-    def test_metadata_generator_has_expected_structure(self):
-        """Test that metadata generator has expected components."""
-        from openscope_experimental_launcher.base import metadata_generator
-        
-        # Check that the module exists and has some content
-        assert hasattr(metadata_generator, '__file__')
-
-
 class TestUtilityModulesIntegration:
     """Integration tests for utility modules working together."""
     

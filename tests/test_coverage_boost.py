@@ -10,7 +10,6 @@ import tempfile
 
 # Import the modules we want to improve coverage for
 from openscope_experimental_launcher.base.bonsai_interface import BonsaiInterface
-from openscope_experimental_launcher.base.metadata_generator import MetadataGenerator
 from openscope_experimental_launcher.utils.process_monitor import ProcessMonitor
 
 
@@ -106,83 +105,6 @@ class TestBonsaiInterfaceBasic:
         assert interface._versions_match("1.0.0", "1.0.0") is True
         assert interface._versions_match("1.0", "1.0.0") is True  # Normalized comparison
         assert interface._versions_match("2.0.0", "1.0.0") is False
-
-
-class TestMetadataGeneratorBasic:
-    """Basic tests for MetadataGenerator to boost coverage."""
-    
-    def test_create_output_data(self):
-        """Test output data creation."""
-        generator = MetadataGenerator()
-        
-        start_time = datetime.datetime.now()
-        output = generator.create_output_data(
-            platform_info={"os": "Windows"},
-            start_time=start_time,
-            stop_time=None,
-            session_uuid="test-123",
-            params={"subject_id": "test_mouse"},
-            config={"test": True},
-            subject_id="test_mouse",
-            user_id="test_user",
-            script_checksum="abc123",
-            params_checksum="def456",
-            bonsai_stdout=["line1"],
-            bonsai_stderr=[],
-            bonsai_return_code=0
-        )
-        
-        assert output is not None
-        assert output["session_uuid"] == "test-123"
-        assert "stop_time" in output
-
-    @patch('builtins.open', new_callable=mock_open)
-    @patch('pickle.dump')
-    @patch('os.path.isdir', return_value=True)
-    @patch('os.path.isfile', return_value=False)
-    def test_save_pickle_output(self, mock_isfile, mock_isdir, mock_pickle_dump, mock_file_open):
-        """Test pickle output saving."""
-        generator = MetadataGenerator()
-        
-        data = {"test": "data"}
-        result = generator.save_pickle_output(data, "/test/output.pkl")
-        
-        assert result is True
-        mock_pickle_dump.assert_called_once()
-
-    @patch('builtins.open', new_callable=mock_open)
-    @patch('json.dump')
-    def test_create_config_file(self, mock_json_dump, mock_file_open):
-        """Test config file creation."""
-        generator = MetadataGenerator()
-        
-        result = generator.create_config_file(
-            "/test/params.json", {"param": "value"}, {}, {}, []
-        )
-        
-        # Use os.path.join for cross-platform compatibility
-        expected_path = os.path.join("/test", "params_config.json")
-        assert result == expected_path
-        mock_json_dump.assert_called_once()
-
-    def test_filter_pickleable(self):
-        """Test filtering of pickleable items."""
-        generator = MetadataGenerator()
-        
-        test_data = {
-            "good_string": "test",
-            "good_number": 123,
-            "_private": "skip",
-            "bad_function": lambda x: x
-        }
-        
-        filtered = generator._filter_pickleable(test_data)
-        
-        assert "good_string" in filtered
-        assert "good_number" in filtered
-        assert "_private" not in filtered
-        assert "unpickleable" in filtered
-
 
 class TestProcessMonitorBasic:
     """Basic tests for ProcessMonitor to boost coverage."""

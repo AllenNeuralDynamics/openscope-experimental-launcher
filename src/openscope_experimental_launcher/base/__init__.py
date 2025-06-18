@@ -7,12 +7,10 @@ parameter management, process monitoring, and metadata generation.
 
 from .experiment import BaseExperiment
 from .bonsai_interface import BonsaiInterface
-from .metadata_generator import MetadataGenerator
 from .session_builder import BaseSessionBuilder
 
 __all__ = [
     "BaseExperiment",
     "BonsaiInterface", 
-    "MetadataGenerator",
     "BaseSessionBuilder"
 ]
