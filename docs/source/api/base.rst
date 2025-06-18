@@ -19,14 +19,12 @@ BaseExperiment Class
    .. automethod:: load_parameters
    .. automethod:: start_bonsai
    .. automethod:: stop
-   .. automethod:: post_experiment_processing
-
-   **Properties:**
+   .. automethod:: post_experiment_processing   **Properties:**
 
    .. autoattribute:: session_uuid
    .. autoattribute:: subject_id
    .. autoattribute:: user_id
-   .. autoattribute:: session_output_path
+   .. autoattribute:: session_directory
    .. autoattribute:: start_time
    .. autoattribute:: stop_time
 
@@ -83,7 +81,7 @@ Basic Experiment
    if success:
        print(f"Experiment completed successfully!")
        print(f"Session UUID: {experiment.session_uuid}")
-       print(f"Output file: {experiment.session_output_path}")
+       print(f"Output directory: {experiment.session_directory}")
        print(f"Duration: {experiment.stop_time - experiment.start_time}")
    else:
        print("Experiment failed. Check logs for details.")
@@ -149,7 +147,7 @@ Session Metadata
            'start_time': experiment.start_time.isoformat(),
            'end_time': experiment.stop_time.isoformat(),
            'duration_seconds': (experiment.stop_time - experiment.start_time).total_seconds(),
-           'output_path': experiment.session_output_path,
+           'output_directory': experiment.session_directory,
            'parameter_checksum': experiment.params_checksum,
            'workflow_checksum': experiment.script_checksum
        }
@@ -316,13 +314,12 @@ Creating Custom Launchers
            """Custom parameter validation."""
            if not isinstance(setting, str):
                raise ValueError("custom_setting must be a string")
-       
-       def _generate_custom_outputs(self):
+         def _generate_custom_outputs(self):
            """Generate custom output files."""
-           output_dir = os.path.dirname(self.session_output_path)
+           output_dir = self.session_directory
            self.custom_output_path = os.path.join(
                output_dir, 
-               f"{os.path.basename(self.session_output_path)}_custom.json"
+               f"{self.session_uuid}_custom.json"
            )
            
            custom_data = {
@@ -378,12 +375,11 @@ Core Methods
 Utility Methods
 ~~~~~~~~~~~~~~~
 
-.. py:method:: BaseExperiment.setup_output_path(output_path: Optional[str] = None) -> str
+.. py:method:: BaseExperiment.determine_session_directory() -> Optional[str]
 
-   Set up the output path for experiment data.
+   Determine or generate output directory path using AIND data schema standards.
    
-   :param output_path: Specific output path to use
-   :returns: The configured output file path
+   :returns: Full path to the output directory, or None if not determinable
 
 .. py:method:: BaseExperiment.create_bonsai_arguments() -> List[str]
 

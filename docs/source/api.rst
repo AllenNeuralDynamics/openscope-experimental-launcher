@@ -27,7 +27,7 @@ BaseExperiment
 
    **Properties:**
 
-   .. autoproperty:: openscope_experimental_launcher.BaseExperiment.session_output_path
+   .. autoproperty:: openscope_experimental_launcher.BaseExperiment.session_directory
    .. autoproperty:: openscope_experimental_launcher.BaseExperiment.is_running
    .. autoproperty:: openscope_experimental_launcher.BaseExperiment.has_completed
 
@@ -343,7 +343,7 @@ Basic Experiment Run
    
    if success:
        print(f"Experiment completed successfully")
-       print(f"Output saved to: {experiment.session_output_path}")
+       print(f"Output saved to: {experiment.session_directory}")
    else:
        print("Experiment failed")
 
@@ -405,7 +405,7 @@ Custom Experiment Subclass
                'timestamp': self.session_start_time.isoformat()
            }
            
-           custom_file = self.session_output_path.replace('.json', '_custom.json')
+           custom_file = os.path.join(self.session_directory, f"{self.session_uuid}_custom.json")
            with open(custom_file, 'w') as f:
                json.dump(custom_data, f, indent=2)
    
@@ -441,7 +441,7 @@ Asynchronous Experiment Execution
        for i, (success, experiment) in enumerate(results):
            param_file = param_files[i]
            if success:
-               print(f"✅ {param_file}: {experiment.session_output_path}")
+               print(f"✅ {param_file}: {experiment.session_directory}")
            else:
                print(f"❌ {param_file}: Failed")
    
@@ -474,7 +474,7 @@ Error Handling and Logging
            success = experiment.run(param_file)
            
            if success:
-               logger.info(f"Experiment completed: {experiment.session_output_path}")
+               logger.info(f"Experiment completed: {experiment.session_directory}")
                return True
            else:
                logger.error("Experiment failed for unknown reasons")

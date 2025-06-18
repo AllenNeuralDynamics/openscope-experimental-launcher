@@ -62,8 +62,7 @@ Basic SLAP2 Experiment
    success = experiment.run("slap2_params.json")
 
    if success:
-       print(f"SLAP2 experiment completed successfully!")
-       print(f"Session data: {experiment.session_output_path}")
+       print(f"SLAP2 experiment completed successfully!")       print(f"Session data: {experiment.session_directory}")
        print(f"Stimulus table: {experiment.stimulus_table_path}")
        print(f"Session metadata: {experiment.session_json_path}")
    else:
@@ -336,7 +335,7 @@ Multi-Session Experiments
            results.append({
                'session_index': i,
                'success': success,
-               'output_path': experiment.session_output_path if success else None,
+               'output_directory': experiment.session_directory if success else None,
                'stimulus_table': experiment.stimulus_table_path if success else None,
                'session_metadata': experiment.session_json_path if success else None
            })

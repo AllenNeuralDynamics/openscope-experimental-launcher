@@ -1,4 +1,5 @@
-Examples
+
+]Examples
 ========
 
 This section provides practical examples of using the OpenScope Experimental Launcher in various scenarios.
@@ -78,7 +79,7 @@ Complete Basic Workflow
            if success:
                print("✅ Experiment completed successfully!")
                print(f"Session UUID: {experiment.session_uuid}")
-               print(f"Output file: {experiment.session_output_path}")
+               print(f"Output directory: {experiment.session_directory}")
                print(f"Duration: {experiment.stop_time - experiment.start_time}")
                
                # Show session metadata
@@ -249,7 +250,7 @@ Complete SLAP2 Workflow
                
                # Show output files
                print(f"\n📁 Output Files:")
-               print(f"  Session data: {experiment.session_output_path}")
+               print(f"  Session data: {experiment.session_directory}")
                print(f"  Stimulus table: {experiment.stimulus_table_path}")
                print(f"  Session metadata: {experiment.session_json_path}")
                
@@ -403,11 +404,10 @@ Automated Batch Experiments
                'start_time': datetime.now().isoformat(),
            }
            
-           if success:
-               result.update({
+           if success:               result.update({
                    'session_uuid': experiment.session_uuid,
                    'subject_id': experiment.subject_id,
-                   'output_path': experiment.session_output_path,
+                   'output_directory': experiment.session_directory,
                    'stimulus_table': experiment.stimulus_table_path,
                    'session_json': experiment.session_json_path
                })
@@ -635,11 +635,10 @@ Robust Experiment Runner
                if success:
                    self.logger.info("✅ Experiment completed successfully")
                    
-                   # Generate success report
-                   report = {
+                   # Generate success report                   report = {
                        'status': 'success',
                        'session_uuid': experiment.session_uuid,
-                       'output_path': experiment.session_output_path,
+                       'output_directory': experiment.session_directory,
                        'duration_seconds': (experiment.stop_time - experiment.start_time).total_seconds(),
                        'parameter_checksum': experiment.params_checksum
                    }
@@ -683,13 +682,12 @@ Robust Experiment Runner
                
                if hasattr(experiment, 'start_time') and experiment.start_time:
                    partial_data['start_time'] = experiment.start_time.isoformat()
-               
-               # Check for any output files that were created
-               if hasattr(experiment, 'session_output_path'):
-                   output_path = Path(experiment.session_output_path)
+                 # Check for any output files that were created
+               if hasattr(experiment, 'session_directory') and experiment.session_directory:
+                   output_path = Path(experiment.session_directory)
                    if output_path.exists():
-                       partial_data['partial_output_file'] = str(output_path)
-                       partial_data['output_file_size'] = output_path.stat().st_size
+                       partial_data['partial_output_directory'] = str(output_path)
+                       partial_data['output_files'] = list(output_path.glob('*'))
                
                self.logger.info(f"Recovered partial data: {partial_data}")
                
@@ -739,7 +737,7 @@ Robust Experiment Runner
            print(f"✅ Success!")
            print(f"  Session UUID: {result['session_uuid']}")
            print(f"  Duration: {result['duration_seconds']:.1f}s")
-           print(f"  Output: {result['output_path']}")
+           print(f"  Output: {result['output_directory']}")
        
        elif result['status'] == 'failed':
            print(f"❌ Failed: {result['error']}")

@@ -63,7 +63,6 @@ class BaseExperiment:
     def __init__(self):
         """Initialize the base experiment with core functionality."""
         self.platform_info = self._get_platform_info()
-        self.output_path = None
         self.params = {}
         self.bonsai_process = None
         self.start_time = None
@@ -238,7 +237,7 @@ class BaseExperiment:
             self.bonsai_process = self.bonsai_interface.start_workflow(
                 workflow_path=workflow_path,
                 arguments=workflow_args,
-                output_path=self.output_path
+                output_path=self.session_directory
             )
             
             # Create threads to read output streams

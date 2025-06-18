@@ -90,7 +90,7 @@ class TestSLAP2Experiment:
         """Test successful stimulus table creation."""
         experiment = SLAP2Experiment()
         experiment.params = {"num_trials": 50}
-        experiment.session_output_path = os.path.join(temp_dir, "output.pkl")
+        experiment.session_directory = temp_dir
         
         with patch.object(experiment.stimulus_table_generator, 'generate_stimulus_table') as mock_gen:
             mock_gen.return_value = Mock()  # Mock DataFrame
@@ -105,7 +105,7 @@ class TestSLAP2Experiment:
         """Test stimulus table creation failure."""
         experiment = SLAP2Experiment()
         experiment.params = {"num_trials": 50}
-        experiment.session_output_path = os.path.join(temp_dir, "output.pkl")
+        experiment.session_directory = temp_dir
         
         with patch.object(experiment.stimulus_table_generator, 'generate_stimulus_table') as mock_gen:
             mock_gen.return_value = None
@@ -134,7 +134,7 @@ class TestSLAP2Experiment:
         experiment.user_id = "Test User"
         experiment.session_uuid = "test-uuid"
         experiment.slap_fovs = []
-        experiment.session_output_path = os.path.join(temp_dir, "output.pkl")
+        experiment.session_directory = temp_dir
         
         mock_session = Mock()
         mock_session.write_standard_file = Mock()
@@ -148,7 +148,7 @@ class TestSLAP2Experiment:
     def test_create_session_json_failure(self, temp_dir):
         """Test session.json creation failure."""
         experiment = SLAP2Experiment()
-        experiment.session_output_path = os.path.join(temp_dir, "output.pkl")
+        experiment.session_directory = temp_dir
         
         with patch.object(experiment.session_builder, 'build_session', return_value=None):
             result = experiment.create_session_json()

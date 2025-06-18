@@ -21,7 +21,7 @@ Basic Experiment Setup
           "local_repository_path": "C:/BonsaiExperiments",
           "bonsai_path": "code/stimulus-control/src/Standard_oddball_slap2.bonsai",
           "bonsai_exe_path": "code/stimulus-control/bonsai/Bonsai.exe",
-          "output_directory": "C:/experiment_data"
+          "OutputFolder": "C:/experiment_data"
       }
 
 2. **Run Basic Experiment**
@@ -34,11 +34,9 @@ Basic Experiment Setup
       experiment = BaseExperiment()
 
       # Run the experiment
-      success = experiment.run("example_params.json")
-
-      if success:
+      success = experiment.run("example_params.json")      if success:
           print("Experiment completed successfully!")
-          print(f"Data saved to: {experiment.session_output_path}")
+          print(f"Data saved to: {experiment.session_directory}")
       else:
           print("Experiment failed. Check logs for details.")
 
@@ -67,11 +65,10 @@ SLAP2 Imaging Experiments
 
    # Create SLAP2 experiment with enhanced metadata generation
    experiment = SLAP2Experiment()
-   success = experiment.run("slap2_params.json")
-
-   # Check generated outputs
+   success = experiment.run("slap2_params.json")   # Check generated outputs
    if success:
-       print(f"Experiment data: {experiment.session_output_path}")       print(f"Stimulus table: {experiment.stimulus_table_path}")
+       print(f"Experiment data: {experiment.session_directory}")
+       print(f"Stimulus table: {experiment.stimulus_table_path}")
        print(f"Session metadata: {experiment.session_json_path}")
 
 Working with Sessions
@@ -124,11 +121,9 @@ The launcher validates parameters before running:
        "bonsai_path",
        "subject_id",
        "user_id"
-   ]
-
-   # Optional parameters with defaults
+   ]   # Optional parameters with defaults
    optional_params = {
-       "output_directory": "data",
+       "OutputFolder": "data",
        "repository_commit_hash": "main",
        "local_repository_path": "C:/BonsaiTemp"
    }
@@ -161,7 +156,9 @@ Integration Testing
 
 Test that different rig launchers work with the same Bonsai workflow:
 
-.. code-block:: python   # Test cross-launcher compatibility
+.. code-block:: python
+
+   # Test cross-launcher compatibility
    from openscope_experimental_launcher.slap2.launcher import SLAP2Experiment
 
    # Same parameters, different launchers

@@ -14,24 +14,20 @@ The most basic usage involves running a single experiment with a parameter file:
 
    # Create and run basic experiment
    experiment = BaseExperiment()
-   success = experiment.run("basic_params.json")
-
-   if success:
+   success = experiment.run("basic_params.json")   if success:
        print(f"Experiment completed successfully!")
-       print(f"Output file: {experiment.session_output_path}")
+       print(f"Output file: {experiment.session_directory}")
    else:
        print("Experiment failed - check logs for details")
 
 **Parameter File (basic_params.json):**
 
-.. code-block:: json
-
-   {
+.. code-block:: json   {
        "subject_id": "basic_mouse_001",
        "user_id": "researcher_name",
        "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
        "bonsai_path": "code/stimulus-control/src/Standard_oddball_slap2.bonsai",
-       "output_directory": "data"
+       "OutputFolder": "data"
    }
 
 Manual Parameter Loading
@@ -46,11 +42,9 @@ For more control over the experiment process, you can load parameters manually:
 
    # Load parameters manually
    with open("params.json") as f:
-       params = json.load(f)
-
-   # Modify parameters programmatically
+       params = json.load(f)   # Modify parameters programmatically
    params["subject_id"] = f"modified_{params['subject_id']}"
-   params["output_directory"] = "custom_output"
+   params["OutputFolder"] = "custom_output"
 
    # Create experiment and load modified parameters
    experiment = BaseExperiment()
@@ -83,15 +77,14 @@ Access detailed information about completed experiments:
            'start_time': experiment.start_time.isoformat(),
            'end_time': experiment.stop_time.isoformat(),
            'duration_minutes': (experiment.stop_time - experiment.start_time).total_seconds() / 60,
-           'output_file': experiment.session_output_path
+           'output_file': experiment.session_directory
        }
 
        print("Session Information:")
        for key, value in session_info.items():
-           print(f"  {key}: {value}")
-
-       # Load and examine output file
-       with open(experiment.session_output_path, 'rb') as f:
+           print(f"  {key}: {value}")       # Load and examine pickle output file
+       pickle_file = experiment.pickle_file_path
+       with open(pickle_file, 'rb') as f:
            session_data = pickle.load(f)
        
        print(f"\nOutput file contains {len(session_data)} data items")
@@ -106,7 +99,8 @@ Using the launcher from command line:
    # Basic experiment
    python -m openscope_experimental_launcher.base.experiment basic_params.json
 
-   # SLAP2 experiment   python -m openscope_experimental_launcher.slap2.launcher slap2_params.json
+   # SLAP2 experiment
+   python -m openscope_experimental_launcher.slap2.launcher slap2_params.json
 
 Configuration File Usage
 -------------------------
@@ -131,7 +125,7 @@ Using CamStim configuration files alongside parameter files:
        "user_id": "researcher",
        "repository_url": "https://github.com/user/repo.git",
        "bonsai_path": "workflow.bonsai",
-       "output_directory": system_config.get('output', {}).get('base_path', 'data')
+       "OutputFolder": system_config.get('output', {}).get('base_path', 'data')
    }
 
    experiment.params = params
@@ -182,7 +176,7 @@ Robust experiment execution with comprehensive error handling:
                raise ValueError(f"Missing required parameters: {missing_params}")
            
            # Check disk space
-           output_dir = os.path.dirname(experiment.session_output_path)
+           output_dir = experiment.session_directory
            if not check_disk_space(output_dir, min_gb=1.0):
                raise RuntimeError("Insufficient disk space for experiment output")
            
@@ -194,7 +188,7 @@ Robust experiment execution with comprehensive error handling:
            
            if success:
                logging.info(f"Experiment completed successfully")
-               logging.info(f"Output file: {experiment.session_output_path}")
+               logging.info(f"Output directory: {experiment.session_directory}")
                logging.info(f"Duration: {experiment.stop_time - experiment.start_time}")
                return True
            else:
@@ -273,7 +267,7 @@ Compare output from different launchers using the same workflow:
                    results[name] = {
                        'success': True,
                        'session_uuid': launcher.session_uuid,
-                       'output_path': launcher.session_output_path,
+                       'output_directory': launcher.session_directory,
                        'duration': launcher.stop_time - launcher.start_time,
                        'launcher_specific': get_launcher_specific_info(launcher)
                    }
@@ -292,7 +286,7 @@ Compare output from different launchers using the same workflow:
            print(f"\n{name} Launcher:")
            if result['success']:
                print(f"  ✅ Success")
-               print(f"  📁 Output: {result['output_path']}")
+               print(f"  📁 Output: {result['output_directory']}")
                print(f"  ⏱️  Duration: {result['duration']}")
                print(f"  🆔 UUID: {result['session_uuid']}")
                

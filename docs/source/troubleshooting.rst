@@ -212,12 +212,11 @@ Output File Issues
               # Override run method to add file monitoring
               result = super().run(param_file)
               
-              # Check what files were actually created
-              if hasattr(self, 'session_output_path'):
-                  output_path = Path(self.session_output_path)
+              # Check what files were actually created              if hasattr(self, 'session_directory') and self.session_directory:
+                  output_path = Path(self.session_directory)
                   if output_path.exists():
-                      print(f"Output file created: {output_path}")
-                      print(f"File size: {output_path.stat().st_size} bytes")
+                      print(f"Output directory created: {output_path}")
+                      print(f"Number of files: {len(list(output_path.glob('*')))}")
                   else:
                       print("Output file was not created")
               

@@ -12,7 +12,7 @@ Basic Parameter Structure
    {
        "repository_url": "https://github.com/user/repo.git",
        "bonsai_path": "path/to/workflow.bonsai",
-       "output_directory": "C:/experiment_data"
+       "OutputFolder": "C:/experiment_data"
    }
 
 Required Parameters
@@ -54,7 +54,7 @@ Optional Parameters
 **bonsai_exe_path** (string, default: "Bonsai.exe")
    Path to Bonsai executable within the repository
 
-**output_directory** (string, default: "data")
+**OutputFolder** (string, default: "data")
    Directory for saving experiment output files
 
 **session_type** (string, default: "experiment")

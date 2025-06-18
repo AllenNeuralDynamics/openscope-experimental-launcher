@@ -66,14 +66,12 @@ Quick Start
 
 3. **Parameter File Example**:
 
-   .. code-block:: json
-   
-      {
+   .. code-block:: json      {
           "subject_id": "test_mouse_001",
           "user_id": "researcher_name",
           "bonsai_path": "path/to/workflow.bonsai",
           "repository_url": "https://github.com/user/repo.git",
-          "output_directory": "C:/experiment_data"
+          "OutputFolder": "C:/experiment_data"
       }
 
 Architecture

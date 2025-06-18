@@ -22,18 +22,6 @@ Overview
      - SLAP2 imaging experiments
      - .pkl, stimulus table .csv, session .json
      - AIND metadata, stimulus analysis
-   * - ClusterExperiment
-     - Cluster rig experiments
-     - .pkl, cluster metadata .pkl
-     - Cluster-specific metadata
-   * - MesoscopeExperiment
-     - Mesoscope imaging
-     - .pkl, mesoscope metadata .pkl
-     - Imaging plane tracking
-   * - NeuropixelExperiment
-     - Electrophysiology recording
-     - .pkl, neuropixel metadata .pkl
-     - Probe configuration tracking
 
 Base Experiment Launcher
 -------------------------
@@ -192,21 +180,17 @@ Run multiple launchers in sequence for comprehensive output:
 .. code-block:: python
 
    def run_comprehensive_experiment(params_file):
-       """Run experiment with multiple output formats."""
+       """Run experiment with comprehensive output formats."""
        
        # Run SLAP2 for AIND metadata
        slap2_exp = SLAP2Experiment()
        slap2_success = slap2_exp.run(params_file)
        
        if slap2_success:
-           # Run cluster for additional metadata
-           cluster_exp = ClusterExperiment()
-           cluster_exp.run(params_file)
-           
            return {
                'session_json': slap2_exp.session_json_path,
                'stimulus_table': slap2_exp.stimulus_table_path,
-               'cluster_metadata': cluster_exp.pickle_file_path
+               'session_pickle': slap2_exp.pickle_file_path
            }
 
 Conditional Launcher Selection
@@ -214,9 +198,7 @@ Conditional Launcher Selection
 
 Automatically select launcher based on parameters:
 
-.. code-block:: python
-
-   def auto_select_launcher(params_file):
+.. code-block:: python   def auto_select_launcher(params_file):
        """Automatically select appropriate launcher."""
        
        with open(params_file) as f:
@@ -224,7 +206,8 @@ Automatically select launcher based on parameters:
        
        rig_type = params.get('rig_id', '').lower()
        session_type = params.get('session_type', '').lower()
-         if 'slap2' in rig_type or 'slap2' in session_type:
+       
+       if 'slap2' in rig_type or 'slap2' in session_type:
            return SLAP2Experiment()
        else:
            return BaseExperiment()

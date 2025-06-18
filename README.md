@@ -4,7 +4,7 @@
 ![Code Style](https://img.shields.io/badge/code%20style-black-black)
 [![semantic-release: angular](https://img.shields.io/badge/semantic--release-angular-e10079?logo=semantic-release)](https://github.com/semantic-release/semantic-release)
 ![Interrogate](https://img.shields.io/badge/interrogate-100.0%25-brightgreen)
-![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen?logo=codecov)
+![Coverage](https://img.shields.io/badge/coverage-70.88%25-green?logo=codecov)
 ![Python](https://img.shields.io/badge/python->=3.8-blue?logo=python)
 ![Platform](https://img.shields.io/badge/platform-Windows-blue?logo=windows)
 
@@ -76,12 +76,12 @@ Create a JSON parameter file with your experiment configuration:
 
 ```json
 {
-    "mouse_id": "test_mouse_001",
+    "subject_id": "test_mouse_001",
     "user_id": "researcher_name",
     "bonsai_path": "path/to/workflow.bonsai",
-    "output_directory": "C:/experiment_data",
-    "session_type": "behavior",
-    "rig_id": "behavior_rig_1"
+    "OutputFolder": "C:/experiment_data",
+    "repository_url": "https://github.com/example/workflow.git",
+    "repository_commit_hash": "main"
 }
 ```
 
@@ -122,7 +122,7 @@ class MyRigSessionBuilder(BaseSessionBuilder):
         pass
 ```
 
-See `docs/session_builder_refactoring.md` for detailed documentation and `examples/neuropixels_session_builder.py` for a complete example.
+See `docs/session_builder_refactoring.md` for detailed documentation and examples.
 
 ### Process Management
 - Uses Windows job objects for robust process control

@@ -13,10 +13,9 @@ class TestBaseExperiment:
 
     def test_init(self):
         """Test BaseExperiment initialization."""
-        experiment = BaseExperiment()
-        
+        experiment = BaseExperiment()        
         assert experiment.platform_info is not None
-        assert experiment.output_path is None
+        assert experiment.session_directory == ""
         assert experiment.params == {}
         assert experiment.bonsai_process is None
         assert experiment.session_uuid is not None
