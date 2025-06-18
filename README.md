@@ -153,7 +153,7 @@ The package consists of several key components:
 - **ConfigLoader**: CamStim-compatible configuration file handling
 - **GitManager**: Repository management and version control
 - **ProcessMonitor**: Memory monitoring and process health checks
-- **MetadataGenerator**: AIND schema-compliant metadata generation
+- **BonsaiInterface**: Bonsai workflow and process management
 
 ## Contributing
 

@@ -11,20 +11,19 @@ BaseExperiment Class
    :undoc-members:
    :show-inheritance:
 
-   The core experiment launcher class that provides Bonsai process management, parameter handling, and session tracking.
-
-   **Key Methods:**
+   The core experiment launcher class that provides Bonsai process management, parameter handling, and session tracking.   **Key Methods:**
 
    .. automethod:: run
    .. automethod:: load_parameters
    .. automethod:: start_bonsai
    .. automethod:: stop
-   .. automethod:: post_experiment_processing   **Properties:**
+   .. automethod:: post_experiment_processing
+
+   **Properties:**
 
    .. autoattribute:: session_uuid
    .. autoattribute:: subject_id
    .. autoattribute:: user_id
-   .. autoattribute:: session_directory
    .. autoattribute:: start_time
    .. autoattribute:: stop_time
 
@@ -81,8 +80,10 @@ Basic Experiment
    if success:
        print(f"Experiment completed successfully!")
        print(f"Session UUID: {experiment.session_uuid}")
-       print(f"Output directory: {experiment.session_directory}")
-       print(f"Duration: {experiment.stop_time - experiment.start_time}")
+       print(f"Subject ID: {experiment.subject_id}")
+       print(f"User ID: {experiment.user_id}")
+       if experiment.start_time and experiment.stop_time:
+           print(f"Duration: {experiment.stop_time - experiment.start_time}")
    else:
        print("Experiment failed. Check logs for details.")
        errors = experiment.get_bonsai_errors()

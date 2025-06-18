@@ -5,7 +5,7 @@
 
 
 OpenScope Experimental Launcher Documentation
-============================================
+==============================================
 
 .. image:: https://img.shields.io/badge/license-MIT-brightgreen
    :target: https://github.com/AllenNeuralDynamics/openscope-experimental-launcher/blob/main/LICENSE
@@ -66,7 +66,9 @@ Quick Start
 
 3. **Parameter File Example**:
 
-   .. code-block:: json      {
+   .. code-block:: json
+
+      {
           "subject_id": "test_mouse_001",
           "user_id": "researcher_name",
           "bonsai_path": "path/to/workflow.bonsai",
@@ -110,25 +112,16 @@ Contents
 .. toctree::
    :maxdepth: 2
    :caption: API Reference
-     api/base
+   
+   api/base
    api/slap2
    api/utils
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Developer Guide
-   
-   contributing
-   testing
-   deployment
 
 .. toctree::
    :maxdepth: 1
    :caption: Additional Resources
    
    troubleshooting
-   changelog
-   license
 
 Indices and Tables
 ==================
