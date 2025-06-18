@@ -34,8 +34,8 @@ The following information is collected interactively when you run an experiment:
 **subject_id** (string)
    Unique identifier for the experimental subject (collected at runtime)
 
-**experimenter_name** (string)  
-   Name of the person running the experiment (collected at runtime)
+**user_id** (string)  
+   Identifier for the person running the experiment (collected at runtime)
 
 For SLAP2 experiments, additional information is collected:
 
@@ -71,7 +71,7 @@ Pass parameters directly to Bonsai workflows using the ``bonsai_parameters`` sec
 .. code-block:: json
 
    {
-       "mouse_id": "test_mouse",
+       "subject_id": "test_mouse",
        "user_id": "researcher",
        "repository_url": "https://github.com/user/repo.git",
        "bonsai_path": "workflow.bonsai",
@@ -97,13 +97,13 @@ SLAP2 experiments support additional imaging-specific parameters:
 .. code-block:: json
 
    {
-       "mouse_id": "slap2_mouse_001",
+       "subject_id": "slap2_mouse_001",
        "user_id": "imaging_researcher",
        "repository_url": "https://github.com/AllenNeuralDynamics/repo.git",
        "bonsai_path": "imaging/slap2_workflow.bonsai",
        "session_type": "SLAP2",
        "rig_id": "slap2_rig_1",
-       "experimenter_name": "Dr. Researcher Name",
+       "user_id": "Dr. Researcher Name",
        "slap_fovs": [
            {
                "index": 0,
@@ -131,7 +131,7 @@ The launcher can also load settings from CamStim-style configuration files:
 .. code-block:: json
 
    {
-       "mouse_id": "config_mouse",
+       "subject_id": "config_mouse",
        "user_id": "config_user",
        "repository_url": "https://github.com/user/repo.git", 
        "bonsai_path": "workflow.bonsai",
@@ -168,7 +168,7 @@ Minimal Example
    :caption: minimal_params.json
 
    {
-       "mouse_id": "test_mouse",
+       "subject_id": "test_mouse",
        "user_id": "test_user",
        "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
        "bonsai_path": "code/stimulus-control/src/Standard_oddball_slap2.bonsai"
@@ -181,7 +181,7 @@ Full SLAP2 Example
    :caption: full_slap2_params.json
 
    {
-       "mouse_id": "slap2_experimental_mouse",
+       "subject_id": "slap2_experimental_mouse",
        "user_id": "imaging_scientist",
        "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
        "repository_commit_hash": "v1.2.0",
@@ -191,7 +191,7 @@ Full SLAP2 Example
        "output_directory": "C:/ExperimentData/SLAP2",
        "session_type": "SLAP2",
        "rig_id": "slap2_rig_001",
-       "experimenter_name": "Dr. Jane Smith",
+       "user_id": "Dr. Jane Smith",
        "laser_power": 12.5,
        "laser_wavelength": 920,
        "num_trials": 500,
@@ -226,7 +226,7 @@ The same parameter file can often be used across different rig types:
    :caption: cross_rig_params.json
 
    {
-       "mouse_id": "multi_rig_mouse",
+       "subject_id": "multi_rig_mouse",
        "user_id": "cross_platform_researcher",
        "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
        "bonsai_path": "code/stimulus-control/src/Standard_oddball_slap2.bonsai",
@@ -253,7 +253,7 @@ Best Practices
    .. code-block:: json
    
       {
-          "mouse_id": "VISp_ChR2_mouse_001_20250613",
+          "subject_id": "VISp_ChR2_mouse_001_20250613",
           "user_id": "jane_smith_imaging_lab"
       }
 
@@ -293,7 +293,7 @@ Common Errors
    :caption: ❌ This will fail
 
    {
-       "mouse_id": "test_mouse"
+       "subject_id": "test_mouse"
        // Missing user_id, repository_url, bonsai_path
    }
 
@@ -303,7 +303,7 @@ Common Errors
    :caption: ❌ This will fail if OutputDirectory is not defined in the workflow
 
    {
-       "mouse_id": "test_mouse",
+       "subject_id": "test_mouse",
        "user_id": "test_user", 
        "repository_url": "https://github.com/user/repo.git",
        "bonsai_path": "workflow.bonsai",

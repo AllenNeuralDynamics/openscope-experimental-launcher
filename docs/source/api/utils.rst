@@ -176,7 +176,7 @@ Validation Utilities
 
    # Validate parameter structure
    params = {
-       "mouse_id": "test_mouse",
+       "subject_id": "test_mouse",
        "user_id": "researcher",
        "repository_url": "https://github.com/user/repo.git"
    }

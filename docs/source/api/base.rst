@@ -24,7 +24,7 @@ BaseExperiment Class
    **Properties:**
 
    .. autoattribute:: session_uuid
-   .. autoattribute:: mouse_id
+   .. autoattribute:: subject_id
    .. autoattribute:: user_id
    .. autoattribute:: session_output_path
    .. autoattribute:: start_time
@@ -124,7 +124,7 @@ Parameter Access
    experiment.load_parameters("params.json")
 
    # Access loaded parameters
-   print(f"Mouse ID: {experiment.mouse_id}")
+   print(f"Subject ID: {experiment.subject_id}")
    print(f"User ID: {experiment.user_id}")
    print(f"Repository URL: {experiment.params['repository_url']}")
    print(f"Bonsai path: {experiment.params['bonsai_path']}")
@@ -144,7 +144,7 @@ Session Metadata
        # Access session information
        session_info = {
            'uuid': experiment.session_uuid,
-           'mouse_id': experiment.mouse_id,
+           'subject_id': experiment.subject_id,
            'user_id': experiment.user_id,
            'start_time': experiment.start_time.isoformat(),
            'end_time': experiment.stop_time.isoformat(),
@@ -174,7 +174,7 @@ Error Handling
            experiment.load_parameters(params_file)
            
            # Check required fields
-           required_fields = ['repository_url', 'bonsai_path', 'mouse_id', 'user_id']
+           required_fields = ['repository_url', 'bonsai_path', 'subject_id', 'user_id']
            missing_fields = [field for field in required_fields 
                            if not experiment.params.get(field)]
            

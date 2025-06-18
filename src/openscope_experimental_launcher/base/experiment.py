@@ -74,6 +74,7 @@ class BaseExperiment:
         self.subject_id = ""
         self.user_id = ""
         self.session_uuid = ""
+        self.session_directory = ""  # Store the session output directory
         self.script_checksum = None
         self.params_checksum = None
         
@@ -498,9 +499,9 @@ class BaseExperiment:
             if not self.git_manager.setup_repository(self.params):
                 logging.error("Repository setup failed")
                 return False
-            
-            # Determine output directory for data saving
+              # Determine output directory for data saving
             output_directory = self.determine_session_directory()
+            self.session_directory = output_directory  # Store for post-processing
             
             # Set up continuous logging to output directory
             if output_directory:

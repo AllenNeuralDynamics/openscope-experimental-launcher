@@ -69,7 +69,7 @@ Quick Start
    .. code-block:: json
    
       {
-          "mouse_id": "test_mouse_001",
+          "subject_id": "test_mouse_001",
           "user_id": "researcher_name",
           "bonsai_path": "path/to/workflow.bonsai",
           "repository_url": "https://github.com/user/repo.git",

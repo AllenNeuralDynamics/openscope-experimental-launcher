@@ -42,7 +42,7 @@ Complete Basic Workflow
    def create_basic_parameters():
        """Create a basic parameter file for testing."""
        params = {
-           "mouse_id": "example_mouse_001",
+           "subject_id": "example_mouse_001",
            "user_id": "researcher_jane",
            "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
            "repository_commit_hash": "main",
@@ -83,7 +83,7 @@ Complete Basic Workflow
                
                # Show session metadata
                print("\nSession Metadata:")
-               print(f"  Mouse ID: {experiment.mouse_id}")
+               print(f"  Subject ID: {experiment.subject_id}")
                print(f"  User ID: {experiment.user_id}")
                print(f"  Parameter checksum: {experiment.params_checksum}")
                print(f"  Workflow checksum: {experiment.script_checksum}")
@@ -136,7 +136,7 @@ Complete SLAP2 Workflow
    def create_slap2_parameters():
        """Create comprehensive SLAP2 parameter file."""
        params = {
-           "mouse_id": "slap2_mouse_20250613_001",
+           "subject_id": "slap2_mouse_20250613_001",
            "user_id": "imaging_researcher",
            "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
            "repository_commit_hash": "v1.2.0",
@@ -148,7 +148,7 @@ Complete SLAP2 Workflow
            # SLAP2-specific parameters
            "session_type": "SLAP2",
            "rig_id": "slap2_rig_behavior_room_2",
-           "experimenter_name": "Dr. Jane Smith",
+           "user_id": "Dr. Jane Smith",
            "laser_power": 12.5,
            "laser_wavelength": 920,
            "num_trials": 500,
@@ -324,21 +324,21 @@ Automated Batch Experiments
        conditions = [
            {
                "condition_name": "low_power",
-               "mouse_id": "batch_mouse_001_low",
+               "subject_id": "batch_mouse_001_low",
                "laser_power": 8.0,
-               "experimenter_name": "Researcher A"
+               "user_id": "Researcher A"
            },
            {
                "condition_name": "medium_power", 
-               "mouse_id": "batch_mouse_002_med",
+               "subject_id": "batch_mouse_002_med",
                "laser_power": 12.5,
-               "experimenter_name": "Researcher B"
+               "user_id": "Researcher B"
            },
            {
                "condition_name": "high_power",
-               "mouse_id": "batch_mouse_003_high", 
+               "subject_id": "batch_mouse_003_high", 
                "laser_power": 18.0,
-               "experimenter_name": "Researcher C"
+               "user_id": "Researcher C"
            }
        ]
        
@@ -373,7 +373,7 @@ Automated Batch Experiments
            param_files.append({
                'file': param_file,
                'condition': condition['condition_name'],
-               'mouse_id': condition['mouse_id']
+               'subject_id': condition['subject_id']
            })
        
        return param_files
@@ -406,7 +406,7 @@ Automated Batch Experiments
            if success:
                result.update({
                    'session_uuid': experiment.session_uuid,
-                   'mouse_id': experiment.mouse_id,
+                   'subject_id': experiment.subject_id,
                    'output_path': experiment.session_output_path,
                    'stimulus_table': experiment.stimulus_table_path,
                    'session_json': experiment.session_json_path
@@ -473,8 +473,8 @@ Automated Batch Experiments
            for result in successful:
                condition = result['condition']
                duration = result['duration_seconds']
-               mouse_id = result.get('mouse_id', 'unknown')
-               print(f"  • {condition} ({mouse_id}): {duration:.1f}s")
+               subject_id = result.get('subject_id', 'unknown')
+               print(f"  • {condition} ({subject_id}): {duration:.1f}s")
        
        if failed:
            print(f"\n❌ Failed Experiments:")
@@ -701,7 +701,7 @@ Robust Experiment Runner
    def create_test_parameters():
        """Create test parameters for robust runner demonstration."""
        params = {
-           "mouse_id": "robust_test_mouse",
+           "subject_id": "robust_test_mouse",
            "user_id": "robust_researcher",
            "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
            "bonsai_path": "code/stimulus-control/src/Standard_oddball_slap2.bonsai",

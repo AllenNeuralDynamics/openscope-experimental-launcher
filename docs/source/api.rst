@@ -129,7 +129,7 @@ Parameter Schema
        """Experiment parameter schema."""
        
        # Required parameters
-       mouse_id: str
+       subject_id: str
        user_id: str
        repository_url: str
        bonsai_path: str

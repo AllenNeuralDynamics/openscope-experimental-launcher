@@ -75,13 +75,13 @@ SLAP2 Parameter File
 .. code-block:: json
 
    {
-       "mouse_id": "slap2_mouse_001",
+       "subject_id": "slap2_mouse_001",
        "user_id": "imaging_researcher",
        "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
        "bonsai_path": "code/stimulus-control/src/Standard_oddball_slap2.bonsai",
        "session_type": "SLAP2",
        "rig_id": "slap2_rig_001",
-       "experimenter_name": "Dr. Jane Smith",
+       "user_id": "Dr. Jane Smith",
        "laser_power": 12.5,
        "laser_wavelength": 920,
        "num_trials": 500,
@@ -185,7 +185,7 @@ SLAP2 can generate metadata without requiring optical physiology data streams:
 
    # Parameters for stimulus-only session
    stimulus_only_params = {
-       "mouse_id": "stimulus_test",
+       "subject_id": "stimulus_test",
        "user_id": "researcher",
        "repository_url": "https://github.com/user/repo.git",
        "bonsai_path": "stimulus_workflow.bonsai",
@@ -327,7 +327,7 @@ Multi-Session Experiments
            # Update parameters for this session
            session_params = base_params.copy()
            session_params.update(config)
-           session_params['mouse_id'] = f"{base_params['mouse_id']}_session_{i}"
+           session_params['subject_id'] = f"{base_params['subject_id']}_session_{i}"
            
            # Run session
            experiment = SLAP2Experiment()
@@ -390,7 +390,7 @@ Integration with Analysis Pipelines
        # Convert to analysis format
        analysis_input = {
            'session_uuid': session_data.get('session_uuid'),
-           'mouse_id': session_data.get('subject_id'),
+           'subject_id': session_data.get('subject_id'),
            'session_start': session_data.get('session_start_time'),
            'stimulus_times': stimulus_table[['start_time', 'stop_time']].values,
            'stimulus_types': stimulus_table['stimulus_type'].values,

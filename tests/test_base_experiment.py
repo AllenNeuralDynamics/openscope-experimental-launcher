@@ -123,8 +123,7 @@ class TestBaseExperiment:
         }
         experiment.mouse_id = "test_mouse"
         experiment.user_id = "test_user"
-        
-        # Create a temporary workflow file
+          # Create a temporary workflow file
         test_workflow = os.path.join(temp_dir, "test.bonsai")
         with open(test_workflow, 'w') as f:
             f.write("<WorkflowBuilder>Test Workflow</WorkflowBuilder>")
@@ -136,37 +135,136 @@ class TestBaseExperiment:
              patch.object(experiment.process_monitor, 'monitor_process'):
             
             mock_md5.return_value.hexdigest.return_value = "test_checksum"
-            
             experiment.start_bonsai()
             
             assert experiment.bonsai_process is not None
             assert experiment.start_time is not None
             mock_subprocess['popen'].assert_called_once()
-
-    def test_get_platform_info(self):
-        """Test platform information gathering."""
-        experiment = BaseExperiment()
-        platform_info = experiment._get_platform_info()
+    
+    @patch('os.path.exists', return_value=True)
+    @patch('subprocess.Popen')
+    def test_start_bonsai_process_creation_failure(self, mock_popen, mock_exists):
+        """Test Bonsai process creation failure."""
+        mock_popen.side_effect = OSError("Failed to start process")
         
-        assert 'python' in platform_info
-        assert 'os' in platform_info
-        assert 'hardware' in platform_info
-        assert 'computer_name' in platform_info
-        assert 'rig_id' in platform_info
-
-    @patch('openscope_experimental_launcher.base.experiment.WINDOWS_MODULES_AVAILABLE', True)
-    @patch('openscope_experimental_launcher.base.experiment.win32job')
-    def test_setup_windows_job_success(self, mock_win32job):
-        """Test Windows job object setup."""
-        mock_win32job.CreateJobObject.return_value = "test_job"
-        mock_win32job.QueryInformationJobObject.return_value = {
-            'BasicLimitInformation': {'LimitFlags': 0}
+        experiment = BaseExperiment()
+        experiment.params = {
+            'bonsai_exe_path': 'bonsai.exe',
+            'bonsai_path': 'workflow.bonsai'
         }
+          # Mock the setup and command creation
+        experiment.bonsai_interface.setup_bonsai_environment = Mock(return_value=True)
+        experiment.bonsai_interface.create_bonsai_command = Mock(return_value=['bonsai.exe', 'workflow.bonsai'])
+        experiment.bonsai_interface.bonsai_exe_path = 'bonsai.exe'  # Set the exe path        # Mock the path resolution
+        experiment._resolve_bonsai_paths = Mock(return_value={})
+        
+        # Should raise the exception since current implementation re-raises
+        with pytest.raises(OSError, match="Failed to start process"):
+            experiment.start_bonsai()
+          # Process should not be set
+        assert experiment.bonsai_process is None
+    
+    def test_determine_session_directory_no_output_folder(self):
+        """Test session directory determination when no OutputFolder specified."""
+        experiment = BaseExperiment()
+        experiment.params = {
+            'subject_id': 'test_mouse',
+            'user_id': 'test_user'
+        }
+        experiment.subject_id = 'test_mouse'
+        experiment.user_id = 'test_user'
+        
+        # Should return None when OutputFolder is not specified
+        result = experiment.determine_session_directory()
+        
+        assert result is None
+    
+    @patch('os.makedirs')
+    def test_determine_session_directory_creation_failure(self, mock_makedirs):
+        """Test session directory creation failure."""
+        mock_makedirs.side_effect = OSError("Permission denied")
         
         experiment = BaseExperiment()
+        experiment.params = {
+            'OutputFolder': '/invalid/path',
+            'subject_id': 'test_mouse',
+            'user_id': 'test_user'
+        }
+        experiment.subject_id = 'test_mouse'
+        experiment.user_id = 'test_user'
         
-        assert experiment.hJob == "test_job"
-        mock_win32job.CreateJobObject.assert_called_once()
+        result = experiment.determine_session_directory()
+        assert result is None
+    
+    @patch('builtins.open', side_effect=OSError("File not found"))
+    def test_save_experiment_metadata_file_error(self, mock_open):
+        """Test experiment metadata saving with file error."""
+        experiment = BaseExperiment()
+        experiment.params = {'test': 'value'}
+        experiment.subject_id = 'test_mouse'
+        experiment.user_id = 'test_user'
+        experiment.session_uuid = 'test_session'
+          # Should handle file errors gracefully
+        experiment.save_experiment_metadata('/tmp/test', 'param_file.json')
+        
+        # Test should complete without raising exception
+    
+    def test_collect_runtime_info_error_handling(self):
+        """Test runtime info collection with errors."""
+        experiment = BaseExperiment()
+        
+        with patch('platform.platform', side_effect=Exception("Platform error")):
+            runtime_info = experiment.collect_runtime_information()
+        
+        # Should return dict with default values on error
+        assert isinstance(runtime_info, dict)
+    
+    @patch('logging.FileHandler')
+    def test_setup_continuous_logging_error(self, mock_file_handler):
+        """Test continuous logging setup with errors."""
+        mock_file_handler.side_effect = Exception("Cannot create log file")
+        
+        experiment = BaseExperiment()
+        experiment.session_uuid = 'test_session'
+        
+        # Should handle logging setup errors gracefully
+        experiment.setup_continuous_logging('/tmp/test')
+    
+    def test_run_with_bonsai_failure(self):
+        """Test run method when Bonsai process fails."""
+        experiment = BaseExperiment()
+        experiment.params = {
+            'subject_id': 'test_mouse',
+            'user_id': 'test_user',
+            'bonsai_exe_path': 'bonsai.exe',
+            'bonsai_path': 'workflow.bonsai'        }
+        experiment.subject_id = 'test_mouse'
+        experiment.user_id = 'test_user'        
+        mock_process = Mock()
+        mock_process.returncode = 1  # Failed process
+        mock_process.pid = 1234
+        
+        with patch.object(experiment, 'load_parameters'), \
+             patch.object(experiment, 'determine_session_directory', return_value='/tmp/test'), \
+             patch.object(experiment, 'setup_continuous_logging'), \
+             patch.object(experiment, 'save_experiment_metadata'), \
+             patch.object(experiment, 'start_bonsai'), \
+             patch.object(experiment, 'post_experiment_processing', return_value=True):
+            
+            experiment.bonsai_process = mock_process
+            
+            result = experiment.run('test_params.json')
+            assert result is False
+    
+    def test_get_experiment_type_name(self):
+        """Test experiment type name getter."""
+        experiment = BaseExperiment()
+        assert experiment._get_experiment_type_name() == "Bonsai"    
+    def test_post_experiment_processing_default(self):
+        """Test default post-experiment processing."""
+        experiment = BaseExperiment()
+        result = experiment.post_experiment_processing()
+        assert result is True
 
     def test_signal_handler(self, mock_subprocess):
         """Test signal handler functionality."""

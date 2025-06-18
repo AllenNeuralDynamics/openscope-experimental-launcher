@@ -27,7 +27,7 @@ The most basic usage involves running a single experiment with a parameter file:
 .. code-block:: json
 
    {
-       "mouse_id": "basic_mouse_001",
+       "subject_id": "basic_mouse_001",
        "user_id": "researcher_name",
        "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
        "bonsai_path": "code/stimulus-control/src/Standard_oddball_slap2.bonsai",
@@ -49,13 +49,13 @@ For more control over the experiment process, you can load parameters manually:
        params = json.load(f)
 
    # Modify parameters programmatically
-   params["mouse_id"] = f"modified_{params['mouse_id']}"
+   params["subject_id"] = f"modified_{params['subject_id']}"
    params["output_directory"] = "custom_output"
 
    # Create experiment and load modified parameters
    experiment = BaseExperiment()
    experiment.params = params
-   experiment.mouse_id = params["mouse_id"]
+   experiment.subject_id = params["subject_id"]
    experiment.user_id = params["user_id"]
 
    # Run with manual setup
@@ -78,7 +78,7 @@ Access detailed information about completed experiments:
        # Access session metadata
        session_info = {
            'session_uuid': experiment.session_uuid,
-           'mouse_id': experiment.mouse_id,
+           'subject_id': experiment.subject_id,
            'user_id': experiment.user_id,
            'start_time': experiment.start_time.isoformat(),
            'end_time': experiment.stop_time.isoformat(),
@@ -127,7 +127,7 @@ Using CamStim configuration files alongside parameter files:
    
    # Override default paths from configuration
    params = {
-       "mouse_id": "config_mouse_001",
+       "subject_id": "config_mouse_001",
        "user_id": "researcher",
        "repository_url": "https://github.com/user/repo.git",
        "bonsai_path": "workflow.bonsai",
@@ -175,7 +175,7 @@ Robust experiment execution with comprehensive error handling:
            experiment.load_parameters(param_file)
            
            # Check required parameters
-           required_params = ['mouse_id', 'user_id', 'repository_url', 'bonsai_path']
+           required_params = ['subject_id', 'user_id', 'repository_url', 'bonsai_path']
            missing_params = [p for p in required_params if not experiment.params.get(p)]
            
            if missing_params:
@@ -346,7 +346,7 @@ Examples of working with different output file types:
            session_data = pickle.load(f)
        
        print(f"Session UUID: {session_data.get('session_uuid', 'N/A')}")
-       print(f"Mouse ID: {session_data.get('mouse_id', 'N/A')}")
+       print(f"Subject ID: {session_data.get('subject_id', 'N/A')}")
        print(f"Duration: {session_data.get('duration_seconds', 'N/A')} seconds")
        
        # SLAP2 specific outputs
@@ -383,7 +383,7 @@ Templates for different experiment types:
 .. code-block:: json
 
    {
-       "mouse_id": "mouse_YYYYMMDD_##",
+       "subject_id": "mouse_YYYYMMDD_##",
        "user_id": "researcher_name",
        "repository_url": "https://github.com/user/bonsai-workflow-repo.git",
        "repository_commit_hash": "main",
@@ -397,7 +397,7 @@ Templates for different experiment types:
 .. code-block:: json
 
    {
-       "mouse_id": "lab_mouse_001",
+       "subject_id": "lab_mouse_001",
        "user_id": "lab_researcher",
        "repository_url": "https://github.com/lab/experiment-workflows.git",
        "repository_commit_hash": "v1.2.0",
@@ -414,7 +414,7 @@ Templates for different experiment types:
 .. code-block:: json
 
    {
-       "mouse_id": "prod_${DATE}_${SEQUENCE}",
+       "subject_id": "prod_${DATE}_${SEQUENCE}",
        "user_id": "${EXPERIMENTER}",
        "repository_url": "https://github.com/institution/production-workflows.git",
        "repository_commit_hash": "${WORKFLOW_VERSION}",

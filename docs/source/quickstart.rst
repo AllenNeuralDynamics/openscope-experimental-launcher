@@ -14,7 +14,7 @@ Basic Experiment Setup
       :caption: example_params.json
 
       {
-          "mouse_id": "test_mouse_001",
+          "subject_id": "test_mouse_001",
           "user_id": "researcher_name",
           "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
           "repository_commit_hash": "main",
@@ -83,7 +83,7 @@ Each experiment generates a unique session with comprehensive tracking:
 
    # Session information is automatically generated
    print(f"Session UUID: {experiment.session_uuid}")
-   print(f"Mouse ID: {experiment.mouse_id}")
+   print(f"Subject ID: {experiment.subject_id}")
    print(f"User ID: {experiment.user_id}")
    print(f"Start time: {experiment.start_time}")
    print(f"Duration: {experiment.stop_time - experiment.start_time}")
@@ -122,7 +122,7 @@ The launcher validates parameters before running:
    required_params = [
        "repository_url",
        "bonsai_path",
-       "mouse_id",
+       "subject_id",
        "user_id"
    ]
 

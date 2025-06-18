@@ -91,7 +91,7 @@ Specialized launcher for Selective Plane Activation with Multiphoton microscopy 
 
    {
        "session_type": "SLAP2",
-       "experimenter_name": "Dr. Researcher",
+       "user_id": "Dr. Researcher",
        "laser_power": 15.0,
        "laser_wavelength": 920,
        "num_trials": 200,

@@ -96,8 +96,7 @@ class SLAP2Experiment(BaseExperiment):
             param_file: Path to the JSON parameter file
         """        # Call parent method to load base parameters (which includes runtime collection)
         super().load_parameters(param_file)
-        
-        # Extract SLAP2-specific parameters from loaded params (runtime info is already merged)
+          # Extract SLAP2-specific parameters from loaded params (runtime info is already merged)
         self.session_type = self.params.get("session_type", "SLAP2")
         self.rig_id = self.params.get("rig_id", "slap2_rig")
         self.user_id = self.params.get("user_id", "Unknown")
@@ -114,14 +113,14 @@ class SLAP2Experiment(BaseExperiment):
             # Generate stimulus table using the specialized generator
             self.stimulus_table = self.stimulus_table_generator.generate_stimulus_table(
                 self.params, 
-                self.session_output_path
+                self.session_directory
             )
             
             if self.stimulus_table is not None:
                 # Save stimulus table
                 self.stimulus_table_path = os.path.join(
-                    os.path.dirname(self.session_output_path),
-                    os.path.splitext(os.path.basename(self.session_output_path))[0] + "_stimulus_table.csv"
+                    self.session_directory,
+                    f"{self.session_uuid}_stimulus_table.csv"
                 )
                 
                 self.stimulus_table.to_csv(self.stimulus_table_path, index=False)
@@ -156,13 +155,12 @@ class SLAP2Experiment(BaseExperiment):
                 subject_id=self.subject_id,
                 user_id=self.user_id,
                 session_uuid=self.session_uuid,
-                slap_fovs=self.slap_fovs
-            )
+                slap_fovs=self.slap_fovs            )
             
             if session:
                 # Save session.json - fix the file path to avoid duplicate "session"
-                base_name = os.path.splitext(os.path.basename(self.session_output_path))[0]
-                output_dir = os.path.dirname(self.session_output_path)
+                base_name = self.session_uuid
+                output_dir = self.session_directory
                 
                 # Use write_standard_file correctly
                 session.write_standard_file(

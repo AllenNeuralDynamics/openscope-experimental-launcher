@@ -116,6 +116,9 @@ class GitManager:
     
     def _get_repo_name_from_url(self, repo_url: str) -> str:
         """Extract repository name from Git URL."""
+        # Remove trailing slash if present
+        repo_url = repo_url.rstrip('/')
+        
         # Handle both HTTPS and SSH URLs
         if repo_url.endswith('.git'):
             repo_name = os.path.basename(repo_url)[:-4]

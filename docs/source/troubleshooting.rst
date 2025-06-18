@@ -56,7 +56,7 @@ Experiment Launch Failures
 
       # Minimal test parameters
       params = {
-          "mouse_id": "test_mouse",
+          "subject_id": "test_mouse",
           "user_id": "test_user",
           "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
           "output_directory": "C:/TestOutput"
