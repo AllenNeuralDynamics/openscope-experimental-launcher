@@ -198,7 +198,9 @@ Conditional Launcher Selection
 
 Automatically select launcher based on parameters:
 
-.. code-block:: python   def auto_select_launcher(params_file):
+.. code-block:: python
+
+   def auto_select_launcher(params_file):
        """Automatically select appropriate launcher."""
        
        with open(params_file) as f:
@@ -241,30 +243,30 @@ Troubleshooting
 **Common Issues:**
 
 1. **Launcher Import Errors**
-   
+
    .. code-block:: python
-   
+
       # Ensure proper package installation
       pip install -e .[dev]
 
 2. **Missing Rig-Specific Dependencies**
-   
+
    Some launchers may require additional packages:
-   
+
    .. code-block:: bash
-   
+
       # For SLAP2 (AIND metadata)
       pip install aind-data-schema
-      
+
       # For advanced imaging analysis
       pip install numpy pandas matplotlib
 
 3. **Parameter Validation Failures**
-   
+
    Check that rig-specific parameters match expected format:
-   
+
    .. code-block:: python
-   
+
       # Validate parameters before running
       experiment = SLAP2Experiment()
       experiment.load_parameters("params.json")
