@@ -5,10 +5,11 @@
     "bonsai_path": "code/stimulus-control/src/Standard_oddball_slap2.bonsai",
     "bonsai_exe_path": "code/stimulus-control/bonsai/Bonsai.exe",
     "bonsai_setup_script": "code/stimulus-control/bonsai/setup.cmd",
-    "mouse_id": "test_mouse",
-    "user_id": "test_user",    "bonsai_parameters": {
+    "subject_id": "test_mouse",
+    "user_id": "test_user",   
+    "OutputFolder": "C:/BonsaiDataPredictiveProcessing", 
+    "bonsai_parameters": {
         "PortName": "COM3",
-        "OutputFolder": "C:/BonsaiDataPredictiveProcessing",
         "NbMismatchPerCondition": 1,
         "NbBaselineGrating": 20,
         "NbReceptiveFieldRepeats": 1,

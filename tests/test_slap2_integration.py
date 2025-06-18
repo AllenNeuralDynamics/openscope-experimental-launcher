@@ -60,7 +60,7 @@ class TestSLAP2WithMinimalistParams:
             "bonsai_path": "code/stimulus-control/src/Standard_oddball_slap2.bonsai",
             "bonsai_exe_path": "code/stimulus-control/bonsai/Bonsai.exe",
             "bonsai_setup_script": "code/stimulus-control/bonsai/setup.cmd",
-            "mouse_id": "test_mouse",
+            "subject_id": "test_mouse",
             "user_id": "test_user"
         }
         
@@ -103,10 +103,8 @@ class TestSLAP2WithMinimalistParams:
                 
                 if success:
                     print(f"\n✅ SLAP2 EXPERIMENT COMPLETED SUCCESSFULLY")
-                    
-                    # Verify that the experiment was properly initialized
-                    assert hasattr(experiment, 'mouse_id'), "SLAP2 should have mouse_id set"
-                    assert hasattr(experiment, 'session_output_path'), "SLAP2 should have session_output_path set"
+                      # Verify that the experiment was properly initialized
+                    assert hasattr(experiment, 'subject_id'), "SLAP2 should have subject_id set"
                     
                     # Check that stop was called during cleanup
                     mock_stop.assert_called()

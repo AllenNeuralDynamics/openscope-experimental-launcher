@@ -63,9 +63,8 @@ class TestBaseSessionBuilder:
             mock_session.return_value = mock_session_instance
             
             result = builder.build_session(
-                mouse_id="test_mouse",
+                subject_id="test_mouse",
                 user_id="test_user",
-                experimenter_name="Test Experimenter",
                 session_uuid="test-uuid-123"
             )
             
@@ -76,7 +75,7 @@ class TestBaseSessionBuilder:
             assert call_args['subject_id'] == "test_mouse"
             assert call_args['session_type'] == "TestRig"
             assert call_args['rig_id'] == "testrig_rig"
-            assert "Test Experimenter" in call_args['experimenter_full_name']
+            assert "test_user" in call_args['experimenter_full_name']
             
             assert result == mock_session_instance
     

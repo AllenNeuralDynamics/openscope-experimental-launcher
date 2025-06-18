@@ -53,7 +53,7 @@ class BaseSessionBuilder(ABC):
                      start_time: Optional[datetime.datetime] = None,
                      end_time: Optional[datetime.datetime] = None,
                      params: Optional[Dict[str, Any]] = None,
-                     mouse_id: str = "",
+                     subject_id: str = "",
                      user_id: str = "",
                      experimenter_name: str = "",
                      session_uuid: str = "",
@@ -65,9 +65,8 @@ class BaseSessionBuilder(ABC):
             start_time: Session start time
             end_time: Session end time
             params: Experiment parameters
-            mouse_id: Subject ID
+            subject_id: Subject ID
             user_id: User ID
-            experimenter_name: Experimenter's full name
             session_uuid: Unique session identifier
             **kwargs: Additional rig-specific parameters
             
@@ -92,7 +91,7 @@ class BaseSessionBuilder(ABC):
             bonsai_software = self._create_bonsai_software(params)
             
             # Create script information
-            script_software = self._create_script_software(params, mouse_id, user_id, session_uuid)
+            script_software = self._create_script_software(params, subject_id, user_id, session_uuid)
             
             # Create stimulus epoch
             stimulus_epoch = self._create_stimulus_epoch(
@@ -107,17 +106,17 @@ class BaseSessionBuilder(ABC):
             
             # Create the session
             session = Session(
-                experimenter_full_name=[experimenter_name] if experimenter_name else [],
+                experimenter_full_name=[user_id] if user_id else [],
                 session_start_time=start_time,
                 session_end_time=end_time,
                 session_type=self._get_session_type(params),
                 rig_id=self._get_rig_id(params),
-                subject_id=mouse_id,
+                subject_id=subject_id,
                 mouse_platform_name=self._get_mouse_platform_name(params),
                 active_mouse_platform=self._get_active_mouse_platform(params),
                 data_streams=data_streams,
                 stimulus_epochs=[stimulus_epoch],
-                notes=self._create_session_notes(params, mouse_id, user_id)
+                notes=self._create_session_notes(params, subject_id, user_id)
             )
             
             logging.info(f"{self.rig_name} session object created successfully")
@@ -138,7 +137,7 @@ class BaseSessionBuilder(ABC):
     
     def _create_script_software(self, 
                                params: Dict[str, Any], 
-                               mouse_id: str, 
+                               subject_id: str, 
                                user_id: str, 
                                session_uuid: str) -> Software:
         """Create Software object for the stimulus script."""
@@ -148,7 +147,7 @@ class BaseSessionBuilder(ABC):
             url=params.get("repository_url", ""),
             parameters={
                 "workflow_path": params.get("bonsai_path", ""),
-                "mouse_id": mouse_id,
+                "subject_id": subject_id,
                 "user_id": user_id,
                 "session_uuid": session_uuid,
                 **self._get_additional_script_parameters(params)
@@ -204,9 +203,9 @@ class BaseSessionBuilder(ABC):
         """Get additional rig-specific script parameters."""
         return {}
     
-    def _create_session_notes(self, params: Dict[str, Any], mouse_id: str, user_id: str) -> str:
+    def _create_session_notes(self, params: Dict[str, Any], subject_id: str, user_id: str) -> str:
         """Create session notes."""
-        base_notes = f"{self.rig_name} experiment session for {mouse_id}"
+        base_notes = f"{self.rig_name} experiment session for {subject_id}"
         if user_id:
             base_notes += f" by {user_id}"
         

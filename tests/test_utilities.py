@@ -161,7 +161,7 @@ class TestConfigLoader:
         """Test loading config with parameters."""
         loader = ConfigLoader()
         params = {
-            "mouse_id": "test_mouse",
+            "subject_id": "test_mouse",
             "user_id": "test_user"
         }
         config = loader.load_config(params)

@@ -38,6 +38,42 @@ class BonsaiInterface:
         self.bonsai_exe_path = bonsai_exe_path
         self.bonsai_install_dir = os.path.dirname(bonsai_exe_path)
     
+    def setup_bonsai_environment(self, params: Dict[str, Any]) -> bool:
+        """
+        Set up Bonsai environment including installation if needed.
+        
+        Args:
+            params: Parameter dictionary containing Bonsai configuration
+            
+        Returns:
+            True if setup successful, False otherwise
+        """
+        # Set Bonsai executable path
+        bonsai_exe_path = params.get('bonsai_exe_path')
+        if bonsai_exe_path:
+            self.set_bonsai_path(bonsai_exe_path)
+        
+        # Check if Bonsai is installed
+        if not self.check_installation():
+            # Try to install if setup script is provided
+            setup_script = params.get('bonsai_setup_script')
+            if setup_script:
+                logging.info("Bonsai not found, attempting installation...")
+                if not self.install_bonsai(setup_script):
+                    logging.error("Failed to install Bonsai")
+                    return False
+            else:
+                logging.error("Bonsai not found and no setup script provided")
+                return False
+          # Verify packages if config file is provided
+        config_path = params.get('bonsai_config_path')
+        if config_path and os.path.exists(config_path):
+            logging.info("Verifying Bonsai packages...")
+            if not self.verify_packages(config_path):
+                logging.warning("Package verification failed, but continuing...")
+        
+        return True
+    
     def check_installation(self) -> bool:
         """
         Check if Bonsai is installed at the expected location.
@@ -310,6 +346,60 @@ class BonsaiInterface:
         
         return '.'.join(parts)
     
+    def create_bonsai_property_arguments(self, params: Dict[str, Any]) -> List[str]:
+        """
+        Create command-line property arguments for Bonsai.
+        
+        Only passes properties that are explicitly requested in bonsai_parameters
+        to avoid conflicts with workflows that don't have these properties defined.
+        
+        Args:
+            params: Parameter dictionary containing bonsai_parameters
+            
+        Returns:
+            List of --property arguments for Bonsai
+        """
+        bonsai_args = []
+        # Only add parameters from bonsai_parameters section - no automatic defaults
+        bonsai_parameters = params.get("bonsai_parameters", {})
+            
+        if bonsai_parameters:
+            logging.info(f"Adding {len(bonsai_parameters)} custom Bonsai parameters")
+            for param_name, param_value in bonsai_parameters.items():
+                # Convert parameter value to string for Bonsai
+                param_str = str(param_value)
+                bonsai_args.extend(["--property", f"{param_name}={param_str}"])
+                logging.info(f"Added Bonsai parameter: {param_name}={param_str}")
+        else:
+            logging.info("No custom Bonsai parameters specified - running workflow with defaults")
+        
+        logging.info(f"Created {len(bonsai_args) // 2} Bonsai property arguments")
+        return bonsai_args
+    
+    def construct_workflow_arguments(self, params: Dict[str, Any]) -> List[str]:
+        """
+        Construct command-line arguments for Bonsai workflow based on parameters.
+        
+        Args:
+            params: Parameter dictionary
+            
+        Returns:
+            List of command-line arguments
+        """
+        args = []
+        
+        # Add property arguments from bonsai_parameters
+        property_args = self.create_bonsai_property_arguments(params)
+        if property_args:
+            args.extend(property_args)
+        
+        # Add any custom command-line arguments (not properties)
+        custom_args = params.get('bonsai_arguments', [])
+        if custom_args:
+            args.extend(custom_args)
+        
+        return args
+    
     def start_workflow(self, workflow_path: str, arguments: List[str] = None, output_path: str = None) -> subprocess.Popen:
         """
         Start a Bonsai workflow as a subprocess.
@@ -359,93 +449,3 @@ class BonsaiInterface:
         except Exception as e:
             logging.error(f"Failed to start Bonsai workflow: {e}")
             raise
-    
-    def setup_bonsai_environment(self, params: Dict[str, Any]) -> bool:
-        """
-        Set up Bonsai environment including installation if needed.
-        
-        Args:
-            params: Parameter dictionary containing Bonsai configuration
-            
-        Returns:
-            True if setup successful, False otherwise
-        """
-        # Set Bonsai executable path
-        bonsai_exe_path = params.get('bonsai_exe_path')
-        if bonsai_exe_path:
-            self.set_bonsai_path(bonsai_exe_path)
-        
-        # Check if Bonsai is installed
-        if not self.check_installation():
-            # Try to install if setup script is provided
-            setup_script = params.get('bonsai_setup_script')
-            if setup_script:
-                logging.info("Bonsai not found, attempting installation...")
-                if not self.install_bonsai(setup_script):
-                    logging.error("Failed to install Bonsai")
-                    return False
-            else:
-                logging.error("Bonsai not found and no setup script provided")
-                return False
-          # Verify packages if config file is provided
-        config_path = params.get('bonsai_config_path')
-        if config_path and os.path.exists(config_path):
-            logging.info("Verifying Bonsai packages...")
-            if not self.verify_packages(config_path):
-                logging.warning("Package verification failed, but continuing...")
-        
-        return True
-
-    def create_bonsai_property_arguments(self, params: Dict[str, Any]) -> List[str]:
-        """
-        Create command-line property arguments for Bonsai.
-        
-        Only passes properties that are explicitly requested in bonsai_parameters
-        to avoid conflicts with workflows that don't have these properties defined.
-        
-        Args:
-            params: Parameter dictionary containing bonsai_parameters
-            
-        Returns:
-            List of --property arguments for Bonsai
-        """
-        bonsai_args = []
-        # Only add parameters from bonsai_parameters section - no automatic defaults
-        bonsai_parameters = params.get("bonsai_parameters", {})
-            
-        if bonsai_parameters:
-            logging.info(f"Adding {len(bonsai_parameters)} custom Bonsai parameters")
-            for param_name, param_value in bonsai_parameters.items():
-                # Convert parameter value to string for Bonsai
-                param_str = str(param_value)
-                bonsai_args.extend(["--property", f"{param_name}={param_str}"])
-                logging.info(f"Added Bonsai parameter: {param_name}={param_str}")
-        else:
-            logging.info("No custom Bonsai parameters specified - running workflow with defaults")
-        
-        logging.info(f"Created {len(bonsai_args) // 2} Bonsai property arguments")
-        return bonsai_args
-
-    def construct_workflow_arguments(self, params: Dict[str, Any]) -> List[str]:
-        """
-        Construct command-line arguments for Bonsai workflow based on parameters.
-        
-        Args:
-            params: Parameter dictionary
-            
-        Returns:
-            List of command-line arguments
-        """
-        args = []
-        
-        # Add property arguments from bonsai_parameters
-        property_args = self.create_bonsai_property_arguments(params)
-        if property_args:
-            args.extend(property_args)
-        
-        # Add any custom command-line arguments (not properties)
-        custom_args = params.get('bonsai_arguments', [])
-        if custom_args:
-            args.extend(custom_args)
-        
-        return args

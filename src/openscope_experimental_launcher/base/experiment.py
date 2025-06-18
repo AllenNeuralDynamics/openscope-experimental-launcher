@@ -21,7 +21,7 @@ import psutil
 import threading
 import shutil
 import json
-import yaml
+import argparse
 from typing import Dict, List, Optional, Any
 from decimal import Decimal
 
@@ -58,8 +58,7 @@ class BaseExperiment:
     - Bonsai process management
     - Repository setup and version control
     - Process monitoring and memory management
-    - Basic output file generation
-    """
+    - Basic output file generation    """
     
     def __init__(self):
         """Initialize the base experiment with core functionality."""
@@ -72,10 +71,9 @@ class BaseExperiment:
         self.config = {}
         
         # Session tracking variables
-        self.mouse_id = ""
+        self.subject_id = ""
         self.user_id = ""
-        self.session_uuid = str(uuid.uuid4())
-        self.session_output_path = ""
+        self.session_uuid = ""
         self.script_checksum = None
         self.params_checksum = None
         
@@ -142,9 +140,8 @@ class BaseExperiment:
             Dictionary containing collected runtime information
         """
         runtime_info = {}
-        
-        # Only collect subject_id if not already provided in params
-        if not self.params.get("mouse_id") and not self.params.get("subject_id"):
+          # Only collect subject_id if not already provided in params
+        if not self.params.get("subject_id"):
             try:
                 subject_id = input("Enter subject ID (default: test_subject): ").strip()
                 if not subject_id:
@@ -153,17 +150,16 @@ class BaseExperiment:
                 # Handle cases where input is not available (e.g., during testing)
                 subject_id = "test_subject"
             runtime_info["subject_id"] = subject_id
-        
-        # Only collect experimenter_name if not already provided in params
-        if not self.params.get("user_id") and not self.params.get("experimenter_name"):
+          # Only collect user_id if not already provided in params
+        if not self.params.get("user_id"):
             try:
-                experimenter_name = input("Enter experimenter name (default: test_experimenter): ").strip()
-                if not experimenter_name:
-                    experimenter_name = "test_experimenter"
+                user_id = input("Enter user ID (default: test_user): ").strip()
+                if not user_id:
+                    user_id = "test_user"
             except (EOFError, OSError):
                 # Handle cases where input is not available (e.g., during testing)
-                experimenter_name = "test_experimenter"
-            runtime_info["experimenter_name"] = experimenter_name
+                user_id = "test_user"
+            runtime_info["user_id"] = user_id
         
         logging.info(f"Collected runtime info - {runtime_info}")
         return runtime_info
@@ -189,33 +185,31 @@ class BaseExperiment:
             self.params = {}
         
         # Collect runtime information (only for missing values)
-        runtime_info = self.collect_runtime_information()
-        
-        # Update parameters with runtime information
+        runtime_info = self.collect_runtime_information()        # Update parameters with runtime information
         self.params.update(runtime_info)
-        
-        # Extract mouse_id and user_id (using runtime info as fallback)
-        self.mouse_id = self.params.get("subject_id") or self.params.get("mouse_id", "")
-        self.user_id = self.params.get("experimenter_name") or self.params.get("user_id", "")
         
         # Load hardware configuration
         self.config = self.config_loader.load_config(self.params)
-          # Update mouse_id and user_id from config if still not set
-        if not self.mouse_id:
-            self.mouse_id = self.config.get("Behavior", {}).get("mouse_id", "test_mouse")
-            self.params["mouse_id"] = self.mouse_id
-            
-        if not self.user_id:
-            self.user_id = self.config.get("Behavior", {}).get("user_id", "test_user")
-            self.params["user_id"] = self.user_id
         
-        logging.info(f"Using mouse_id: {self.mouse_id}, user_id: {self.user_id}")
-  
-
+        # Extract subject_id and user_id (using runtime info and config as fallbacks)
+        self.subject_id = (
+            self.params.get("subject_id") or 
+            (self.config.get("Behavior", {}).get("subject_id") if self.config else "") or
+            ""
+        )
+        self.user_id = (
+            self.params.get("user_id") or
+            (self.config.get("Behavior", {}).get("user_id") if self.config else "") or
+            ""
+        )
+        
+        logging.info(f"Using subject_id: {self.subject_id}, user_id: {self.user_id}")
+    
     def start_bonsai(self):
         """Start the Bonsai workflow using BonsaiInterface."""
-        logging.info(f"Mouse ID: {self.mouse_id}, User ID: {self.user_id}, Session UUID: {self.session_uuid}")
-          # Store current memory usage
+        logging.info(f"Subject ID: {self.subject_id}, User ID: {self.user_id}, Session UUID: {self.session_uuid}")
+        
+        # Store current memory usage
         vmem = psutil.virtual_memory()
         self._percent_used = vmem.percent
         
@@ -226,11 +220,11 @@ class BaseExperiment:
             # Create updated params with resolved paths
             bonsai_params = self.params.copy()
             bonsai_params.update(resolved_paths)
-            
-            # Setup Bonsai environment (including installation if needed)
+              # Setup Bonsai environment (including installation if needed)
             if not self.bonsai_interface.setup_bonsai_environment(bonsai_params):
                 raise RuntimeError("Failed to setup Bonsai environment")
-              # Get workflow path
+            
+            # Get workflow path
             workflow_path = self._get_workflow_path()
             
             # Handle output directory generation (migrate from Bonsai GenerateRootLoggingPath)
@@ -248,15 +242,15 @@ class BaseExperiment:
             
             # Create threads to read output streams
             self._start_output_readers()
-            
-            # Assign process to Windows job object if available
+              # Assign process to Windows job object if available
             if WINDOWS_MODULES_AVAILABLE and self.hJob:
                 self._assign_to_job_object()
             
             self.start_time = datetime.datetime.now()
             logging.info(f"Bonsai started at {self.start_time}")
-              # Log experiment start
-            logging.info(f"MID, {self.mouse_id}, UID, {self.user_id}, Action, Executing, "
+            
+            # Log experiment start
+            logging.info(f"MID, {self.subject_id}, UID, {self.user_id}, Action, Executing, "
                         f"Checksum, {self.script_checksum}, Json_checksum, {self.params_checksum}")
             
             # Monitor Bonsai process
@@ -377,7 +371,7 @@ class BaseExperiment:
                 if self.stderr_data:
                     error_msg = "\n".join(self.stderr_data)
                     logging.error(f"Complete Bonsai error output:\n{error_msg}")
-                logging.error(f"MID, {self.mouse_id}, UID, {self.user_id}, Action, Errored, "
+                logging.error(f"MID, {self.subject_id}, UID, {self.user_id}, Action, Errored, "
                              f"Return_code, {return_code}")
             else:
                 logging.info("Bonsai completed successfully")
@@ -387,7 +381,7 @@ class BaseExperiment:
                 
                 self.stop_time = datetime.datetime.now()
                 duration_min = (self.stop_time - self.start_time).total_seconds() / 60.0
-                logging.info(f"MID, {self.mouse_id}, UID, {self.user_id}, Action, Completed, "
+                logging.info(f"MID, {self.subject_id}, UID, {self.user_id}, Action, Completed, "
                             f"Duration_min, {round(duration_min, 2)}")
         
         except Exception as e:
@@ -404,9 +398,11 @@ class BaseExperiment:
                     subprocess.call(['taskkill', '/F', '/T', '/PID', str(self.bonsai_process.pid)])
             except Exception as e:
                 logging.error(f"Error killing Bonsai process: {e}")
-    
+                
     def stop(self):
         """Stop the Bonsai process if it's running."""
+        self.stop_time = datetime.datetime.now()
+        
         if self.bonsai_process and self.bonsai_process.poll() is None:
             logging.info("Stopping Bonsai process...")
             
@@ -436,6 +432,9 @@ class BaseExperiment:
                     
             except Exception as e:
                 logging.error(f"Error stopping Bonsai process: {e}")
+        
+        # Finalize logging to flush all logs and close handlers
+        self.finalize_logging()
     
     def get_bonsai_errors(self) -> str:
         """Return any errors reported by Bonsai."""
@@ -487,9 +486,11 @@ class BaseExperiment:
         Returns:
             True if successful, False otherwise
         """
-        signal.signal(signal.SIGINT, self.signal_handler)
-        
+        signal.signal(signal.SIGINT, self.signal_handler)        
         try:
+            # Set start time
+            self.start_time = datetime.datetime.now()
+            
             # Load parameters
             self.load_parameters(param_file)
             
@@ -497,7 +498,19 @@ class BaseExperiment:
             if not self.git_manager.setup_repository(self.params):
                 logging.error("Repository setup failed")
                 return False
-              # Start Bonsai
+            
+            # Determine output directory for data saving
+            output_directory = self.determine_session_directory()
+            
+            # Set up continuous logging to output directory
+            if output_directory:
+                centralized_log_dir = self.params.get("centralized_log_directory")
+                self.setup_continuous_logging(output_directory, centralized_log_dir)
+                
+                # Save experiment metadata after logging is set up
+                self.save_experiment_metadata(output_directory, param_file)
+            
+            # Start Bonsai
             self.start_bonsai()
             
             # Check for errors
@@ -517,51 +530,329 @@ class BaseExperiment:
         finally:
             self.stop()
     
-    def generate_output_directory(self, root_folder: str, subject_id: str, date_time_offset: Optional[datetime.datetime] = None) -> str:
+    def determine_session_directory(self) -> Optional[str]:
         """
-        Generate output directory path using AIND data schema standards.
-        
-        This replaces the functionality previously handled by the GenerateRootLoggingPath 
-        Bonsai workflow, moving the logic into Python for better maintainability.
-        Uses the aind-data-schema-models build_data_name function when available for
-        standardized folder naming that follows AIND conventions.
-        
+        Determine or generate output directory path using AIND data schema standards.
+
         Args:
-            root_folder: Base directory for output
-            subject_id: Subject identifier
-            date_time_offset: Optional datetime override (defaults to current time)
+            None
             
         Returns:
-            Full path to the generated output directory        """
-        if date_time_offset is None:
-            date_time_offset = datetime.datetime.now()
-        
-        if AIND_DATA_SCHEMA_AVAILABLE:
-            try:
-                # Use AIND standard naming: {subject_id}_{datetime}
-                # The build_data_name function handles the formatting according to AIND standards
-                folder_name = build_data_name(
-                    label=subject_id,
-                    creation_datetime=date_time_offset
-                )
-                logging.info(f"Generated AIND-compliant folder name: {folder_name}")
-            except Exception as e:
-                logging.warning(f"Failed to use AIND data schema naming, falling back to default: {e}")
-                # Fallback to default naming
-                folder_name = f"{subject_id}_{date_time_offset.strftime('%Y-%m-%d_%H-%M-%S')}"
-        else:
-            # Fallback naming when AIND data schema is not available
-            folder_name = f"{subject_id}_{date_time_offset.strftime('%Y-%m-%d_%H-%M-%S')}"
-            logging.info(f"Using fallback folder name: {folder_name}")
-        
-        # Create full output directory path
-        output_dir = os.path.join(root_folder, folder_name)
-        
-        # Create the directory if it doesn't exist
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-            logging.info(f"Created output directory: {output_dir}")
-        else:
-            logging.info(f"Output directory already exists: {output_dir}")
+            Full path to the output directory, or None if not determinable
+        """
+        try:
+           
+            # Check if OutputFolder is already specified
+            if "OutputFolder" in self.params:
+                output_dir = self.params["OutputFolder"]
+                logging.info(f"Using OutputFolder from parameters: {output_dir}")
+            else:
+                logging.error("OutputFolder not specified in parameters")
+                raise ValueError("OutputFolder not specified in parameters")
+
+            subject_id = self.subject_id
+
+            # At this point, we should have root_folder and subject_id to generate a directory
+            if subject_id is None:
+                logging.error("Cannot generate output directory: missing root_folder or subject_id")
+                raise ValueError("Missing subject_id")
             
-        return output_dir
+            # Generate directory using AIND data schema standards
+            date_time_offset = datetime.datetime.now()
+            
+            if AIND_DATA_SCHEMA_AVAILABLE:
+                try:
+                    # Use AIND standard naming: {subject_id}_{datetime}
+                    folder_name = build_data_name(
+                        label=subject_id,
+                        creation_datetime=date_time_offset
+                    )
+                    logging.info(f"Generated AIND-compliant folder name: {folder_name}")
+                except Exception as e:
+                    logging.warning(f"Failed to use AIND data schema naming, falling back to default: {e}")
+                    # Fallback to default naming
+                    folder_name = f"{subject_id}_{date_time_offset.strftime('%Y-%m-%d_%H-%M-%S')}"
+            else:
+                # Fallback naming when AIND data schema is not available
+                folder_name = f"{subject_id}_{date_time_offset.strftime('%Y-%m-%d_%H-%M-%S')}"
+                logging.info(f"Using fallback folder name: {folder_name}")
+            
+            # We also assign the session UUID to the output directory
+            self.session_uuid = folder_name
+
+            # Create full output directory path
+            output_dir = os.path.join(output_dir, folder_name)
+            
+            # Create the directory if it doesn't exist
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+                logging.info(f"Created output directory: {output_dir}")
+            else:
+                logging.info(f"Output directory already exists: {output_dir}")
+                
+            return output_dir
+            
+        except Exception as e:
+            logging.error(f"Failed to determine/generate output directory: {e}")
+            return None
+    
+    def save_experiment_metadata(self, output_directory: str, param_file: Optional[str] = None):
+        """
+        Save experiment metadata to the output directory.
+        
+        This includes:
+        - Original parameter JSON file
+        - Command line arguments used to run the experiment
+        - Runtime information and system details
+        - Experiment logs (if available)
+        
+        Args:
+            output_directory: Directory where metadata should be saved
+            param_file: Path to the original parameter file (if available)
+        """
+        try:
+            # Create metadata directory if it doesn't exist
+            metadata_dir = os.path.join(output_directory, "experiment_metadata")
+            os.makedirs(metadata_dir, exist_ok=True)
+            
+            # 1. Save original parameter file if provided
+            if param_file and os.path.exists(param_file):
+                param_filename = os.path.basename(param_file)
+                param_dest = os.path.join(metadata_dir, f"original_{param_filename}")
+                shutil.copy2(param_file, param_dest)
+                logging.info(f"Saved original parameter file to: {param_dest}")
+            
+            # 2. Save processed parameters (with resolved paths, etc.)
+            processed_params_file = os.path.join(metadata_dir, "processed_parameters.json")
+            with open(processed_params_file, 'w') as f:
+                json.dump(self.params, f, indent=2, default=str)
+            logging.info(f"Saved processed parameters to: {processed_params_file}")
+            
+            # 3. Save command line arguments
+            cmdline_file = os.path.join(metadata_dir, "command_line_arguments.json")
+            cmdline_info = {
+                "command_line": " ".join(sys.argv),
+                "arguments": sys.argv,
+                "working_directory": os.getcwd(),
+                "python_executable": sys.executable,
+                "timestamp": datetime.datetime.now().isoformat()
+            }
+            with open(cmdline_file, 'w') as f:
+                json.dump(cmdline_info, f, indent=2)
+            logging.info(f"Saved command line info to: {cmdline_file}")
+            
+            # 4. Save runtime and system information
+            runtime_file = os.path.join(metadata_dir, "runtime_information.json")
+            runtime_info = self.collect_runtime_information()
+            runtime_info.update({
+                "session_uuid": self.session_uuid,
+                "subject_id": self.subject_id,
+                "user_id": self.user_id,
+                "script_checksum": self.script_checksum,
+                "params_checksum": self.params_checksum,
+                "start_time": self.start_time.isoformat() if self.start_time else None,
+                "platform_info": self.platform_info
+            })
+            with open(runtime_file, 'w') as f:
+                json.dump(runtime_info, f, indent=2, default=str)
+            logging.info(f"Saved runtime information to: {runtime_file}")
+
+            logging.info(f"Experiment metadata saved to: {metadata_dir}")
+            
+        except Exception as e:
+            logging.error(f"Failed to save experiment metadata: {e}")
+    
+    @classmethod
+    def create_argument_parser(cls, description: str = None) -> argparse.ArgumentParser:
+        """
+        Create a standard argument parser for experiment launchers.
+        
+        Args:
+            description: Description for the argument parser
+            
+        Returns:
+            Configured ArgumentParser instance
+        """
+        if description is None:
+            description = f"Launch {cls.__name__} experiment"
+            
+        parser = argparse.ArgumentParser(description=description)
+        parser.add_argument(
+            'param_file',
+            nargs='?',
+            help='Path to the JSON parameter file. If not provided, will look for default parameter files.'
+        )
+
+        return parser
+    
+    @classmethod
+    def run_from_args(cls, args: argparse.Namespace) -> int:
+        """
+        Run the experiment from parsed command line arguments.
+        
+        Args:
+            args: Parsed command line arguments
+            
+        Returns:
+            Exit code (0 for success, 1 for failure)
+        """
+        # Set up basic logging
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s'
+        )
+        
+        try:
+            # Validate parameter file if provided
+            if args.param_file and not os.path.exists(args.param_file):
+                logging.error(f"Parameter file not found: {args.param_file}")
+                return 1
+            
+            # Create experiment instance
+            experiment = cls()
+            
+            # Run the experiment
+            experiment_name = cls.__name__.replace('Experiment', '').replace('Launcher', '')
+            logging.info(f"Starting {experiment_name} with parameters: {args.param_file}")
+            
+            success = experiment.run(args.param_file)
+            
+            if success:
+                logging.info(f"===== {experiment_name.upper()} COMPLETED SUCCESSFULLY =====")               
+                return 0
+            else:
+                logging.error(f"===== {experiment_name.upper()} FAILED =====")
+                logging.error("Check the logs above for error details.")
+                return 1
+                
+        except KeyboardInterrupt:
+            logging.info("Experiment interrupted by user")
+            return 1
+        except Exception as e:
+            logging.error(f"Unexpected error: {e}")
+            return 1
+    
+    @classmethod
+    def main(cls, description: str = None, args: List[str] = None) -> int:
+        """
+        Main entry point for experiment launchers.
+        
+        Args:
+            description: Description for the argument parser
+            args: Command line arguments (defaults to sys.argv)
+            
+        Returns:
+            Exit code (0 for success, 1 for failure)
+        """
+        parser = cls.create_argument_parser(description)
+        parsed_args = parser.parse_args(args)
+        return cls.run_from_args(parsed_args)
+    
+    def setup_continuous_logging(self, output_directory: str, centralized_log_dir: Optional[str] = None):
+        """
+        Set up continuous logging to output directory and optionally centralized location.
+        
+        Args:
+            output_directory: Directory where experiment-specific logs should be saved
+            centralized_log_dir: Optional centralized logging directory
+        """
+        try:            # Create log filename with timestamp and session info
+            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+            subject_id = self.params.get('subject_id')
+            log_filename = f"experiment_{self.session_uuid}.log"
+            
+            # Set up logging format
+            log_format = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                datefmt='%Y-%m-%d %H:%M:%S'
+            )
+            
+            # Get root logger
+            root_logger = logging.getLogger()
+            
+            # 1. Set up file handler for output directory
+            output_log_path = os.path.join(output_directory, log_filename)
+            os.makedirs(os.path.dirname(output_log_path), exist_ok=True)
+            
+            output_handler = logging.FileHandler(output_log_path)
+            output_handler.setLevel(logging.DEBUG)
+            output_handler.setFormatter(log_format)
+            root_logger.addHandler(output_handler)
+            
+            logging.info(f"Continuous logging started: {output_log_path}")
+            
+            # 2. Set up centralized logging if specified
+            if centralized_log_dir:
+                # Create centralized log directory structure: YYYY/MM/DD/
+                date_path = datetime.datetime.now().strftime('%Y/%m/%d')
+                centralized_dir = os.path.join(centralized_log_dir, date_path)
+                os.makedirs(centralized_dir, exist_ok=True)
+                
+                centralized_log_path = os.path.join(centralized_dir, log_filename)
+                
+                centralized_handler = logging.FileHandler(centralized_log_path)
+                centralized_handler.setLevel(logging.DEBUG)  # Slightly higher level for centralized
+                centralized_handler.setFormatter(log_format)
+                root_logger.addHandler(centralized_handler)
+                
+                logging.info(f"Centralized logging started: {centralized_log_path}")
+            
+            # 3. Set up console handler if not already present
+            if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
+                console_handler = logging.StreamHandler()
+                console_handler.setLevel(logging.DEBUG)
+                console_handler.setFormatter(logging.Formatter('%(levelname)s - %(message)s'))
+                root_logger.addHandler(console_handler)
+            
+            # Set overall logging level
+            root_logger.setLevel(logging.DEBUG)
+            
+            # Log session information
+            logging.info("="*60)
+            logging.info("EXPERIMENT SESSION STARTED")
+            logging.info(f"Session UUID: {self.session_uuid}")
+            logging.info(f"Subject ID: {subject_id}")
+            logging.info(f"User ID: {self.user_id}")
+            logging.info(f"Platform: {self.platform_info}")
+            logging.info(f"Output Directory: {output_directory}")
+            if centralized_log_dir:
+                logging.info(f"Centralized Logs: {centralized_log_dir}")
+            logging.info("="*60)
+            
+        except Exception as e:
+            print(f"Failed to set up continuous logging: {e}")
+            # Continue without file logging - at least console will work
+
+    def finalize_logging(self):
+        """
+        Finalize logging at the end of the experiment.
+        
+        Logs final session information and closes file handlers.
+        """
+        try:
+            # Log final session information
+            logging.info("="*60)
+            logging.info("EXPERIMENT SESSION COMPLETED")
+            logging.info(f"Session UUID: {self.session_uuid}")
+            logging.info(f"Start Time: {self.start_time}")
+            logging.info(f"Stop Time: {self.stop_time}")
+            if self.start_time and self.stop_time:
+                duration = self.stop_time - self.start_time
+                logging.info(f"Duration: {duration}")
+            logging.info(f"Final Memory Usage: {psutil.virtual_memory().percent}%")
+            logging.info("="*60)
+            
+            # Close and remove file handlers to ensure logs are flushed
+            root_logger = logging.getLogger()
+            handlers_to_remove = []
+            
+            for handler in root_logger.handlers:
+                if isinstance(handler, logging.FileHandler):
+                    handler.close()
+                    handlers_to_remove.append(handler)
+            
+            for handler in handlers_to_remove:
+                root_logger.removeHandler(handler)
+                
+        except Exception as e:
+            print(f"Error finalizing logging: {e}")

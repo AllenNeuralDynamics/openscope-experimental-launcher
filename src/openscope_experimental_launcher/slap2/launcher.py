@@ -50,7 +50,7 @@ class SLAP2Experiment(BaseExperiment):
         # Additional session parameters for SLAP2
         self.session_type = "SLAP2"
         self.rig_id = "slap2_rig"
-        self.experimenter_name = "Unknown"  # Initialize with default for backwards compatibility
+        self.user_id = "Unknown"  # Initialize with default
         
         # Initialize SLAP2 utility classes
         self.session_builder = SLAP2SessionBuilder()
@@ -66,7 +66,7 @@ class SLAP2Experiment(BaseExperiment):
         Returns:
             Dictionary containing collected runtime information
         """
-        # Call parent method to get base information (subject_id and experimenter_name)
+        # Call parent method to get base information (subject_id and user_id)
         runtime_info = super().collect_runtime_information()
         
         # Only collect rig_id if not already provided in params
@@ -100,7 +100,7 @@ class SLAP2Experiment(BaseExperiment):
         # Extract SLAP2-specific parameters from loaded params (runtime info is already merged)
         self.session_type = self.params.get("session_type", "SLAP2")
         self.rig_id = self.params.get("rig_id", "slap2_rig")
-        self.experimenter_name = self.params.get("experimenter_name", "Unknown")
+        self.user_id = self.params.get("user_id", "Unknown")
         logging.info("SLAP2 parameters loaded successfully")
     
     def create_stimulus_table(self) -> bool:
@@ -153,9 +153,8 @@ class SLAP2Experiment(BaseExperiment):
                 start_time=self.start_time,
                 end_time=self.stop_time,
                 params=self.params,
-                mouse_id=self.mouse_id,
+                subject_id=self.subject_id,
                 user_id=self.user_id,
-                experimenter_name=self.experimenter_name,
                 session_uuid=self.session_uuid,
                 slap_fovs=self.slap_fovs
             )
@@ -220,53 +219,5 @@ class SLAP2Experiment(BaseExperiment):
       # Remove the unnecessary run method override - the base class handles this correctly
     # The base class already calls post_experiment_processing() which we've properly overridden
 
-
-def main():
-    """Main function to run the SLAP2 Bonsai experiment."""
-    logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s' )
-    # Check if aind-data-schema is available
-    if not AIND_SCHEMA_AVAILABLE:
-        print("Warning: aind-data-schema is not installed. Session.json creation will be disabled.")
-        print("To install: pip install aind-data-schema")
-    
-    # Get parameter file from command line
-    param_file = None
-    if len(sys.argv) > 1:
-        param_file = sys.argv[1]
-        if not os.path.exists(param_file):
-            print(f"Error: Parameter file not found: {param_file}")
-            sys.exit(1)
-    
-    # Create and run experiment
-    experiment = SLAP2Experiment()
-    
-    try:
-        success = experiment.run(param_file)
-        if success:
-            print("\n===== SLAP2 EXPERIMENT COMPLETED SUCCESSFULLY =====")
-            if experiment.stimulus_table_path:
-                print(f"Stimulus table: {experiment.stimulus_table_path}")
-            if experiment.session_json_path:
-                print(f"Session metadata: {experiment.session_json_path}")
-            print(f"Experiment data: {experiment.output_path}")
-            print("================================================\n")
-            sys.exit(0)
-        else:
-            print("\n===== SLAP2 EXPERIMENT FAILED =====")
-            print("Check the logs above for error details.")
-            print("===================================\n")
-            sys.exit(1)
-    except KeyboardInterrupt:
-        print("\nExperiment interrupted by user")
-        experiment.stop()
-        sys.exit(1)
-    except Exception as e:
-        print(f"Unexpected error: {e}")
-        experiment.stop()
-        sys.exit(1)
-
-
 if __name__ == "__main__":
-    main()
+    SLAP2Experiment.main("Launch SLAP2 experiment")

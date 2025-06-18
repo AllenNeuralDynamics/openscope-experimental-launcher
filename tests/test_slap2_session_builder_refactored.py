@@ -35,13 +35,13 @@ class TestSLAP2SessionBuilderRefactored:
                 start_time=datetime.datetime.now(),
                 end_time=datetime.datetime.now(),
                 params={"num_trials": 100},
-                mouse_id="test_mouse",
+                subject_id="test_mouse",
                 user_id="test_user",
-                experimenter_name="Test Experimenter",
                 session_uuid="test-uuid-123",
                 slap_fovs=[]  # SLAP2-specific parameter
             )
-              # Verify Session was called
+            
+            # Verify Session was called
             mock_session.assert_called_once()
             call_args = mock_session.call_args[1]  # keyword arguments
             

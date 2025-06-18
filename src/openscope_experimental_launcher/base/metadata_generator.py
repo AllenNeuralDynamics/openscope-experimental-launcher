@@ -32,7 +32,7 @@ class MetadataGenerator:
                           session_uuid: str,
                           params: Dict[str, Any],
                           config: Dict[str, Any],
-                          mouse_id: str,
+                          subject_id: str,
                           user_id: str,
                           script_checksum: Optional[str],
                           params_checksum: Optional[str],
@@ -49,7 +49,7 @@ class MetadataGenerator:
             session_uuid: Unique session identifier
             params: Experiment parameters
             config: Hardware configuration
-            mouse_id: Subject ID
+            subject_id: Subject ID
             user_id: User ID
             script_checksum: Workflow file checksum
             params_checksum: Parameter file checksum
@@ -87,7 +87,7 @@ class MetadataGenerator:
             'items': {
                 'behavior': {
                     'config': config.get('Behavior', {}),
-                    'mouse_id': mouse_id,
+                    'subject_id': subject_id,
                     'user_id': user_id,
                     # Placeholder for behavior data coming from Bonsai
                     'bonsai_data': params.get('bonsai_output', {})
@@ -234,21 +234,21 @@ class MetadataGenerator:
     def create_backup_copy(self, 
                           source_path: str, 
                           backup_dir: str, 
-                          mouse_id: str) -> bool:
+                          subject_id: str) -> bool:
         """
         Create a backup copy of the output file.
         
         Args:
             source_path: Path to source file
             backup_dir: Backup directory base path
-            mouse_id: Mouse ID for organizing backups
+            subject_id: Mouse ID for organizing backups
             
         Returns:
             True if successful, False otherwise
         """
         try:
             # Create backup directory structure
-            mouse_backup_dir = os.path.join(backup_dir, mouse_id, "output")
+            mouse_backup_dir = os.path.join(backup_dir, subject_id, "output")
             if not os.path.isdir(mouse_backup_dir):
                 os.makedirs(mouse_backup_dir)
             

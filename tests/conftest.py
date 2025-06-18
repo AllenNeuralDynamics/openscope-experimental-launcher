@@ -26,9 +26,8 @@ def temp_dir():
 def sample_params():
     """Sample experiment parameters for testing."""
     return {
-        "mouse_id": "test_mouse_123",
-        "user_id": "test_user",
-        "experimenter_name": "Test Experimenter",
+        "subject_id": "test_mouse_123",
+        "user_id": "Test User",
         "session_type": "SLAP2",
         "rig_id": "test_rig",
         "num_trials": 50,
@@ -70,7 +69,7 @@ def sample_config():
     """Sample CamStim configuration."""
     return {
         "Behavior": {
-            "mouse_id": "test_mouse",
+            "subject_id": "test_mouse",
             "user_id": "test_user",
             "nidevice": "Dev1"
         },

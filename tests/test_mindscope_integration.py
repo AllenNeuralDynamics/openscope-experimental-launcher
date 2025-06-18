@@ -93,7 +93,7 @@ class TestMindoscopeWithMinimalistParams:
             "bonsai_path": "code/stimulus-control/src/Standard_oddball_slap2.bonsai",
             "bonsai_exe_path": "code/stimulus-control/bonsai/Bonsai.exe",
             "bonsai_setup_script": "code/stimulus-control/bonsai/setup.cmd",
-            "mouse_id": "test_mouse",
+            "subject_id": "test_mouse",
             "user_id": "test_user"
         }
         
@@ -136,10 +136,8 @@ class TestMindoscopeWithMinimalistParams:
                 
                 if success:
                     print(f"\n✅ {rig_name} EXPERIMENT COMPLETED SUCCESSFULLY")
-                    
-                    # Verify that the experiment was properly initialized
-                    assert hasattr(experiment, 'mouse_id'), f"{rig_name} should have mouse_id set"
-                    assert hasattr(experiment, 'session_output_path'), f"{rig_name} should have session_output_path set"
+                      # Verify that the experiment was properly initialized
+                    assert hasattr(experiment, 'subject_id'), f"{rig_name} should have subject_id set"
                     
                     # Check that stop was called during cleanup
                     mock_stop.assert_called()
