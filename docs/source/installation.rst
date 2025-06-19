@@ -83,8 +83,8 @@ Test that the installation was successful:
 .. code-block:: python
 
    # Test basic functionality
-   from openscope_experimental_launcher.base.experiment import BaseExperiment
-   experiment = BaseExperiment()
+   from openscope_experimental_launcher.launchers import BaseLauncher
+   launcher = BaseLauncher()
    print("Installation successful!")
 
 Development Dependencies

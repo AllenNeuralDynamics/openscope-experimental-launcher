@@ -200,19 +200,18 @@ Output File Issues
       else:
           print("Output directory does not exist")
 
-2. **Verify file creation during experiment:**
+2. **Verify file creation during experiment:**   .. code-block:: python
 
-   .. code-block:: python
-
-      from openscope_experimental_launcher.base.experiment import BaseExperiment
+      from openscope_experimental_launcher.launchers import BaseLauncher
       import time
       
-      class DiagnosticExperiment(BaseExperiment):
+      class DiagnosticLauncher(BaseLauncher):
           def run(self, param_file):
               # Override run method to add file monitoring
               result = super().run(param_file)
               
-              # Check what files were actually created              if hasattr(self, 'session_directory') and self.session_directory:
+              # Check what files were actually created
+              if hasattr(self, 'session_directory') and self.session_directory:
                   output_path = Path(self.session_directory)
                   if output_path.exists():
                       print(f"Output directory created: {output_path}")
@@ -288,11 +287,9 @@ Memory and Performance Issues
               
               time.sleep(5)
 
-2. **Implement resource limits:**
+2. **Implement resource limits:**   .. code-block:: python
 
-   .. code-block:: python
-
-      class ResourceLimitedExperiment(BaseExperiment):
+      class ResourceLimitedLauncher(BaseLauncher):
           def __init__(self, memory_limit_mb=2048, cpu_limit_percent=80):
               super().__init__()
               self.memory_limit = memory_limit_mb

@@ -12,16 +12,19 @@
 
 ## Overview
 
-This package provides a modular, extensible launcher for neuroscience experiments in the OpenScope project. It supports multiple experimental interfaces and handles:
+This package provides a modular, extensible launcher for neuroscience experiments in the OpenScope project. It features a clean architectural separation between interface-specific process creation and common launcher functionality.
 
-- **Multi-Interface Support**: Bonsai, MATLAB, and Python experiment execution
-- **Modular Architecture**: Clean separation between common logic and interface-specific code
-- **Process Management**: Start, monitor, and manage experiment execution
-- **Parameter Management**: Load and pass parameters to experiment workflows
-- **Session Tracking**: Generate unique session IDs and track experiment metadata
-- **Git Repository Management**: Clone and manage workflow repositories
-- **Process Monitoring**: Monitor memory usage and handle runaway processes
-- **Windows Integration**: Uses Windows-specific APIs for robust process control (where applicable)
+### Key Features
+
+- **Multi-Interface Support**: Bonsai, MATLAB, and Python experiment execution through dedicated launchers
+- **Modular Architecture**: Clean separation between common logic (`BaseLauncher`) and interface-specific process creation
+- **Stateless Design**: Interface modules provide pure functions with no global state
+- **Process Management**: Comprehensive process monitoring, memory tracking, and cleanup
+- **Parameter Management**: Unified parameter handling with `script_path` convention
+- **Session Tracking**: Generate unique session IDs and comprehensive experiment metadata
+- **Git Repository Management**: Automatic cloning and version tracking for reproducibility
+- **Windows Integration**: Enhanced process control using Windows job objects (where available)
+- **Project Flexibility**: Custom launchers via scripts without modifying core code
 
 ## Architecture Overview
 

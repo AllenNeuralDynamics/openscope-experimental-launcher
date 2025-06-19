@@ -1,7 +1,7 @@
-Rig Launchers
-=============
+Launchers
+=========
 
-The OpenScope Experimental Launcher provides specialized launchers for different experimental rig types. Each launcher extends the base functionality with rig-specific features and metadata generation.
+The OpenScope Experimental Launcher provides a modular architecture with specialized launchers for different experimental environments. Each launcher is built on a common base and handles specific interfaces (Bonsai, MATLAB, Python) with process management and monitoring.
 
 Overview
 --------
@@ -12,219 +12,305 @@ Overview
 
    * - Launcher
      - Use Case
-     - Output Files
+     - Interface
      - Special Features
-   * - BaseExperiment
-     - Generic Bonsai workflows
-     - .pkl session file
-     - Basic process management
-   * - SLAP2Experiment
-     - SLAP2 imaging experiments
-     - .pkl, stimulus table .csv, session .json
-     - AIND metadata, stimulus analysis
+   * - BonsaiLauncher
+     - Bonsai workflows
+     - Bonsai workflows (.bonsai)
+     - Git management, Windows job objects
+   * - MATLABLauncher
+     - MATLAB scripts
+     - MATLAB scripts (.m)
+     - MATLAB engine, GPU support
+   * - PythonLauncher
+     - Python experiments
+     - Python scripts (.py)
+     - Environment management, package handling
 
-Base Experiment Launcher
--------------------------
+Base Launcher
+-------------
 
-The foundation for all other launchers, providing core Bonsai process management.
+The foundation for all other launchers, providing core process management and session tracking.
 
 .. code-block:: python
 
-   from openscope_experimental_launcher.base.experiment import BaseExperiment
+   from openscope_experimental_launcher.launchers import BaseLauncher
 
-   experiment = BaseExperiment()
-   success = experiment.run("parameters.json")
+   launcher = BaseLauncher()
+   success = launcher.run("parameters.json")
 
 **Features:**
-- Bonsai process management with Windows job objects
-- Git repository cloning and management
+- Universal process management with monitoring
 - Session UUID generation and tracking
-- Memory monitoring and process cleanup
-- Basic parameter validation
+- Memory and resource monitoring
+- Standardized parameter validation
+- Cross-platform process handling
 
 **Output:**
-- Session .pkl file with basic experiment metadata
+- Session .pkl file with experiment metadata
+- Standardized logging and monitoring data
 
-SLAP2 Experiment Launcher
---------------------------
+Bonsai Launcher
+---------------
 
-Specialized launcher for Selective Plane Activation with Multiphoton microscopy (SLAP2) experiments.
+Specialized launcher for Bonsai visual programming workflows.
 
 .. code-block:: python
 
-   from openscope_experimental_launcher.slap2.launcher import SLAP2Experiment
+   from openscope_experimental_launcher.launchers import BonsaiLauncher
 
-   experiment = SLAP2Experiment()
-   success = experiment.run("slap2_parameters.json")
+   launcher = BonsaiLauncher()
+   success = launcher.run("bonsai_parameters.json")
 
    if success:
-       print(f"Stimulus table: {experiment.stimulus_table_path}")
-       print(f"Session metadata: {experiment.session_json_path}")
+       print(f"Session data: {launcher.session_pkl_path}")
+       print(f"Process log: {launcher.process_log}")
 
 **Enhanced Features:**
-- AIND-data-schema compliant session.json generation
-- Automatic stimulus table creation from trial data
-- SLAP field-of-view (FOV) configuration tracking
-- Laser parameter validation and logging
-- Stimulus-only metadata mode (no POPhys requirements)
+- Git repository management and workflow checkout
+- Windows job objects for robust process control
+- Bonsai-specific parameter validation
+- Workflow path resolution and validation
+- Real-time process monitoring
 
-**Output Files:**
-- Session .pkl file (basic experiment data)
-- Stimulus table .csv file (trial-by-trial stimulus information)
-- Session .json file (AIND-compliant metadata)
-
-**SLAP2-Specific Parameters:**
+**Required Parameters:**
 
 .. code-block:: json
 
    {
-       "session_type": "SLAP2",
-       "user_id": "Dr. Researcher",
-       "laser_power": 15.0,
-       "laser_wavelength": 920,
-       "num_trials": 200,
-       "slap_fovs": [
-           {
-               "index": 0,
-               "imaging_depth": 150,
-               "targeted_structure": "V1",
-               "fov_coordinate_ml": 2.5,
-               "fov_coordinate_ap": -2.0,
-               "frame_rate": 30.0
-           }
-       ]   }
+       "repository_url": "https://github.com/user/workflow.git",
+       "script_path": "path/to/workflow.bonsai",
+       "OutputFolder": "C:/experiment_data"
+   }
 
-Cross-Launcher Compatibility
-----------------------------
+MATLAB Launcher
+---------------
 
-One of the key features of the system is that the same Bonsai workflow can run across different rig types with their respective post-processing.
+Specialized launcher for MATLAB-based experiments.
 
 .. code-block:: python
 
-   # Same parameter file, different launchers
-   params_file = "shared_workflow_params.json"
+   from openscope_experimental_launcher.launchers import MATLABLauncher
 
-   # Base launcher - minimal output
-   base_exp = BaseExperiment()
-   base_exp.run(params_file)
+   launcher = MATLABLauncher()
+   success = launcher.run("matlab_parameters.json")
 
-   # SLAP2 launcher - adds stimulus table and session.json
-   slap2_exp = SLAP2Experiment()
-   slap2_exp.run(params_file)
+**Enhanced Features:**
+- MATLAB engine integration
+- Script path validation and execution
+- GPU detection and configuration
+- Environment variable management
+- Cross-platform MATLAB support
 
-**Benefits:**
-- Workflow portability across rig types
-- Consistent parameter structure
-- Rig-specific metadata without workflow changes
-- Easy migration between experimental setups
+**Required Parameters:**
+
+.. code-block:: json
+
+   {
+       "script_path": "path/to/script.m",
+       "OutputFolder": "C:/experiment_data"
+   }
+
+Python Launcher
+---------------
+
+Specialized launcher for Python-based experiments.
+
+.. code-block:: python
+
+   from openscope_experimental_launcher.launchers import PythonLauncher
+
+   launcher = PythonLauncher()
+   success = launcher.run("python_parameters.json")
+
+**Enhanced Features:**
+- Python environment management
+- Package and dependency handling
+- Script execution with proper isolation
+- Cross-platform Python support
+- Real-time output capture
+
+**Required Parameters:**
+
+.. code-block:: json
+
+   {
+       "script_path": "path/to/script.py",
+       "OutputFolder": "C:/experiment_data"
+   }
+
+Launcher Interfaces
+-------------------
+
+Each launcher uses a corresponding stateless interface module that provides the process creation logic:
+
+- ``BonsaiInterface``: Creates Bonsai workflow processes
+- ``MATLABInterface``: Creates MATLAB script processes  
+- ``PythonInterface``: Creates Python script processes
+
+These interfaces can be used independently for custom launcher implementations:
+
+.. code-block:: python
+
+   from openscope_experimental_launcher.interfaces import BonsaiInterface
+   from openscope_experimental_launcher.launchers import BaseLauncher
+
+   # Direct interface usage
+   process = BonsaiInterface.create_process(
+       bonsai_path="path/to/workflow.bonsai",
+       parameters={"param1": "value1"}
+   )
+
+   # Custom launcher with interface
+   class CustomLauncher(BaseLauncher):
+       def _create_process(self, script_path, parameters):
+           return BonsaiInterface.create_process(script_path, parameters)
+
+Modular Architecture Benefits
+-----------------------------
+
+The new modular architecture provides several advantages:
+
+**Separation of Concerns:**
+- Launchers handle process management and monitoring
+- Interfaces handle process creation
+- Utilities provide shared functionality
+
+**Flexibility:**
+- Mix and match launchers with different interfaces
+- Easy to add new interfaces (e.g., Julia, R)
+- Stateless interfaces for better testing
+
+**Maintainability:**
+- Clear separation between launcher logic and interface logic
+- Easier to extend and modify individual components
+- Better code reusability
 
 Launcher Selection Guide
 ------------------------
 
-Choose the appropriate launcher based on your experimental setup:
+Choose the appropriate launcher based on your experiment type:
 
-**Use BaseExperiment when:**
-- Running generic Bonsai workflows
-- No rig-specific metadata needed
-- Prototyping or testing workflows
-- Simple stimulus presentation experiments
+**Use BonsaiLauncher when:**
+- Running Bonsai visual programming workflows
+- Need Git repository management
+- Working with .bonsai workflow files
+- Require Windows-specific process management
 
-**Use SLAP2Experiment when:**
-- Running SLAP2 imaging experiments
-- Need AIND-compliant metadata
-- Require stimulus table generation
-- Want comprehensive session documentation
+**Use MATLABLauncher when:**
+- Running MATLAB-based experiments
+- Need MATLAB engine integration
+- Working with .m script files
+- Require GPU configuration
+
+**Use PythonLauncher when:**
+- Running Python-based experiments
+- Need environment management
+- Working with .py script files
+- Require package dependency handling
+
+**Use BaseLauncher when:**
+- Creating custom implementations
+- Need minimal process management
+- Working with simple command-line tools
+- Prototyping new launcher types
 
 Custom Launcher Development
 ---------------------------
 
-You can create custom launchers by extending the base classes:
+Create custom launchers by extending BaseLauncher:
 
 .. code-block:: python
 
-   from openscope_experimental_launcher.base.experiment import BaseExperiment
+   from openscope_experimental_launcher.launchers import BaseLauncher
 
-   class CustomRigExperiment(BaseExperiment):
-       """Custom launcher for specialized rig."""
+   class CustomLauncher(BaseLauncher):
+       """Custom launcher for specialized experiments."""
        
-       def __init__(self):
-           super().__init__()
-           self.custom_metadata = {}
-       
-       def post_experiment_processing(self) -> bool:
-           """Add custom post-processing logic."""
-           # Generate custom metadata files
-           self._create_custom_metadata()
-           return super().post_experiment_processing()
-       
-       def _create_custom_metadata(self):
-           """Create rig-specific metadata files."""
-           # Implementation specific to your rig
-           pass
+       def _create_process(self, script_path, parameters):
+           """Create process for custom interface."""
+           command = ["custom_tool", script_path]
+           
+           # Add parameters as command line arguments
+           for key, value in parameters.items():
+               command.extend([f"--{key}", str(value)])
+           
+           return subprocess.Popen(
+               command,
+               stdout=subprocess.PIPE,
+               stderr=subprocess.PIPE,
+               text=True
+           )
 
 **Custom Launcher Guidelines:**
-- Always call ``super().__init__()`` in ``__init__``
-- Override ``post_experiment_processing()`` for custom outputs
-- Maintain compatibility with base parameter structure
-- Add rig-specific parameters as needed
-- Include comprehensive logging
+- Always extend ``BaseLauncher``
+- Implement ``_create_process()`` method
+- Return a ``subprocess.Popen`` object
+- Handle parameters appropriately for your interface
+- Add interface-specific validation as needed
 
 Advanced Usage
 --------------
 
-Launcher Chaining
-~~~~~~~~~~~~~~~~~
+Script-based Execution
+~~~~~~~~~~~~~~~~~~~~~~
 
-Run multiple launchers in sequence for comprehensive output:
+Use the provided scripts for common scenarios:
 
-.. code-block:: python
+.. code-block:: bash
 
-   def run_comprehensive_experiment(params_file):
-       """Run experiment with comprehensive output formats."""
-       
-       # Run SLAP2 for AIND metadata
-       slap2_exp = SLAP2Experiment()
-       slap2_success = slap2_exp.run(params_file)
-       
-       if slap2_success:
-           return {
-               'session_json': slap2_exp.session_json_path,
-               'stimulus_table': slap2_exp.stimulus_table_path,
-               'session_pickle': slap2_exp.pickle_file_path
-           }
+   # Minimalist launcher (no Git dependencies)
+   python scripts/minimalist_launcher.py parameters.json
 
-Conditional Launcher Selection
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   # Bonsai-specific launcher
+   python scripts/bonsai_launcher.py parameters.json
 
-Automatically select launcher based on parameters:
+   # Custom launcher implementation
+   python scripts/custom_launcher.py parameters.json
+
+Programmatic Usage
+~~~~~~~~~~~~~~~~~~
+
+Integrate launchers into larger systems:
 
 .. code-block:: python
 
-   def auto_select_launcher(params_file):
-       """Automatically select appropriate launcher."""
+   from openscope_experimental_launcher.launchers import BonsaiLauncher
+
+   def run_experiment_batch(parameter_files):
+       """Run multiple experiments in sequence."""
+       results = []
        
-       with open(params_file) as f:
-           params = json.load(f)
+       for params_file in parameter_files:
+           launcher = BonsaiLauncher()
+           success = launcher.run(params_file)
+           
+           results.append({
+               'params_file': params_file,
+               'success': success,
+               'session_uuid': launcher.session_uuid,
+               'session_data': launcher.session_pkl_path
+           })
        
-       rig_type = params.get('rig_id', '').lower()
-       session_type = params.get('session_type', '').lower()
-       
-       if 'slap2' in rig_type or 'slap2' in session_type:
-           return SLAP2Experiment()
-       else:
-           return BaseExperiment()
+       return results
 
 Performance Considerations
 --------------------------
 
+**Process Management:**
+- All launchers include process monitoring
+- Automatic cleanup of processes and resources
+- Cross-platform process handling
+
 **Memory Usage:**
-- All launchers include memory monitoring
-- Automatic cleanup of runaway processes
-- Windows job object process management
+- Efficient session data serialization
+- Memory monitoring during experiments
+- Automatic resource cleanup
 
 **File I/O:**
-- Efficient pickle serialization for metadata
-- Streaming CSV generation for large stimulus tables
+- Standardized parameter file handling
+- Efficient logging and data output
+- Session tracking and management
 - Atomic file operations to prevent corruption
 
 **Process Management:**

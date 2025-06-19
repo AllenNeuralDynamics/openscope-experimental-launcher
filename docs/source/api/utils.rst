@@ -1,7 +1,7 @@
 API Reference - Utils Module
 ============================
 
-The utils module provides utility classes and functions that support the core functionality of the OpenScope Experimental Launcher.
+The utils module provides shared utility classes and functions used across the launcher ecosystem.
 
 Overview
 --------
@@ -9,10 +9,12 @@ Overview
 The utils module contains helper classes for:
 
 - **ConfigLoader**: Loading and parsing CamStim-style configuration files
-- **GitManager**: Git repository operations and version control
+- **GitManager**: Git repository operations and version control  
 - **ProcessMonitor**: Process health monitoring and resource tracking
-- **FileUtils**: File system operations and path management
-- **ValidationUtils**: Parameter validation and schema checking
+- **SessionBuilder**: Session metadata creation and management
+- **StimulusTable**: Stimulus table generation and validation
+
+These utilities are used by the launcher classes to provide common functionality across different experiment types and interfaces.
 
 ConfigLoader Class
 ------------------

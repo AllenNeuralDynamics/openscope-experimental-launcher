@@ -1,53 +1,62 @@
 API Reference
 =============
 
-This section provides detailed API documentation for all public classes and functions in the OpenScope Experimental Launcher.
+The OpenScope Experimental Launcher API is organized into several modules that provide different aspects of functionality.
 
-Core Classes
-------------
+.. toctree::
+   :maxdepth: 2
 
-BaseExperiment
-~~~~~~~~~~~~~~
+   api/launchers
+   api/interfaces
+   api/utils
 
-.. autoclass:: openscope_experimental_launcher.BaseExperiment
-   :members:
-   :undoc-members:
-   :show-inheritance:
+Overview
+--------
 
-   The base experiment class that handles the core functionality of running experiments.
+The API follows a modular design with clear separation of concerns:
 
-   **Key Methods:**
+**Launchers** (``openscope_experimental_launcher.launchers``)
+   Main launcher classes that manage the complete experiment lifecycle, from process creation to session tracking and cleanup.
 
-   .. automethod:: openscope_experimental_launcher.BaseExperiment.run
-   .. automethod:: openscope_experimental_launcher.BaseExperiment.load_parameters
-   .. automethod:: openscope_experimental_launcher.BaseExperiment.setup_repository
-   .. automethod:: openscope_experimental_launcher.BaseExperiment.start_bonsai
-   .. automethod:: openscope_experimental_launcher.BaseExperiment.wait_for_completion
-   .. automethod:: openscope_experimental_launcher.BaseExperiment.cleanup
+**Interfaces** (``openscope_experimental_launcher.interfaces``)
+   Stateless interface classes that handle process creation for specific execution environments (Bonsai, MATLAB, Python).
 
-   **Properties:**
+**Utilities** (``openscope_experimental_launcher.utils``)
+   Shared utility classes for configuration loading, Git management, process monitoring, and other common functionality.
 
-   .. autoproperty:: openscope_experimental_launcher.BaseExperiment.session_directory
-   .. autoproperty:: openscope_experimental_launcher.BaseExperiment.is_running
-   .. autoproperty:: openscope_experimental_launcher.BaseExperiment.has_completed
+Quick Start
+-----------
 
-Slap2Experiment
-~~~~~~~~~~~~~~~
+.. code-block:: python
 
-.. autoclass:: openscope_experimental_launcher.Slap2Experiment
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   # Basic usage with a Bonsai launcher
+   from openscope_experimental_launcher.launchers import BonsaiLauncher
 
-   Specialized experiment class for SLAP2 (Simultaneous Light Activation and Photometry) experiments.
+   launcher = BonsaiLauncher()
+   success = launcher.run("parameters.json")
 
-   **Additional Methods:**
+   # Direct interface usage
+   from openscope_experimental_launcher.interfaces import BonsaiInterface
 
-   .. automethod:: openscope_experimental_launcher.Slap2Experiment.create_stimulus_table
-   .. automethod:: openscope_experimental_launcher.Slap2Experiment.create_session_json
-   .. automethod:: openscope_experimental_launcher.Slap2Experiment.validate_slap2_parameters
+   process = BonsaiInterface.create_process(
+       "workflow.bonsai", 
+       {"NumTrials": 100}
+   )
 
-   **SLAP2-Specific Properties:**
+Design Principles
+-----------------
+
+**Modular Architecture:**
+Components are organized into separate modules with clear responsibilities and minimal coupling.
+
+**Stateless Interfaces:**
+Interface classes don't maintain state, making them thread-safe and easy to test.
+
+**Unified Parameter Handling:**
+All launchers use the same parameter structure with ``script_path`` as the primary parameter.
+
+**Cross-Platform Support:**
+Code is designed to work across different operating systems and execution environments.
 
    .. autoproperty:: openscope_experimental_launcher.Slap2Experiment.stimulus_table_path
    .. autoproperty:: openscope_experimental_launcher.Slap2Experiment.session_json_path

@@ -1,13 +1,15 @@
 
-]Examples
+Examples
 ========
 
-This section provides practical examples of using the OpenScope Experimental Launcher in various scenarios.
+This section provides practical examples of using the OpenScope Experimental Launcher with the new modular architecture.
 
 .. toctree::
-   :maxdepth: 2   examples/basic_usage
-   examples/slap2_workflows
-   examples/custom_launchers
+   :maxdepth: 2
+
+   examples/basic_usage
+   examples/launcher_types
+   examples/custom_implementations
    examples/batch_processing
    examples/error_handling
 
@@ -16,23 +18,23 @@ Working Examples
 
 This section provides complete, working examples of using the OpenScope Experimental Launcher for different experimental scenarios.
 
-Basic Experiment Example
--------------------------
+Basic Launcher Example
+-----------------------
 
-Complete Basic Workflow
-~~~~~~~~~~~~~~~~~~~~~~~~
+Simple Bonsai Workflow
+~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
-   :caption: basic_experiment_example.py
+   :caption: basic_bonsai_example.py
 
    """
-   Complete example of running a basic OpenScope experiment.
+   Complete example of running a Bonsai workflow with the new launcher architecture.
    """
    
    import logging
    import json
    from pathlib import Path
-   from openscope_experimental_launcher.base.experiment import BaseExperiment
+   from openscope_experimental_launcher.launchers import BonsaiLauncher
 
    # Set up logging
    logging.basicConfig(
@@ -41,13 +43,128 @@ Complete Basic Workflow
    )
 
    def create_basic_parameters():
-       """Create a basic parameter file for testing."""
+       """Create a basic parameter file for Bonsai experiments."""
        params = {
-           "subject_id": "example_mouse_001",
-           "user_id": "researcher_jane",
-           "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
+           "repository_url": "https://github.com/user/bonsai-workflows.git",
+           "script_path": "workflows/visual_stimulus.bonsai",
            "repository_commit_hash": "main",
-           "local_repository_path": "C:/BonsaiExperiments/BasicExample",
+           "OutputFolder": "C:/ExperimentData",
+           "bonsai_parameters": {
+               "NumTrials": 100,
+               "StimulusDuration": 2.0,
+               "InterTrialInterval": 1.0
+           }
+       }
+       
+       # Save parameters to file
+       params_file = Path("basic_bonsai_params.json")
+       with open(params_file, 'w') as f:
+           json.dump(params, f, indent=2)
+       
+       return params_file
+
+   def run_basic_experiment():
+       """Run a basic Bonsai experiment."""
+       
+       # Create parameter file
+       params_file = create_basic_parameters()
+       
+       # Create and run launcher
+       launcher = BonsaiLauncher()
+       success = launcher.run(str(params_file))
+       
+       if success:
+           print(f"Experiment completed successfully!")
+           print(f"Session UUID: {launcher.session_uuid}")
+           print(f"Session data: {launcher.session_pkl_path}")
+       else:
+           print("Experiment failed!")
+       
+       return success
+
+   if __name__ == "__main__":
+       run_basic_experiment()
+
+Multi-Interface Examples
+------------------------
+
+Python Script Launcher
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+   :caption: python_experiment_example.py
+
+   """
+   Example of running a Python-based experiment.
+   """
+   
+   from openscope_experimental_launcher.launchers import PythonLauncher
+   import json
+
+   def create_python_parameters():
+       """Create parameters for Python experiment."""
+       params = {
+           "script_path": "experiments/visual_task.py",
+           "OutputFolder": "C:/ExperimentData",
+           "python_parameters": {
+               "subject_id": "mouse_001",
+               "num_trials": 150,
+               "stimulus_type": "gratings"
+           }
+       }
+       
+       with open("python_params.json", 'w') as f:
+           json.dump(params, f, indent=2)
+       
+       return "python_params.json"
+
+   def run_python_experiment():
+       """Run Python experiment."""
+       params_file = create_python_parameters()
+       
+       launcher = PythonLauncher()
+       success = launcher.run(params_file)
+       
+       return success
+
+MATLAB Script Launcher
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+   :caption: matlab_experiment_example.py
+
+   """
+   Example of running a MATLAB-based experiment.
+   """
+   
+   from openscope_experimental_launcher.launchers import MATLABLauncher
+   import json
+
+   def create_matlab_parameters():
+       """Create parameters for MATLAB experiment."""
+       params = {
+           "script_path": "analysis/process_data.m",
+           "OutputFolder": "C:/ExperimentData",
+           "matlab_parameters": {
+               "data_path": "C:/RawData",
+               "analysis_type": "spectral",
+               "save_plots": True
+           }
+       }
+       
+       with open("matlab_params.json", 'w') as f:
+           json.dump(params, f, indent=2)
+       
+       return "matlab_params.json"
+
+   def run_matlab_experiment():
+       """Run MATLAB experiment."""
+       params_file = create_matlab_parameters()
+       
+       launcher = MATLABLauncher()
+       success = launcher.run(params_file)
+       
+       return success
            "bonsai_path": "code/stimulus-control/src/Standard_oddball_slap2.bonsai",
            "bonsai_exe_path": "code/stimulus-control/bonsai/Bonsai.exe",
            "output_directory": "C:/ExperimentData/BasicExample",

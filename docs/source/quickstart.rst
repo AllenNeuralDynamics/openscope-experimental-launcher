@@ -6,9 +6,7 @@ This guide will help you run your first experiment with the OpenScope Experiment
 Basic Experiment Setup
 -----------------------
 
-1. **Create a Parameter File**
-
-   Create a JSON file with your experiment parameters:
+1. **Create a Parameter File**   Create a JSON file with your experiment parameters:
 
    .. code-block:: json
       :caption: example_params.json
@@ -19,26 +17,70 @@ Basic Experiment Setup
           "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
           "repository_commit_hash": "main",
           "local_repository_path": "C:/BonsaiExperiments",
-          "bonsai_path": "code/stimulus-control/src/Standard_oddball_slap2.bonsai",
+          "script_path": "code/stimulus-control/src/Standard_oddball_slap2.bonsai",
           "bonsai_exe_path": "code/stimulus-control/bonsai/Bonsai.exe",
           "OutputFolder": "C:/experiment_data"
       }
 
-2. **Run Basic Experiment**
+2. **Choose Your Interface**
+
+   Select the appropriate launcher for your experiment type:
+
+   **For Bonsai Workflows:**
 
    .. code-block:: python
 
-      from openscope_experimental_launcher.base.experiment import BaseExperiment
+      from openscope_experimental_launcher.launchers import BonsaiLauncher
 
-      # Create experiment instance
-      experiment = BaseExperiment()
+      # Create launcher instance
+      launcher = BonsaiLauncher()
 
       # Run the experiment
-      success = experiment.run("example_params.json")      if success:
+      success = launcher.run("example_params.json")
+      if success:
           print("Experiment completed successfully!")
-          print(f"Data saved to: {experiment.session_directory}")
+          print(f"Data saved to: {launcher.session_directory}")
       else:
           print("Experiment failed. Check logs for details.")
+
+   **For MATLAB Scripts:**
+
+   .. code-block:: python
+
+      from openscope_experimental_launcher.launchers import MatlabLauncher
+
+      # Create launcher instance  
+      launcher = MatlabLauncher()
+
+      # Run the experiment
+      success = launcher.run("matlab_params.json")
+
+   **For Python Scripts:**
+
+   .. code-block:: python
+
+      from openscope_experimental_launcher.launchers import PythonLauncher
+
+      # Create launcher instance
+      launcher = PythonLauncher()
+
+      # Run the experiment
+      success = launcher.run("python_params.json")
+
+3. **Using Project Scripts**
+
+   For project-specific experiments, use the launcher scripts:
+
+   .. code-block:: bash
+
+      # Test BaseLauncher functionality
+      python scripts/minimalist_launcher.py scripts/example_minimalist_params.json
+
+      # SLAP2 imaging experiments
+      python scripts/slap2_launcher.py path/to/slap2_params.json
+
+      # Predictive processing experiments  
+      python scripts/predictive_processing_launcher.py path/to/pp_params.json
 
 Command Line Usage
 ------------------
