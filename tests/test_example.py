@@ -9,8 +9,7 @@ def test_package_imports():
     """Test that all main package components can be imported."""
     try:
         from openscope_experimental_launcher import BaseExperiment, SLAP2Experiment
-        from openscope_experimental_launcher.utils import GitManager, ConfigLoader, ProcessMonitor
-        from openscope_experimental_launcher.slap2 import SLAP2SessionBuilder, SLAP2StimulusTableGenerator
+        from openscope_experimental_launcher.utils import git_manager, config_loader, process_monitor
         assert True
     except ImportError as e:
         pytest.fail(f"Failed to import package components: {e}")

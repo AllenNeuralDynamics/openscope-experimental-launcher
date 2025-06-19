@@ -2,22 +2,22 @@
 
 ## Overview
 
-The session building logic has been refactored to support reusability across different rigs. The new architecture consists of:
+The session building logic has been refactored from class-based to functional approach for better reusability across different rigs. The new architecture consists of:
 
-1. **BaseSessionBuilder** - A base class in `openscope_experimental_launcher.base.session_builder`
-2. **Rig-specific implementations** - That extend the base class (e.g., SLAP2SessionBuilder)
+1. **Functional session builders** - Located in `openscope_experimental_launcher.utils.session_builder`
+2. **Rig-specific implementations** - That use the functional utilities (e.g., `build_slap2_session`)
 
 ## Architecture
 
-### BaseSessionBuilder
+### Functional Session Builders
 
-The `BaseSessionBuilder` class provides:
-- Common session building logic
-- Abstract methods that must be implemented by rig-specific classes
-- Helper methods for creating common configurations (lasers, detectors, etc.)
+The `utils.session_builder` module provides:
+- Common session building utilities
+- Specialized functions for different rigs
+- Helper functions for creating common configurations (lasers, detectors, etc.)
 - Standardized parameter handling
 
-### Key Abstract Methods
+### Key Functions
 
 Rig-specific implementations must implement:
 
@@ -46,18 +46,25 @@ def _get_additional_script_parameters(self, params):
 
 ## Creating a New Rig Session Builder
 
-### Step 1: Create the Session Builder Class
+### Step 1: Create the Session Builder Function
 
 ```python
-from openscope_experimental_launcher.base.session_builder import BaseSessionBuilder
+from openscope_experimental_launcher.utils import session_builder
 
-class MyRigSessionBuilder(BaseSessionBuilder):
-    def __init__(self):
-        super().__init__("MyRig")  # Rig name
+def build_my_rig_session(params, experiment_config, **kwargs):
+    """Build session metadata for MyRig."""
+    # Use the functional session builder utilities
+    session_data = session_builder.build_session(
+        rig_name="MyRig",
+        params=params,
+        experiment_config=experiment_config,
+        **kwargs
+    )
     
-    def _create_stimulus_epoch(self, start_time, end_time, params, bonsai_software, script_software, **kwargs):
-        # Create rig-specific stimulus epoch
-        return StimulusEpoch(
+    # Add rig-specific customizations
+    session_data["my_rig_specific_field"] = "custom_value"
+    
+    return session_data
             stimulus_start_time=start_time,
             stimulus_end_time=end_time,
             stimulus_name=params.get("stimulus_name", "My Rig Stimulus"),

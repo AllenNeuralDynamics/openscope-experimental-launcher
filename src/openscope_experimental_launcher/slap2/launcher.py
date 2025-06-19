@@ -20,8 +20,8 @@ except ImportError:
     logging.warning("aind-data-schema modules not available. Session.json creation will be disabled.")
 
 from ..base.experiment import BaseExperiment
-from .session_builder import SLAP2SessionBuilder
-from .stimulus_table import SLAP2StimulusTableGenerator
+from ..utils import session_builder
+from ..utils import stimulus_table
 
 
 class SLAP2Experiment(BaseExperiment):
@@ -46,15 +46,10 @@ class SLAP2Experiment(BaseExperiment):
         self.trial_data = []
         self.session_json_path = None
         self.stimulus_table_path = None
-        
-        # Additional session parameters for SLAP2
+          # Additional session parameters for SLAP2
         self.session_type = "SLAP2"
         self.rig_id = "slap2_rig"
         self.user_id = "Unknown"  # Initialize with default
-        
-        # Initialize SLAP2 utility classes
-        self.session_builder = SLAP2SessionBuilder()
-        self.stimulus_table_generator = SLAP2StimulusTableGenerator()
         
         logging.info("SLAP2 Bonsai Experiment initialized")
     
@@ -96,8 +91,7 @@ class SLAP2Experiment(BaseExperiment):
             param_file: Path to the JSON parameter file
         """        # Call parent method to load base parameters (which includes runtime collection)
         super().load_parameters(param_file)
-          # Extract SLAP2-specific parameters from loaded params (runtime info is already merged)
-        self.session_type = self.params.get("session_type", "SLAP2")
+          # Extract SLAP2-specific parameters from loaded params (runtime info is already merged)        self.session_type = self.params.get("session_type", "SLAP2")
         self.rig_id = self.params.get("rig_id", "slap2_rig")
         self.user_id = self.params.get("user_id", "Unknown")
         logging.info("SLAP2 parameters loaded successfully")
@@ -110,14 +104,13 @@ class SLAP2Experiment(BaseExperiment):
             True if successful, False otherwise
         """
         try:
-            # Generate stimulus table using the specialized generator
-            self.stimulus_table = self.stimulus_table_generator.generate_stimulus_table(
+            # Generate stimulus table using the functional approach
+            self.stimulus_table = stimulus_table.generate_slap2_stimulus_table(
                 self.params, 
                 self.session_directory
             )
             
-            if self.stimulus_table is not None:
-                # Save stimulus table
+            if self.stimulus_table is not None:                # Save stimulus table
                 self.stimulus_table_path = os.path.join(
                     self.session_directory,
                     f"{self.session_uuid}_stimulus_table.csv"
@@ -147,15 +140,19 @@ class SLAP2Experiment(BaseExperiment):
             return False
         
         try:
-            # Create session using the specialized builder
-            session = self.session_builder.build_session(
+            # Create session using the functional session builder
+            # Add slap_fovs to params for the session builder
+            session_params = self.params.copy() if self.params else {}
+            session_params["slap_fovs"] = self.slap_fovs
+            
+            session = session_builder.build_slap2_session(
                 start_time=self.start_time,
                 end_time=self.stop_time,
-                params=self.params,
+                params=session_params,
                 subject_id=self.subject_id,
                 user_id=self.user_id,
-                session_uuid=self.session_uuid,
-                slap_fovs=self.slap_fovs            )
+                session_uuid=self.session_uuid
+            )
             
             if session:
                 # Save session.json - fix the file path to avoid duplicate "session"

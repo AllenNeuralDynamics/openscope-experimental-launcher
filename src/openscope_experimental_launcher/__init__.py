@@ -9,5 +9,5 @@ __version__ = "0.1.0"
 
 # Import main classes for easy access
 from .base.experiment import BaseExperiment
-from .base.bonsai_interface import BonsaiInterface
+from .base import bonsai_interface
 from .slap2.launcher import SLAP2Experiment

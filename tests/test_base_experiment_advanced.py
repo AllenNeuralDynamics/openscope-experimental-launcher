@@ -110,7 +110,7 @@ class TestBaseExperimentComprehensive:
         experiment = BaseExperiment()
         
         with patch.object(experiment, 'collect_runtime_information', return_value={}), \
-             patch.object(experiment.config_loader, 'load_config', return_value={
+             patch('openscope_experimental_launcher.utils.config_loader.load_config', return_value={
                  'Behavior': {'subject_id': 'config_mouse', 'user_id': 'config_user'}
              }):
             
@@ -141,41 +141,42 @@ class TestBaseExperimentComprehensive:
             }
         }
         
-        # Mock the create_bonsai_property_arguments method since it doesn't exist in the actual interface
-        def mock_create_args(params):
-            args = []
-            if "bonsai_parameters" in params:
-                for key, value in params["bonsai_parameters"].items():
-                    args.extend(["--property", f"{key}={value}"])
-            return args
-        
-        experiment.bonsai_interface.create_bonsai_property_arguments = mock_create_args
-        args = experiment.bonsai_interface.create_bonsai_property_arguments(experiment.params)
-        
-        expected_args = [
-            "--property", "StimType=gratings",
-            "--property", "Duration=300", 
-            "--property", "MouseID=test_mouse"
-        ]
-        assert args == expected_args
+        # Mock the bonsai_interface function directly
+        with patch('openscope_experimental_launcher.base.bonsai_interface.construct_workflow_arguments') as mock_construct:
+            def mock_create_args(params):
+                args = []
+                if "bonsai_parameters" in params:
+                    for key, value in params["bonsai_parameters"].items():
+                        args.extend(["--property", f"{key}={value}"])
+                return args
+            
+            mock_construct.return_value = mock_create_args(experiment.params)
+            
+            # Import the module to test it
+            from openscope_experimental_launcher.base import bonsai_interface
+            args = bonsai_interface.construct_workflow_arguments(experiment.params)
+            
+            expected_args = [
+                "--property", "StimType=gratings",
+                "--property", "Duration=300", 
+                "--property", "MouseID=test_mouse"
+            ]
+            assert args == expected_args
 
     def test_create_bonsai_arguments_no_parameters(self):
         """Test Bonsai argument creation with no custom parameters."""
         experiment = BaseExperiment()
         experiment.params = {}
         
-        # Mock the create_bonsai_property_arguments method since it doesn't exist in the actual interface
-        def mock_create_args(params):
-            args = []
-            if "bonsai_parameters" in params:
-                for key, value in params["bonsai_parameters"].items():
-                    args.extend(["--property", f"{key}={value}"])
-            return args
-        
-        experiment.bonsai_interface.create_bonsai_property_arguments = mock_create_args
-        args = experiment.bonsai_interface.create_bonsai_property_arguments(experiment.params)
-        
-        assert args == []
+        # Mock the bonsai_interface function directly
+        with patch('openscope_experimental_launcher.base.bonsai_interface.construct_workflow_arguments') as mock_construct:
+            mock_construct.return_value = []
+            
+            # Import the module to test it
+            from openscope_experimental_launcher.base import bonsai_interface
+            args = bonsai_interface.construct_workflow_arguments(experiment.params)
+            
+            assert args == []
 
     def test_get_workflow_path_missing_path(self):
         """Test workflow path resolution with missing workflow path."""
@@ -191,7 +192,7 @@ class TestBaseExperimentComprehensive:
         experiment.params = {'bonsai_path': '/nonexistent/workflow.bonsai'}
         
         with patch('os.path.exists', return_value=False), \
-             patch.object(experiment.git_manager, 'get_repository_path', return_value=None):
+             patch('openscope_experimental_launcher.utils.git_manager.get_repository_path', return_value=None):
               with pytest.raises(FileNotFoundError, match="Workflow file not found"):
                 experiment._get_workflow_path()
 
@@ -200,12 +201,11 @@ class TestBaseExperimentComprehensive:
         """Test workflow path resolution with relative paths."""
         experiment = BaseExperiment()
         experiment.params = {
-            'bonsai_path': 'workflow.bonsai'
-        }
+            'bonsai_path': 'workflow.bonsai'        }
         
         with patch('os.path.exists', return_value=True), \
              patch('os.path.isabs', return_value=False), \
-             patch.object(experiment.git_manager, 'get_repository_path', return_value='/repo'):
+             patch('openscope_experimental_launcher.utils.git_manager.get_repository_path', return_value='/repo'):
             
             workflow_path = experiment._get_workflow_path()
             
@@ -272,7 +272,7 @@ class TestBaseExperimentComprehensive:
         experiment.user_id = "test_user"
         experiment._output_threads = []
         
-        with patch.object(experiment.process_monitor, 'monitor_process'):
+        with patch('openscope_experimental_launcher.utils.process_monitor.monitor_process'):
             experiment._monitor_bonsai()
 
     def test_monitor_bonsai_success_with_warnings(self):
@@ -286,7 +286,7 @@ class TestBaseExperimentComprehensive:
         experiment._output_threads = []
         experiment.start_time = datetime.datetime.now()
         
-        with patch.object(experiment.process_monitor, 'monitor_process'):
+        with patch('openscope_experimental_launcher.utils.process_monitor.monitor_process'):
             experiment._monitor_bonsai()
             
             assert experiment.stop_time is not None
@@ -297,7 +297,7 @@ class TestBaseExperimentComprehensive:
         experiment.bonsai_process = Mock()
         experiment._output_threads = []
         
-        with patch.object(experiment.process_monitor, 'monitor_process', side_effect=Exception("Monitor failed")), \
+        with patch('openscope_experimental_launcher.utils.process_monitor.monitor_process', side_effect=Exception("Monitor failed")), \
              patch.object(experiment, 'stop'):
             
             experiment._monitor_bonsai()
@@ -368,7 +368,7 @@ class TestBaseExperimentComprehensive:
         experiment = BaseExperiment()
         
         with patch.object(experiment, 'load_parameters'), \
-             patch.object(experiment.git_manager, 'setup_repository', return_value=False), \
+             patch('openscope_experimental_launcher.utils.git_manager.setup_repository', return_value=False), \
              patch.object(experiment, 'stop'):
             
             result = experiment.run("test_params.json")
@@ -382,7 +382,7 @@ class TestBaseExperimentComprehensive:
         experiment.bonsai_process.returncode = 1
         
         with patch.object(experiment, 'load_parameters'), \
-             patch.object(experiment.git_manager, 'setup_repository', return_value=True), \
+             patch('openscope_experimental_launcher.utils.git_manager.setup_repository', return_value=True), \
              patch.object(experiment, 'start_bonsai'), \
              patch.object(experiment, 'stop'):
             
@@ -397,7 +397,7 @@ class TestBaseExperimentComprehensive:
         experiment.bonsai_process.returncode = 0
         
         with patch.object(experiment, 'load_parameters'), \
-             patch.object(experiment.git_manager, 'setup_repository', return_value=True), \
+             patch('openscope_experimental_launcher.utils.git_manager.setup_repository', return_value=True), \
              patch.object(experiment, 'start_bonsai'), \
              patch.object(experiment, 'post_experiment_processing', return_value=False), \
              patch.object(experiment, 'stop'):

@@ -1,16 +1,19 @@
 """
 Utility modules for OpenScope experimental launchers.
 
-Contains helper classes for configuration loading, Git management,
-and process monitoring.
+Contains helper functions for configuration loading, Git management,
+process monitoring, and session building.
 """
 
-from .config_loader import ConfigLoader
-from .git_manager import GitManager
-from .process_monitor import ProcessMonitor
+# Import functions from modules
+from . import config_loader
+from . import git_manager
+from . import process_monitor
+from . import session_builder
 
 __all__ = [
-    "ConfigLoader",
-    "GitManager", 
-    "ProcessMonitor"
+    "config_loader",
+    "git_manager", 
+    "process_monitor",
+    "session_builder"
 ]

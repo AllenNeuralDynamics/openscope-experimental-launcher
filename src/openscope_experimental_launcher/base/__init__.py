@@ -6,11 +6,9 @@ parameter management, process monitoring, and metadata generation.
 """
 
 from .experiment import BaseExperiment
-from .bonsai_interface import BonsaiInterface
-from .session_builder import BaseSessionBuilder
+from . import bonsai_interface
 
 __all__ = [
     "BaseExperiment",
-    "BonsaiInterface", 
-    "BaseSessionBuilder"
+    "bonsai_interface"
 ]

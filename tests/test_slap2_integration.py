@@ -63,12 +63,11 @@ class TestSLAP2WithMinimalistParams:
             "subject_id": "test_mouse",
             "user_id": "test_user"
         }
-        
-        # Comprehensive mocking for CI environments
+          # Comprehensive mocking for CI environments
         with patch('subprocess.Popen') as mock_popen, \
              patch('psutil.virtual_memory') as mock_vmem, \
-             patch.object(experiment.git_manager, 'setup_repository', return_value=True), \
-             patch.object(experiment.process_monitor, 'monitor_process'), \
+             patch('openscope_experimental_launcher.utils.git_manager.setup_repository', return_value=True), \
+             patch('openscope_experimental_launcher.utils.process_monitor.monitor_process'), \
              patch('os.path.exists', return_value=True), \
              patch('os.path.isdir', return_value=True), \
              patch('os.makedirs'), \

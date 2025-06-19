@@ -99,7 +99,7 @@ python -m openscope_experimental_launcher.base.experiment --params parameters.js
 
 The package now includes a modular session builder architecture that allows reuse across different rigs:
 
-- **BaseSessionBuilder**: Core session building functionality that can be extended
+- **Functional session builders**: Core session building functionality in `utils/session_builder.py`
 - **Rig-specific implementations**: Custom session builders for each rig type (e.g., SLAP2)
 - **Backward compatibility**: Existing code continues to work unchanged
 - **Easy extensibility**: Simple to add support for new rig types
@@ -107,19 +107,22 @@ The package now includes a modular session builder architecture that allows reus
 #### Creating a New Rig Session Builder
 
 ```python
-from openscope_experimental_launcher.base.session_builder import BaseSessionBuilder
+from openscope_experimental_launcher.utils import session_builder
 
-class MyRigSessionBuilder(BaseSessionBuilder):
-    def __init__(self):
-        super().__init__("MyRig")
+def build_my_rig_session(params, experiment_config, **kwargs):
+    """Build session metadata for MyRig."""
+    # Use the functional session builder utilities
+    session_data = session_builder.build_session(
+        rig_name="MyRig",
+        params=params,
+        experiment_config=experiment_config,
+        **kwargs
+    )
     
-    def _create_stimulus_epoch(self, start_time, end_time, params, bonsai_software, script_software, **kwargs):
-        # Implement rig-specific stimulus epoch creation
-        pass
+    # Add rig-specific customizations
+    session_data["my_rig_specific_field"] = "custom_value"
     
-    def _create_data_streams(self, params, **kwargs):
-        # Implement rig-specific data stream creation
-        pass
+    return session_data
 ```
 
 See `docs/session_builder_refactoring.md` for detailed documentation and examples.

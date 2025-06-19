@@ -15,7 +15,8 @@ class TestWorkflowIntegration:
     """Integration tests for complete workflows."""
 
     def test_base_experiment_end_to_end(self, temp_dir):
-        """Test complete BaseExperiment workflow."""        # Create mock workflow file first
+        """Test complete BaseExperiment workflow."""
+        # Create mock workflow file first
         workflow_file = os.path.join(temp_dir, "test_workflow.bonsai")
         with open(workflow_file, 'w') as f:
             f.write("<WorkflowBuilder>Test Workflow</WorkflowBuilder>")
@@ -43,8 +44,8 @@ class TestWorkflowIntegration:
         # Mock subprocess to simulate Bonsai execution
         with patch('subprocess.Popen') as mock_popen, \
              patch('psutil.virtual_memory') as mock_vmem, \
-             patch.object(experiment.git_manager, 'setup_repository', return_value=True), \
-             patch.object(experiment.process_monitor, 'monitor_process'):
+             patch('openscope_experimental_launcher.utils.git_manager.setup_repository', return_value=True), \
+             patch('openscope_experimental_launcher.utils.process_monitor.monitor_process'):
             
             # Configure mocks
             mock_process = Mock()
@@ -56,8 +57,7 @@ class TestWorkflowIntegration:
             mock_popen.return_value = mock_process
             
             mock_vmem.return_value.percent = 50.0
-            
-            # Run experiment
+              # Run experiment
             result = experiment.run(param_file)
             
             assert result is True
@@ -67,7 +67,8 @@ class TestWorkflowIntegration:
 
     @pytest.mark.integration
     def test_slap2_experiment_end_to_end(self, temp_dir):
-        """Test complete SLAP2Experiment workflow with metadata generation."""        # Create mock workflow file first
+        """Test complete SLAP2Experiment workflow with metadata generation."""
+        # Create mock workflow file first
         workflow_file = os.path.join(temp_dir, "slap2_workflow.bonsai")
         with open(workflow_file, 'w') as f:
             f.write("<WorkflowBuilder>SLAP2 Test Workflow</WorkflowBuilder>")
@@ -105,12 +106,11 @@ class TestWorkflowIntegration:
             json.dump(params, f)
         
         experiment = SLAP2Experiment()
-        
-        # Mock subprocess and post-processing
+          # Mock subprocess and post-processing
         with patch('subprocess.Popen') as mock_popen, \
              patch('psutil.virtual_memory') as mock_vmem, \
-             patch.object(experiment.git_manager, 'setup_repository', return_value=True), \
-             patch.object(experiment.process_monitor, 'monitor_process'), \
+             patch('openscope_experimental_launcher.utils.git_manager.setup_repository', return_value=True), \
+             patch('openscope_experimental_launcher.utils.process_monitor.monitor_process'), \
              patch.object(experiment, 'post_experiment_processing', return_value=True):
             
             # Configure mocks
@@ -123,8 +123,7 @@ class TestWorkflowIntegration:
             mock_popen.return_value = mock_process
             
             mock_vmem.return_value.percent = 50.0
-            
-            # Run experiment
+              # Run experiment
             result = experiment.run(param_file)
             
             assert result is True
@@ -135,12 +134,9 @@ class TestWorkflowIntegration:
     @pytest.mark.requires_git
     def test_git_repository_integration(self, temp_dir):
         """Test Git repository management integration."""
-        from openscope_experimental_launcher.utils.git_manager import GitManager
-        
-        git_manager = GitManager()
-        
-        # Skip if Git is not available
-        if not git_manager.git_available:
+        from openscope_experimental_launcher.utils import git_manager
+          # Skip if Git is not available
+        if not git_manager._check_git_available():
             pytest.skip("Git not available for integration testing")
         
         # Test repository setup with local path
@@ -149,8 +145,7 @@ class TestWorkflowIntegration:
             'repository_commit_hash': 'main',
             'local_repository_path': temp_dir
         }
-        
-        # This test requires internet connection, so we'll mock it
+          # This test requires internet connection, so we'll mock it
         with patch.object(git_manager, '_clone_repository', return_value=True), \
              patch('os.path.exists', return_value=False):
             
@@ -160,9 +155,7 @@ class TestWorkflowIntegration:
     @pytest.mark.integration
     def test_config_loader_integration(self, temp_dir):
         """Test configuration loading integration."""
-        from openscope_experimental_launcher.utils.config_loader import ConfigLoader
-        
-        config_loader = ConfigLoader()
+        from openscope_experimental_launcher.utils import config_loader
         
         # Create test config file
         config_content = """
@@ -190,10 +183,8 @@ monitor_brightness = 50
     @pytest.mark.integration
     def test_stimulus_table_generation_integration(self, temp_dir):
         """Test stimulus table generation integration."""
-        from openscope_experimental_launcher.slap2.stimulus_table import SLAP2StimulusTableGenerator
+        from openscope_experimental_launcher.utils import stimulus_table
         import pandas as pd
-        
-        generator = SLAP2StimulusTableGenerator()
         
         # Create mock Bonsai output
         bonsai_output = pd.DataFrame({
@@ -210,7 +201,7 @@ monitor_brightness = 50
         session_output_path = os.path.join(temp_dir, "output.pkl")
         
         # Generate stimulus table
-        result = generator.generate_stimulus_table(params, session_output_path)
+        result = stimulus_table.generate_slap2_stimulus_table(params, session_output_path)
         
         assert result is not None
         assert len(result) >= 10
@@ -218,7 +209,7 @@ monitor_brightness = 50
         assert 'stimulus_type' in result.columns
         
         # Test statistics calculation
-        stats = generator.get_trial_statistics(result)
+        stats = stimulus_table.get_trial_statistics(result)
         assert stats['total_trials'] >= 10
         assert 'trial_types' in stats
 

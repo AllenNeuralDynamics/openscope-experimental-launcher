@@ -89,89 +89,83 @@ data_export_rep_port = 5001
 """
 
 
-class ConfigLoader:
+def _get_default_config_dir() -> str:
+    """Get the default CamStim configuration directory for Windows."""
+    return "C:/ProgramData/AIBS_MPE/camstim/"
+
+
+def _load_config_section(section: str, config: configparser.RawConfigParser) -> Dict[str, Any]:
     """
-    Handles loading and parsing of CamStim-compatible configuration files.
+    Load a section from the config file.
+    
+    Args:
+        section: Section name
+        config: ConfigParser object
+        
+    Returns:
+        Dictionary containing section configuration
     """
+    section_config = {}
     
-    def __init__(self):
-        """Initialize the configuration loader."""
-        self.default_config_dir = self._get_default_config_dir()
-        self.default_config_path = os.path.join(self.default_config_dir, "config", "stim.cfg")
+    try:
+        if config.has_section(section):
+            for key, value in config.items(section):
+                try:
+                    # Convert string to Python object
+                    section_config[key] = eval(value)
+                except (SyntaxError, NameError):
+                    # If eval fails, keep as string
+                    section_config[key] = value
+        
+        logging.debug(f"Loaded config section: {section}")
+        
+    except Exception as e:
+        logging.warning(f"Failed to load config section {section}: {e}")
     
-    def _get_default_config_dir(self) -> str:
-        """Get the default CamStim configuration directory for Windows."""
-        return "C:/ProgramData/AIBS_MPE/camstim/"
+    return section_config
+
+
+def load_config(params: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """
+    Load configuration from CamStim config files.
     
-    def load_config(self, params: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
-        """
-        Load configuration from CamStim config files.
+    Args:
+        params: Experiment parameters that may contain config path overrides
         
-        Args:
-            params: Experiment parameters that may contain config path overrides
-            
-        Returns:
-            Dictionary containing all configuration sections
-        """
-        config_path = params.get("config_path", self.default_config_path)
-        
-        # Ensure config directory exists
-        config_dir = os.path.dirname(config_path)
-        if not os.path.isdir(config_dir):
-            os.makedirs(config_dir)
-        
-        # Create default config file if it doesn't exist
-        if not os.path.isfile(config_path):
-            logging.info(f"Config file not found, creating default at {config_path}")
-            with open(config_path, 'w') as f:
-                f.write(DEFAULTCONFIG)
-        
-        # Load configuration
-        logging.info(f"Loading configuration from {config_path}")
-        
-        try:
-            config = configparser.RawConfigParser()
-            config.read_file(io.StringIO(DEFAULTCONFIG))
-            config.read(config_path)
-            
-            # Load all sections into dictionary
-            result = {}
-            for section_name in ['Behavior', 'Encoder', 'Reward', 'Licksensing', 
-                               'Sync', 'Stim', 'LIMS', 'SweepStim', 'Display', 'Datastream']:
-                result[section_name] = self._load_config_section(section_name, config)
-            
-            return result
-            
-        except Exception as e:
-            logging.warning(f"Error reading config file: {e}")
-            return {}
+    Returns:
+        Dictionary containing all configuration sections
+    """
+    default_config_dir = _get_default_config_dir()
+    default_config_path = os.path.join(default_config_dir, "config", "stim.cfg")
+    config_path = params.get("config_path", default_config_path)
     
-    def _load_config_section(self, section: str, config: configparser.RawConfigParser) -> Dict[str, Any]:
-        """
-        Load a section from the config file.
+    # Ensure config directory exists
+    config_dir = os.path.dirname(config_path)
+    if not os.path.isdir(config_dir):
+        os.makedirs(config_dir)
+    
+    # Create default config file if it doesn't exist
+    if not os.path.isfile(config_path):
+        logging.info(f"Config file not found, creating default at {config_path}")
+        with open(config_path, 'w') as f:
+            f.write(DEFAULTCONFIG)
+    
+    # Load configuration
+    logging.info(f"Loading configuration from {config_path}")
+    
+    try:
+        config = configparser.RawConfigParser()
+        config.read_file(io.StringIO(DEFAULTCONFIG))
+        config.read(config_path)
         
-        Args:
-            section: Section name
-            config: ConfigParser object
-            
-        Returns:
-            Dictionary containing section configuration
-        """
-        section_config = {}
+        # Load all sections into dictionary
+        result = {}
+        for section_name in ['Behavior', 'Encoder', 'Reward', 'Licksensing', 
+                           'Sync', 'Stim', 'LIMS', 'SweepStim', 'Display', 'Datastream']:
+            result[section_name] = _load_config_section(section_name, config)
         
-        try:
-            if config.has_section(section):
-                for key, value in config.items(section):
-                    try:
-                        # Convert string to Python object
-                        section_config[key] = eval(value)
-                    except (SyntaxError, NameError):
-                        # If eval fails, keep as string
-                        section_config[key] = value
-            
-            logging.debug(f"Loaded config section: {section}")
-            
-        except Exception as e:
-            logging.warning(f"Failed to load config section {section}: {e}")
+        return result
         
-        return section_config
+    except Exception as e:
+        logging.warning(f"Error reading config file: {e}")
+        return {}

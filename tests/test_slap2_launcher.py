@@ -19,24 +19,22 @@ class TestSLAP2Experiment:
         assert experiment.rig_id == "slap2_rig"
         assert experiment.user_id == "Unknown"
         assert experiment.slap_fovs == []
-        assert experiment.session_builder is not None
-        assert experiment.stimulus_table_generator is not None
+        # Test that stimulus table can be created using functional approach
+        assert hasattr(experiment, 'stimulus_table')
 
     def test_load_parameters_with_slap_fovs(self, param_file, sample_params, sample_slap_fovs):
         """Test parameter loading with SLAP FOV data."""
         experiment = SLAP2Experiment()
-        
-        # Add SLAP FOVs to parameters
+          # Add SLAP FOVs to parameters
         params_with_fovs = sample_params.copy()
         params_with_fovs["slap_fovs"] = sample_slap_fovs
         
-        with patch.object(experiment.config_loader, 'load_config', return_value={}), \
+        with patch('openscope_experimental_launcher.utils.config_loader.load_config', return_value={}), \
              patch('json.load', return_value=params_with_fovs), \
              patch('builtins.open'), \
              patch('hashlib.md5') as mock_md5:
             
             mock_md5.return_value.hexdigest.return_value = "test_checksum"
-            
             experiment.load_parameters(param_file)
         
         assert experiment.session_type == params_with_fovs["session_type"]
@@ -50,11 +48,13 @@ class TestSLAP2Experiment:
         
         # When schema is not available, experiment should still work
         assert experiment is not None
-        assert hasattr(experiment, 'session_builder')
-        assert hasattr(experiment, 'stimulus_table_generator')
+        # Test that stimulus table functionality exists through functional approach
+        assert hasattr(experiment, 'stimulus_table')
     
     def test_create_bonsai_arguments_slap2(self):
         """Test SLAP2-specific Bonsai argument creation with real workflow parameters."""
+        from openscope_experimental_launcher.base import bonsai_interface
+        
         experiment = SLAP2Experiment()
         experiment.subject_id = "test_mouse"
         experiment.session_uuid = "test-uuid"
@@ -65,26 +65,17 @@ class TestSLAP2Experiment:
                 "Subject": "test_subject",
                 "NbMismatchPerCondition": 5,
                 "NbBaselineGrating": 15,
-            }
-        }
+            }        }
         
-        # Mock the create_bonsai_property_arguments method since it doesn't exist in the actual interface
-        def mock_create_args(params):
-            args = []
-            if "bonsai_parameters" in params:
-                for key, value in params["bonsai_parameters"].items():
-                    args.extend(["--property", f"{key}={value}"])
-            return args
+        args = bonsai_interface.create_bonsai_property_arguments(experiment.params)
         
-        experiment.bonsai_interface.create_bonsai_property_arguments = mock_create_args
-        args = experiment.bonsai_interface.create_bonsai_property_arguments(experiment.params)
-        
-        assert "--property" in args
-        assert "PortName=COM3" in " ".join(args)
-        assert "OutputFolder=C:/TestData" in " ".join(args)
-        assert "Subject=test_subject" in " ".join(args)
-        assert "NbMismatchPerCondition=5" in " ".join(args)
-        assert "NbBaselineGrating=15" in " ".join(args)
+        assert "-p" in args
+        args_str = " ".join(args)
+        assert "PortName=COM3" in args_str
+        assert "OutputFolder=C:/TestData" in args_str
+        assert "Subject=test_subject" in args_str
+        assert "NbMismatchPerCondition=5" in args_str
+        assert "NbBaselineGrating=15" in args_str
 
     def test_create_stimulus_table_success(self, temp_dir):
         """Test successful stimulus table creation."""
@@ -92,7 +83,7 @@ class TestSLAP2Experiment:
         experiment.params = {"num_trials": 50}
         experiment.session_directory = temp_dir
         
-        with patch.object(experiment.stimulus_table_generator, 'generate_stimulus_table') as mock_gen:
+        with patch('openscope_experimental_launcher.utils.stimulus_table.generate_slap2_stimulus_table') as mock_gen:
             mock_gen.return_value = Mock()  # Mock DataFrame
             
             result = experiment.create_stimulus_table()
@@ -107,7 +98,7 @@ class TestSLAP2Experiment:
         experiment.params = {"num_trials": 50}
         experiment.session_directory = temp_dir
         
-        with patch.object(experiment.stimulus_table_generator, 'generate_stimulus_table') as mock_gen:
+        with patch('openscope_experimental_launcher.utils.stimulus_table.generate_slap2_stimulus_table') as mock_gen:
             mock_gen.return_value = None
             
             result = experiment.create_stimulus_table()
@@ -139,7 +130,7 @@ class TestSLAP2Experiment:
         mock_session = Mock()
         mock_session.write_standard_file = Mock()
         
-        with patch.object(experiment.session_builder, 'build_session', return_value=mock_session):
+        with patch('openscope_experimental_launcher.utils.session_builder.build_slap2_session', return_value=mock_session):
             result = experiment.create_session_json()
             
             assert result is True
@@ -150,7 +141,7 @@ class TestSLAP2Experiment:
         experiment = SLAP2Experiment()
         experiment.session_directory = temp_dir
         
-        with patch.object(experiment.session_builder, 'build_session', return_value=None):
+        with patch('openscope_experimental_launcher.utils.session_builder.build_slap2_session', return_value=None):
             result = experiment.create_session_json()
             
             assert result is False
@@ -182,7 +173,7 @@ class TestSLAP2Experiment:
         experiment = SLAP2Experiment()
         
         with patch.object(experiment, 'load_parameters') as mock_load, \
-             patch.object(experiment.git_manager, 'setup_repository', return_value=True), \
+             patch('openscope_experimental_launcher.utils.git_manager.setup_repository', return_value=True), \
              patch.object(experiment, 'start_bonsai'), \
              patch.object(experiment, 'post_experiment_processing', return_value=True), \
              patch('signal.signal'):
@@ -200,7 +191,7 @@ class TestSLAP2Experiment:
         experiment = SLAP2Experiment()
         
         with patch.object(experiment, 'load_parameters'), \
-             patch.object(experiment.git_manager, 'setup_repository', return_value=True), \
+             patch('openscope_experimental_launcher.utils.git_manager.setup_repository', return_value=True), \
              patch.object(experiment, 'start_bonsai'), \
              patch('signal.signal'):
             
