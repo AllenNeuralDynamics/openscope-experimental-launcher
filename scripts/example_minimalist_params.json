@@ -1,0 +1,7 @@
+{
+    "subject_id": "test_mouse_001",
+    "user_id": "test_user",
+    "script_path": "echo",
+    "OutputFolder": "C:\\temp\\minimalist_test",
+    "description": "Minimalist test of BaseLauncher functionality"
+}

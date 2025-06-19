@@ -1,0 +1,11 @@
+{
+    "repository_url": "https://github.com/example/python-experiment.git",
+    "repository_commit_hash": "main",
+    "script_path": "experiments/experiment.py",
+    "python_exe_path": "python",
+    "python_venv_path": "C:/envs/experiment_env",
+    "script_arguments": ["--verbose", "--save-plots"],
+    "subject_id": "test_mouse_001",
+    "user_id": "researcher_name",
+    "OutputFolder": "C:/experiment_data/python_output"
+}

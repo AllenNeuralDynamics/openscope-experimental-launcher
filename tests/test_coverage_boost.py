@@ -9,7 +9,7 @@ import datetime
 import tempfile
 
 # Import the modules we want to improve coverage for
-from openscope_experimental_launcher.base import bonsai_interface
+from openscope_experimental_launcher.interfaces import bonsai_interface
 from openscope_experimental_launcher.utils import process_monitor
 
 
@@ -33,14 +33,14 @@ class TestBonsaiInterfaceFunctions:
         mock_exists.return_value = False
         result = bonsai_interface.setup_bonsai_environment(params)
         assert result is False
-
+    
     @patch('os.path.isdir', return_value=True)
     @patch('os.listdir')
     @patch('os.path.exists')
     def test_get_installed_packages(self, mock_exists, mock_listdir, mock_isdir):
         """Test getting installed packages."""
-        # Function takes no arguments in current implementation
-        packages = bonsai_interface.get_installed_packages()
+        # Function requires bonsai_install_dir parameter
+        packages = bonsai_interface.get_installed_packages('C:/Bonsai')
         
         # Should return a dict (empty if no packages found)
         assert isinstance(packages, dict)
@@ -61,6 +61,7 @@ class TestBonsaiInterfaceFunctions:
         }
         
         result = bonsai_interface.start_workflow(
+            bonsai_exe_path='C:/Bonsai/Bonsai.exe',
             workflow_path=params['bonsai_path'],
             arguments=['--start', '--no-editor'],
             output_path=params['output_directory']
@@ -87,13 +88,13 @@ class TestBonsaiInterfaceFunctions:
     def test_validate_bonsai_installation_valid(self):
         """Test validating bonsai installation when valid."""
         with patch('os.path.exists', return_value=True):
-            result = bonsai_interface.check_installation()
+            result = bonsai_interface.check_installation('C:/Bonsai/Bonsai.exe')
             assert result is True
 
     def test_validate_bonsai_installation_invalid(self):
         """Test validating bonsai installation when invalid."""
         with patch('os.path.exists', return_value=False):
-            result = bonsai_interface.check_installation()
+            result = bonsai_interface.check_installation('C:/Bonsai/Bonsai.exe')
             assert result is False
 
     @patch('subprocess.run')
@@ -104,7 +105,7 @@ class TestBonsaiInterfaceFunctions:
         
         # Test that check_installation works (version checking is internal)
         with patch('os.path.exists', return_value=True):
-            result = bonsai_interface.check_installation()
+            result = bonsai_interface.check_installation('C:/Bonsai/Bonsai.exe')
             assert result is True
 
     def test_setup_bonsai_environment_invalid_params(self):
@@ -207,39 +208,24 @@ class TestProcessMonitorFunctionsCoverage:
                 kill_threshold=90.0,
                 kill_callback=None
             )
-            # Note: actual behavior may vary based on implementation    def test_active_processes_tracking(self):
-        """Test active processes tracking (if available)."""
+            # Note: actual behavior may vary based on implementation    def test_active_processes_tracking(self):        """Test active processes tracking (if available)."""
         # This module may not have active process tracking in current implementation
         # Just verify the module loads properly
         assert process_monitor is not None
 
 
-class TestBonsaiInterfaceModuleState:
-    """Test bonsai_interface module-level state and functions."""
+class TestProcessMonitor:
+    """Test process monitor functionality."""
     
-    def test_module_state_variables(self):
-        """Test module state variables."""
-        # Test actual module-level variables that exist
-        assert hasattr(bonsai_interface, '_bonsai_exe_path')
-        assert hasattr(bonsai_interface, '_bonsai_install_dir')
-
-    def test_set_bonsai_path(self):
-        """Test setting bonsai path."""
-        test_path = "C:/Test/Bonsai.exe"
-        bonsai_interface.set_bonsai_path(test_path)
-        assert bonsai_interface._bonsai_exe_path == test_path
-        assert bonsai_interface._bonsai_install_dir == "C:/Test"
-
-    def test_get_bonsai_exe_path(self):
-        """Test getting bonsai exe path."""
-        test_path = "C:/Test/Bonsai.exe"
-        bonsai_interface.set_bonsai_path(test_path)
-        result = bonsai_interface.get_bonsai_exe_path()
-        assert result == test_path
+    def test_monitor_process(self):
+        """Test process monitor functionality."""
+        mock_process = Mock()
+        mock_process.pid = 12345
+        mock_process.poll.return_value = None  # Still running
+        mock_process.stdout.readline.return_value = ""
+        mock_process.stderr.readline.return_value = ""
+          # Since the function may have threading, we just test it doesn't crash
+        process_monitor.monitor_process(mock_process, 50.0)  # Initial memory percent
         
-    def test_get_bonsai_install_dir(self):
-        """Test getting bonsai install directory."""
-        test_path = "C:/Test/Bonsai.exe"
-        bonsai_interface.set_bonsai_path(test_path)
-        result = bonsai_interface.get_bonsai_install_dir()
-        assert result == "C:/Test"
+        # Test should complete without error
+        assert True

@@ -166,19 +166,9 @@ class TestUtilityIntegration:
 class TestBonsaiInterface:
     """Test bonsai_interface utility functions."""
     
-    def test_set_and_get_bonsai_path(self):
-        """Test setting and getting Bonsai executable path."""
-        from openscope_experimental_launcher.base import bonsai_interface
-        
-        test_path = "C:\\test\\Bonsai.exe"
-        bonsai_interface.set_bonsai_path(test_path)
-        
-        result = bonsai_interface.get_bonsai_exe_path()
-        assert result == test_path
-    
     def test_construct_workflow_arguments(self):
         """Test workflow argument construction."""
-        from openscope_experimental_launcher.base import bonsai_interface
+        from openscope_experimental_launcher.interfaces import bonsai_interface
         
         params = {
             "bonsai_parameters": {

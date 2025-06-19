@@ -1,29 +1,29 @@
 """
-Unit tests for the BaseExperiment class.
+Unit tests for the BaseLauncher class.
 """
 
 import os
 import signal
 import pytest
 from unittest.mock import Mock, patch, MagicMock
-from openscope_experimental_launcher.base.experiment import BaseExperiment
+from openscope_experimental_launcher.launchers.base_launcher import BaseLauncher
 
 
-class TestBaseExperiment:
-    """Test cases for BaseExperiment class."""
-
+class TestBaseLauncher:
+    """Test cases for BaseLauncher class."""
+    
     def test_init(self):
-        """Test BaseExperiment initialization."""
-        experiment = BaseExperiment()        
+        """Test BaseLauncher initialization."""
+        experiment = BaseLauncher()        
         assert experiment.platform_info is not None
         assert experiment.session_directory == ""
         assert experiment.params == {}
-        assert experiment.bonsai_process is None
+        assert experiment.process is None
         assert experiment.session_uuid is not None
 
     def test_collect_runtime_information(self):
         """Test runtime information collection."""
-        experiment = BaseExperiment()
+        experiment = BaseLauncher()
         runtime_info = experiment.collect_runtime_information()
         
         assert isinstance(runtime_info, dict)
@@ -32,7 +32,7 @@ class TestBaseExperiment:
 
     def test_load_parameters_with_file(self, param_file, sample_params):
         """Test parameter loading from file."""
-        experiment = BaseExperiment()        
+        experiment = BaseLauncher()        
         with patch('openscope_experimental_launcher.utils.config_loader.load_config', return_value=sample_params):
             experiment.load_parameters(param_file)
         
@@ -43,96 +43,69 @@ class TestBaseExperiment:
 
     def test_load_parameters_without_file(self):
         """Test parameter loading without file."""
-        experiment = BaseExperiment()
+        experiment = BaseLauncher()
         
         with patch('openscope_experimental_launcher.utils.config_loader.load_config', return_value={}):
             experiment.load_parameters(None)
-        
-        # The experiment may load default parameters, so we check if params is a dict
+          # The experiment may load default parameters, so we check if params is a dict
         assert isinstance(experiment.params, dict)
         assert experiment.params_checksum is None
 
-    def test_start_bonsai_success(self, temp_dir):
-        """Test successful Bonsai process start."""
-        experiment = BaseExperiment()
+    def test_start_process_success(self, temp_dir):
+        """Test successful process start via BaseLauncher (should fail without implementation)."""
+        experiment = BaseLauncher()
         experiment.params = {
-            "bonsai_path": os.path.join(temp_dir, "test_workflow.bonsai"),
+            "script_path": os.path.join(temp_dir, "test_script.txt"),
             "subject_id": "test_mouse",
-            "OutputFolder": temp_dir        }
-        
-        with patch('openscope_experimental_launcher.utils.git_manager.get_repository_path', return_value=temp_dir), \
-             patch('openscope_experimental_launcher.base.bonsai_interface.setup_bonsai_environment', return_value=True), \
-             patch('openscope_experimental_launcher.base.bonsai_interface.start_workflow') as mock_start, \
-             patch('openscope_experimental_launcher.base.bonsai_interface.construct_workflow_arguments', return_value=[]):
-            
-            mock_process = Mock()
-            mock_process.pid = 12345
-            mock_start.return_value = mock_process
-            
-            # Create a mock workflow file
-            os.makedirs(temp_dir, exist_ok=True)
-            with open(os.path.join(temp_dir, "test_workflow.bonsai"), "w") as f:
-                f.write("<test>workflow</test>")
-            
-            result = experiment.start_bonsai()
-            
-            assert result is True
-            assert experiment.bonsai_process == mock_process
-
-    def test_start_bonsai_process_creation_failure(self):
-        """Test Bonsai process creation failure."""
-        experiment = BaseExperiment()
-        experiment.params = {
-            "bonsai_path": "test_workflow.bonsai",
-            "subject_id": "test_mouse",
-            "OutputFolder": "/tmp/test"
+            "OutputFolder": temp_dir
         }
         
-        with patch('openscope_experimental_launcher.base.bonsai_interface.setup_bonsai_environment', return_value=True), \
-             patch('openscope_experimental_launcher.base.bonsai_interface.start_workflow', return_value=None):
-            
-            result = experiment.start_bonsai()
-            
-            assert result is False
-            assert experiment.bonsai_process is None
+        # Create a mock script file
+        os.makedirs(temp_dir, exist_ok=True)
+        with open(os.path.join(temp_dir, "test_script.txt"), "w") as f:
+            f.write("test script")        # BaseLauncher.create_process should raise NotImplementedError
+        with pytest.raises(NotImplementedError):
+            experiment.create_process()
 
-    def test_kill_process(self):
-        """Test killing the Bonsai process."""
-        experiment = BaseExperiment()
-        experiment.bonsai_process = Mock()
-        experiment.bonsai_process.pid = 12345
-        experiment.bonsai_process.poll.return_value = None  # Process is running
+    def test_stop_process(self):
+        """Test stopping the process."""
+        experiment = BaseLauncher()
+        experiment.process = Mock()
+        experiment.process.pid = 12345
+        experiment.process.poll.return_value = None  # Process is running
         
-        # The kill_process method doesn't return a value, just verify it doesn't crash
-        result = experiment.kill_process()
-        assert result is None  # Method returns None    def test_kill_process_no_process(self):
-        """Test killing when no process exists."""
-        experiment = BaseExperiment()
-        experiment.bonsai_process = None
+        # The stop method doesn't return a value, just verify it doesn't crash
+        result = experiment.stop()
+        assert result is None  # Method returns None
+
+    def test_stop_process_no_process(self):
+        """Test stopping when no process exists."""
+        experiment = BaseLauncher()
+        experiment.process = None
         
-        result = experiment.kill_process()
+        result = experiment.stop()
         
-        assert result is None  # Method returns None    def test_stop(self):
+        assert result is None  # Method returns None
+
+    def test_stop(self):
         """Test stopping the experiment."""
-        experiment = BaseExperiment()
-        experiment.bonsai_process = Mock()
+        experiment = BaseLauncher()
+        experiment.process = Mock()
         
-        with patch.object(experiment, 'kill_process'):
+        with patch.object(experiment, 'stop_process'):
             result = experiment.stop()
             
-            assert result is None  # Method returns None
-
-    def test_get_bonsai_errors(self):
-        """Test getting Bonsai errors."""
-        experiment = BaseExperiment()
-        errors = experiment.get_bonsai_errors()
+            assert result is None  # Method returns None    def test_get_process_errors(self):
+        """Test getting process errors."""
+        experiment = BaseLauncher()
+        errors = experiment.get_process_errors()
         
         assert isinstance(errors, str)
 
     def test_cleanup_success(self):
         """Test successful cleanup."""
-        experiment = BaseExperiment()
-        experiment.bonsai_process = Mock()
+        experiment = BaseLauncher()
+        experiment.process = Mock()
         
         with patch.object(experiment, 'stop'):
             result = experiment.cleanup()
@@ -141,30 +114,56 @@ class TestBaseExperiment:
 
     def test_cleanup_with_exception(self):
         """Test cleanup with exception."""
-        experiment = BaseExperiment()
-        experiment.bonsai_process = Mock()
+        experiment = BaseLauncher()
+        experiment.process = Mock()
+
+    def test_stop(self):
+        """Test stopping the experiment."""
+        experiment = BaseLauncher()
+        experiment.process = Mock()
+        
+        experiment.stop()
+        
+        # Should call stop_process internally
+        assert experiment.process is not None
+
+    def test_cleanup(self):
+        """Test cleanup operation."""
+        experiment = BaseLauncher()
         
         with patch.object(experiment, 'stop', side_effect=Exception("Test error")):
             result = experiment.cleanup()
-            
-            # Should still return None as cleanup should be robust
+              # Should still return None as cleanup should be robust
             assert result is None
+
+    def test_get_process_errors(self):
+        """Test getting process errors."""
+        experiment = BaseLauncher()
+        errors = experiment.get_process_errors()
+        
+        assert isinstance(errors, str)
 
     def test_post_experiment_processing(self):
         """Test post-experiment processing."""
-        experiment = BaseExperiment()
+        experiment = BaseLauncher()
         
-        with patch.object(experiment, 'get_bonsai_errors', return_value=""):
+        with patch.object(experiment, 'get_process_errors', return_value=""):
             result = experiment.post_experiment_processing()
             
             assert isinstance(result, bool)
-
+    
     def test_run_success(self, temp_dir, param_file):
-        """Test successful experiment run."""
-        experiment = BaseExperiment()
+        """Test successful experiment run with mocked create_process."""
+        experiment = BaseLauncher()
+        
+        # Create a mock process object
+        mock_process = Mock()
+        mock_process.poll.return_value = None  # Process is running
+        mock_process.wait.return_value = 0
+        mock_process.returncode = 0
         
         with patch('openscope_experimental_launcher.utils.git_manager.setup_repository', return_value=True), \
-             patch.object(experiment, 'start_bonsai', return_value=True), \
+             patch.object(experiment, 'create_process', return_value=mock_process), \
              patch.object(experiment, 'determine_session_directory', return_value=temp_dir), \
              patch.object(experiment, 'save_experiment_metadata'), \
              patch.object(experiment, 'post_experiment_processing', return_value=True):
@@ -175,7 +174,7 @@ class TestBaseExperiment:
 
     def test_run_repository_setup_failure(self, param_file):
         """Test experiment run with repository setup failure."""
-        experiment = BaseExperiment()
+        experiment = BaseLauncher()
         
         with patch('openscope_experimental_launcher.utils.git_manager.setup_repository', return_value=False), \
              patch.object(experiment, 'load_parameters'):
@@ -186,7 +185,7 @@ class TestBaseExperiment:
 
     def test_determine_session_directory_with_output_folder(self):
         """Test session directory determination with OutputFolder."""
-        experiment = BaseExperiment()
+        experiment = BaseLauncher()
         experiment.params = {"OutputFolder": "/test/output"}
         
         result = experiment.determine_session_directory()
@@ -196,7 +195,7 @@ class TestBaseExperiment:
 
     def test_determine_session_directory_without_output_folder(self):
         """Test session directory determination without OutputFolder."""
-        experiment = BaseExperiment()
+        experiment = BaseLauncher()
         experiment.params = {}
         
         result = experiment.determine_session_directory()
@@ -205,7 +204,7 @@ class TestBaseExperiment:
 
     def test_save_experiment_metadata(self, temp_dir):
         """Test saving experiment metadata."""
-        experiment = BaseExperiment()
+        experiment = BaseLauncher()
         experiment.params = {"subject_id": "test_mouse"}
         
         # This should not raise an exception
@@ -227,20 +226,20 @@ class TestBaseExperiment:
 
     def test_setup_continuous_logging(self, temp_dir):
         """Test setting up continuous logging."""
-        experiment = BaseExperiment()
+        experiment = BaseLauncher()
         
         # This should not raise an exception
         experiment.setup_continuous_logging(temp_dir)
 
     def test_finalize_logging(self):
         """Test finalizing logging."""
-        experiment = BaseExperiment()
+        experiment = BaseLauncher()
           # This should not raise an exception
         experiment.finalize_logging()
 
     def test_signal_handler(self):
         """Test signal handler."""
-        experiment = BaseExperiment()
+        experiment = BaseLauncher()
         
         with patch.object(experiment, 'stop') as mock_stop:
             # Signal handler calls sys.exit, so we need to catch SystemExit
@@ -253,18 +252,18 @@ class TestBaseExperiment:
 
     def test_str_representation(self):
         """Test string representation of experiment."""
-        experiment = BaseExperiment()
+        experiment = BaseLauncher()
         experiment.params = {"subject_id": "test_mouse"}
         
         result = str(experiment)
         
-        assert "BaseExperiment" in result
+        assert "BaseLauncher" in result
 
     def test_repr_representation(self):
         """Test repr representation of experiment."""
-        experiment = BaseExperiment()
+        experiment = BaseLauncher()
         experiment.params = {"subject_id": "test_mouse"}
         
         result = repr(experiment)
         
-        assert "BaseExperiment" in result
+        assert "BaseLauncher" in result

@@ -8,27 +8,66 @@
 ![Python](https://img.shields.io/badge/python->=3.8-blue?logo=python)
 ![Platform](https://img.shields.io/badge/platform-Windows-blue?logo=windows)
 
-**Windows-only experimental launcher for OpenScope Bonsai workflows with metadata generation and session tracking.**
+**Modular experimental launcher for OpenScope with support for Bonsai, MATLAB, and Python workflows.**
 
 ## Overview
 
-This package provides a Windows-specific launcher for Bonsai-based neuroscience experiments in the OpenScope project. It handles:
+This package provides a modular, extensible launcher for neuroscience experiments in the OpenScope project. It supports multiple experimental interfaces and handles:
 
-- **Bonsai Process Management**: Start, monitor, and manage Bonsai workflow execution
-- **Parameter Management**: Load and pass parameters to Bonsai workflows
+- **Multi-Interface Support**: Bonsai, MATLAB, and Python experiment execution
+- **Modular Architecture**: Clean separation between common logic and interface-specific code
+- **Process Management**: Start, monitor, and manage experiment execution
+- **Parameter Management**: Load and pass parameters to experiment workflows
 - **Session Tracking**: Generate unique session IDs and track experiment metadata
 - **Git Repository Management**: Clone and manage workflow repositories
 - **Process Monitoring**: Monitor memory usage and handle runaway processes
-- **Windows Integration**: Uses Windows-specific APIs for robust process control
+- **Windows Integration**: Uses Windows-specific APIs for robust process control (where applicable)
+
+## Architecture Overview
+
+The launcher uses a modular architecture with clear separation of concerns:
+
+```
+src/openscope_experimental_launcher/
+├── launchers/               # Interface-specific launchers
+│   ├── base_launcher.py     # Common launcher logic (interface-agnostic)
+│   ├── bonsai_launcher.py   # Bonsai-specific launcher
+│   ├── matlab_launcher.py   # MATLAB-specific launcher
+│   └── python_launcher.py   # Python-specific launcher
+├── interfaces/              # Stateless interface functions
+│   ├── bonsai_interface.py  # Bonsai process creation utilities
+│   ├── matlab_interface.py  # MATLAB process creation utilities
+│   └── python_interface.py  # Python process creation utilities
+└── utils/                   # Shared utilities
+    ├── config_loader.py     # Configuration management
+    ├── git_manager.py       # Repository management
+    └── process_monitor.py   # Process monitoring
+
+scripts/                     # Project-specific launcher scripts
+├── slap2_launcher.py        # SLAP2 experiment launcher
+├── predictive_processing_launcher.py  # Predictive processing launcher
+├── minimalist_launcher.py   # Simple test launcher
+├── example_matlab_launcher.py  # Example MATLAB launcher
+└── example_python_launcher.py  # Example Python launcher
+```
+
+### Design Principles
+
+1. **Interface Separation**: All interface-specific code (Bonsai, MATLAB, Python) is isolated in interface modules
+2. **Stateless Functions**: Interface modules provide pure functions with no global state - only process creation utilities
+3. **Single Responsibility**: Each launcher handles one interface type, each interface handles only process creation
+4. **Project Flexibility**: Project-specific launchers live in `scripts/` for easy customization
+5. **Common Base**: All launchers share functionality through `BaseLauncher` (process management, monitoring, logging)
 
 ## System Requirements
 
-- **Operating System**: Windows 10 or Windows 11
+- **Operating System**: Windows 10 or Windows 11 (primary), partial support for other platforms
 - **Python**: 3.8 or higher
 - **Dependencies**: 
-  - Bonsai (installed separately)
+  - Bonsai (for Bonsai experiments)
+  - MATLAB (for MATLAB experiments)
   - Git (for repository management)
-  - Windows-specific libraries (pywin32)
+  - Windows-specific libraries (pywin32) for enhanced process management
 
 ## Installation
 
@@ -42,66 +81,201 @@ To install for development:
 pip install -e .[dev]
 ```
 
-**Note**: This package requires Windows and will not work on Linux or macOS due to its use of Windows-specific APIs and process management features.
-
 ## Usage
 
-### Basic Experiment Launcher
+### Using Interface Launchers Directly
 
+#### Bonsai Experiments
 ```python
-from openscope_experimental_launcher.base.experiment import BaseExperiment
+from openscope_experimental_launcher.launchers import BonsaiLauncher
 
-# Create experiment instance
-experiment = BaseExperiment()
+# Create Bonsai launcher instance
+launcher = BonsaiLauncher()
 
 # Run with parameter file
-success = experiment.run("path/to/parameters.json")
+success = launcher.run("path/to/parameters.json")
 ```
 
-### SLAP2 Experiment Launcher
-
+#### MATLAB Experiments
 ```python
-from openscope_experimental_launcher.slap2.launcher import SLAP2Experiment
+from openscope_experimental_launcher.launchers import MatlabLauncher
 
-# Create SLAP2 experiment instance
-experiment = SLAP2Experiment()
+# Create MATLAB launcher instance
+launcher = MatlabLauncher()
 
-# Run with SLAP2-specific parameters
-success = experiment.run("path/to/slap2_parameters.json")
+# Run with parameter file
+success = launcher.run("path/to/parameters.json")
 ```
 
-### Parameter File Format
+#### Python Experiments
+```python
+from openscope_experimental_launcher.launchers import PythonLauncher
 
-Create a JSON parameter file with your experiment configuration:
+# Create Python launcher instance
+launcher = PythonLauncher()
 
+# Run with parameter file
+success = launcher.run("path/to/parameters.json")
+```
+
+### Using Project-Specific Launchers
+
+For project-specific experiments, use the launcher scripts in the `scripts/` folder:
+
+#### SLAP2 Experiments
+```bash
+python scripts/slap2_launcher.py path/to/slap2_parameters.json
+```
+
+#### Predictive Processing Experiments
+```bash
+python scripts/predictive_processing_launcher.py path/to/pp_parameters.json
+```
+
+#### Minimalist Testing (BaseLauncher Demo)
+```bash
+python scripts/minimalist_launcher.py scripts/example_minimalist_params.json
+```
+
+This demonstrates pure BaseLauncher functionality with a simple mock process - perfect for testing the core framework without external dependencies.
+
+#### Example Launchers
+```bash
+# MATLAB example
+python scripts/example_matlab_launcher.py scripts/example_matlab_params.json
+
+# Python example
+python scripts/example_python_launcher.py scripts/example_python_params.json
+```
+
+### Creating Custom Launchers
+
+To create a custom launcher for your project:
+
+1. **Extend an Interface Launcher:**
+```python
+from openscope_experimental_launcher.launchers import BonsaiLauncher
+
+class MyCustomLauncher(BonsaiLauncher):
+    def __init__(self):
+        super().__init__()
+        # Add your custom initialization
+    
+    def post_experiment_processing(self) -> bool:
+        # Add your custom post-processing
+        return True
+```
+
+2. **Create a Script in `scripts/`:**
+```python
+#!/usr/bin/env python3
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
+from your_custom_launcher import MyCustomLauncher
+
+def main():
+    return MyCustomLauncher.main(description="My custom experiment")
+
+if __name__ == "__main__":
+    sys.exit(main())
+```
+
+### Parameter File Formats
+
+#### Bonsai Parameters
 ```json
 {
     "subject_id": "test_mouse_001",
     "user_id": "researcher_name",
-    "bonsai_path": "path/to/workflow.bonsai",
+    "script_path": "workflows/experiment.bonsai",
+    "bonsai_exe_path": "C:/Bonsai/Bonsai.exe",
     "OutputFolder": "C:/experiment_data",
-    "repository_url": "https://github.com/example/workflow.git",
-    "repository_commit_hash": "main"
+    "repository_url": "https://github.com/example/bonsai-workflow.git",
+    "bonsai_parameters": {
+        "StimDuration": 30,
+        "ISI": 5
+    }
+}
+```
+
+#### MATLAB Parameters
+```json
+{
+    "subject_id": "test_mouse_001",
+    "user_id": "researcher_name",
+    "script_path": "experiments/run_experiment.m",
+    "matlab_exe_path": "matlab",
+    "OutputFolder": "C:/experiment_data",
+    "repository_url": "https://github.com/example/matlab-experiment.git",
+    "matlab_arguments": ["-nosplash", "-nodesktop"]
+}
+```
+
+#### Python Parameters
+```json
+{
+    "subject_id": "test_mouse_001",
+    "user_id": "researcher_name",
+    "script_path": "experiments/experiment.py",
+    "python_exe_path": "python",
+    "python_venv_path": "C:/envs/experiment_env",
+    "OutputFolder": "C:/experiment_data",
+    "repository_url": "https://github.com/example/python-experiment.git",
+    "script_arguments": ["--verbose", "--save-plots"]
 }
 ```
 
 ### Command Line Usage
 
-You can also run experiments directly from the command line:
+All launchers support command line execution:
 
 ```bash
-python -m openscope_experimental_launcher.base.experiment --params parameters.json
+# Using interface launchers directly
+python -c "from openscope_experimental_launcher.launchers import BonsaiLauncher; BonsaiLauncher.main()" parameters.json
+
+# Using project-specific scripts
+python scripts/slap2_launcher.py parameters.json
+python scripts/predictive_processing_launcher.py parameters.json
 ```
 
 ## Features
 
-### Session Builder Architecture (New!)
+### Modular Architecture
 
-The package now includes a modular session builder architecture that allows reuse across different rigs:
+The package uses a clean, modular architecture that separates concerns:
+
+- **Interface Separation**: Bonsai, MATLAB, and Python support through dedicated launchers
+- **Stateless Functions**: Interface modules provide pure functions with no global state
+- **Common Base Logic**: All launchers share session management, logging, and metadata through `BaseLauncher`
+- **Project Flexibility**: Project-specific launchers in `scripts/` for easy customization
+
+### Multi-Interface Support
+
+#### Bonsai Workflows
+- Full Bonsai workflow management and process control
+- Package verification and installation support
+- Parameter passing and property arguments
+- Windows job object integration for robust process management
+
+#### MATLAB Scripts  
+- MATLAB script execution with virtual environment support
+- Batch mode execution for non-interactive runs
+- Custom argument passing and environment setup
+
+#### Python Scripts
+- Python script execution with virtual environment support
+- Environment variable passing for output paths
+- Cross-platform compatibility
+
+### Session Builder Architecture
+
+The package includes a modular session builder architecture for metadata generation:
 
 - **Functional session builders**: Core session building functionality in `utils/session_builder.py`
 - **Rig-specific implementations**: Custom session builders for each rig type (e.g., SLAP2)
-- **Backward compatibility**: Existing code continues to work unchanged
+- **AIND Schema Integration**: Compatible with AIND data schema standards
 - **Easy extensibility**: Simple to add support for new rig types
 
 #### Creating a New Rig Session Builder
@@ -125,8 +299,6 @@ def build_my_rig_session(params, experiment_config, **kwargs):
     return session_data
 ```
 
-See `docs/session_builder_refactoring.md` for detailed documentation and examples.
-
 ### Process Management
 - Uses Windows job objects for robust process control
 - Automatic memory monitoring and cleanup
@@ -149,14 +321,39 @@ See `docs/session_builder_refactoring.md` for detailed documentation and example
 
 ## Architecture
 
-The package consists of several key components:
+The package consists of several key components organized into a modular architecture:
 
-- **BaseExperiment**: Core experiment launcher with Bonsai process management
-- **SLAP2Experiment**: Specialized launcher for SLAP2 imaging experiments
-- **ConfigLoader**: CamStim-compatible configuration file handling
-- **GitManager**: Repository management and version control
-- **ProcessMonitor**: Memory monitoring and process health checks
-- **BonsaiInterface**: Bonsai workflow and process management
+### Core Launchers (`src/openscope_experimental_launcher/launchers/`)
+- **BaseLauncher**: Common launcher logic shared across all interfaces (process management, monitoring, logging)
+- **BonsaiLauncher**: Inherits from BaseLauncher, implements only Bonsai-specific process creation
+- **MatlabLauncher**: Inherits from BaseLauncher, implements only MATLAB-specific process creation  
+- **PythonLauncher**: Inherits from BaseLauncher, implements only Python-specific process creation
+
+### Interface Modules (`src/openscope_experimental_launcher/interfaces/`)
+- **bonsai_interface**: Stateless functions for creating Bonsai processes
+- **matlab_interface**: Stateless functions for creating MATLAB processes
+- **python_interface**: Stateless functions for creating Python processes
+
+### Shared Utilities (`src/openscope_experimental_launcher/utils/`)
+- **config_loader**: CamStim-compatible configuration file handling
+- **git_manager**: Repository management and version control
+- **process_monitor**: Memory monitoring and process health checks
+- **session_builder**: Session metadata generation and AIND schema support
+
+### Project Scripts (`scripts/`)
+- **slap2_launcher.py**: SLAP2 imaging experiment launcher
+- **predictive_processing_launcher.py**: Predictive processing experiment launcher
+- **minimalist_launcher.py**: Simple test launcher
+- **example_*_launcher.py**: Example launchers for each interface
+
+### Design Benefits
+
+1. **Separation of Concerns**: Interface-specific process creation is isolated from common launcher logic
+2. **Testability**: Stateless interface functions are easy to unit test
+3. **Extensibility**: New interfaces can be added without changing existing code
+4. **Maintainability**: Bug fixes in common logic benefit all interfaces
+5. **Project Flexibility**: Custom launchers can be created without modifying core code
+6. **Code Reuse**: Only process creation differs between interfaces; all other logic is shared
 
 ## Contributing
 

@@ -8,31 +8,34 @@ import pytest
 def test_package_imports():
     """Test that all main package components can be imported."""
     try:
-        from openscope_experimental_launcher import BaseExperiment, SLAP2Experiment
+        from openscope_experimental_launcher import BaseLauncher, BonsaiLauncher, SLAP2Launcher
         from openscope_experimental_launcher.utils import git_manager, config_loader, process_monitor
         assert True
     except ImportError as e:
         pytest.fail(f"Failed to import package components: {e}")
 
 
-def test_base_experiment_creation():
-    """Test that BaseExperiment can be instantiated."""
-    from openscope_experimental_launcher import BaseExperiment
+def test_base_launcher_creation():
+    """Test that BaseLauncher can be instantiated."""
+    from openscope_experimental_launcher import BaseLauncher
 
-    experiment = BaseExperiment()
-    assert experiment is not None
-    assert hasattr(experiment, 'platform_info')
-    assert hasattr(experiment, 'session_uuid')
+    launcher = BaseLauncher()
+    assert launcher is not None
+    assert hasattr(launcher, 'platform_info')
+    assert hasattr(launcher, 'session_uuid')
 
 
-def test_slap2_experiment_creation():
-    """Test that SLAP2Experiment can be instantiated."""
-    from openscope_experimental_launcher import SLAP2Experiment
-
-    experiment = SLAP2Experiment()
-    assert experiment is not None
-    assert experiment.session_type == "SLAP2"
-    assert hasattr(experiment, 'slap_fovs')
+def test_slap2_launcher_creation():
+    """Test that SLAP2Launcher can be instantiated."""
+    import sys
+    import os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
+    
+    from slap2_launcher import SLAP2Launcher
+    launcher = SLAP2Launcher()
+    assert launcher is not None
+    assert launcher.session_type == "SLAP2"
+    assert hasattr(launcher, 'slap_fovs')
 
 
 @pytest.mark.unit
@@ -49,6 +52,6 @@ def test_version_availability():
 if __name__ == "__main__":
     # Run basic tests if executed directly
     test_package_imports()
-    test_base_experiment_creation()
-    test_slap2_experiment_creation()
+    test_base_launcher_creation()
+    test_slap2_launcher_creation()
     print("✓ All basic tests passed!")

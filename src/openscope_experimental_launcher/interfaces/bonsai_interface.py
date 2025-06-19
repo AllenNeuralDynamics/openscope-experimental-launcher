@@ -1,7 +1,7 @@
 """
 Bonsai interface for OpenScope experimental launchers.
 
-This module provides functions for managing Bonsai process
+This module provides stateless functions for managing Bonsai process
 interactions, package management, and workflow execution.
 """
 
@@ -10,33 +10,6 @@ import logging
 import subprocess
 import xml.etree.ElementTree as ET
 from typing import Dict, List, Optional, Any
-
-
-# Module-level variables to track Bonsai paths
-_bonsai_exe_path = None
-_bonsai_install_dir = None
-
-
-def set_bonsai_path(bonsai_exe_path: str):
-    """
-    Set the path to the Bonsai executable.
-    
-    Args:
-        bonsai_exe_path: Path to Bonsai.exe
-    """
-    global _bonsai_exe_path, _bonsai_install_dir
-    _bonsai_exe_path = bonsai_exe_path
-    _bonsai_install_dir = os.path.dirname(bonsai_exe_path)
-
-
-def get_bonsai_exe_path() -> Optional[str]:
-    """Get the current Bonsai executable path."""
-    return _bonsai_exe_path
-
-
-def get_bonsai_install_dir() -> Optional[str]:
-    """Get the current Bonsai installation directory."""
-    return _bonsai_install_dir
 
 
 def setup_bonsai_environment(params: Dict[str, Any]) -> bool:
@@ -49,13 +22,13 @@ def setup_bonsai_environment(params: Dict[str, Any]) -> bool:
     Returns:
         True if setup successful, False otherwise
     """
-    # Set Bonsai executable path
-    bonsai_exe_path = params.get('bonsai_exe_path')
-    if bonsai_exe_path:
-        set_bonsai_path(bonsai_exe_path)
-    
     # Check if Bonsai is installed
-    if not check_installation():
+    bonsai_exe_path = params.get('bonsai_exe_path')
+    if not bonsai_exe_path:
+        logging.error("No Bonsai executable path specified in parameters")
+        return False
+        
+    if not check_installation(bonsai_exe_path):
         # Try to install if setup script is provided
         setup_script = params.get('bonsai_setup_script')
         if setup_script:
@@ -66,32 +39,33 @@ def setup_bonsai_environment(params: Dict[str, Any]) -> bool:
         else:
             logging.error("Bonsai not found and no setup script provided")
             return False
-      # Verify packages if config file is provided
+    
+    # Verify packages if config file is provided
     config_path = params.get('bonsai_config_path')
     if config_path and os.path.exists(config_path):
         logging.info("Verifying Bonsai packages...")
-        if not verify_packages(config_path):
+        bonsai_install_dir = os.path.dirname(bonsai_exe_path)
+        if not verify_packages(config_path, bonsai_install_dir):
             logging.warning("Package verification failed, but continuing...")
     
     return True
 
 
-def check_installation() -> bool:
+def check_installation(bonsai_exe_path: str) -> bool:
     """
-    Check if Bonsai is installed at the expected location.
+    Check if Bonsai is installed at the specified location.
     
+    Args:
+        bonsai_exe_path: Path to Bonsai executable
+        
     Returns:
         True if Bonsai is found, False otherwise
     """
-    if not _bonsai_exe_path:
-        logging.error("No Bonsai executable path specified")
-        return False
-    
-    if os.path.exists(_bonsai_exe_path):
-        logging.info(f"Bonsai executable found at: {_bonsai_exe_path}")
+    if os.path.exists(bonsai_exe_path):
+        logging.info(f"Bonsai executable found at: {bonsai_exe_path}")
         return True
     else:
-        logging.info(f"Bonsai executable not found at: {_bonsai_exe_path}")
+        logging.info(f"Bonsai executable not found at: {bonsai_exe_path}")
         return False
 
 
@@ -153,14 +127,7 @@ def install_bonsai(setup_script_path: str) -> bool:
         
         if return_code == 0:
             logging.info("Bonsai installation completed successfully")
-            
-            # Verify installation
-            if check_installation():
-                logging.info("Bonsai installation verified")
-                return True
-            else:
-                logging.error("Bonsai installation verification failed")
-                return False
+            return True
         else:
             logging.error(f"Bonsai installation failed with return code: {return_code}")
             return False
@@ -204,18 +171,17 @@ def parse_bonsai_config(config_path: str) -> Dict[str, str]:
         return {}
 
 
-def get_installed_packages() -> Dict[str, str]:
+def get_installed_packages(bonsai_install_dir: str) -> Dict[str, str]:
     """
     Get list of currently installed Bonsai packages and their versions.
     
+    Args:
+        bonsai_install_dir: Bonsai installation directory
+        
     Returns:
         Dictionary mapping package names to versions
     """
-    if not _bonsai_install_dir:
-        logging.warning("Bonsai installation directory not set")
-        return {}
-    
-    packages_dir = os.path.join(_bonsai_install_dir, "Packages")
+    packages_dir = os.path.join(bonsai_install_dir, "Packages")
     installed_packages = {}
     
     if not os.path.exists(packages_dir):
@@ -286,19 +252,21 @@ def _normalize_version(version: str) -> str:
     
     # Split version into parts
     parts = version.split('.')
-      # Remove trailing zeros
+    
+    # Remove trailing zeros
     while len(parts) > 1 and parts[-1] == '0':
         parts.pop()
     
     return '.'.join(parts)
 
 
-def verify_packages(config_path: str) -> bool:
+def verify_packages(config_path: str, bonsai_install_dir: str) -> bool:
     """
     Verify that installed Bonsai packages match the requirements.
     
     Args:
         config_path: Path to Bonsai.config file
+        bonsai_install_dir: Bonsai installation directory
         
     Returns:
         True if packages match, False otherwise
@@ -314,7 +282,7 @@ def verify_packages(config_path: str) -> bool:
         return True
     
     # Get currently installed packages
-    installed_packages = get_installed_packages()
+    installed_packages = get_installed_packages(bonsai_install_dir)
     
     # Compare required vs installed packages
     missing_packages = []
@@ -401,7 +369,8 @@ def construct_workflow_arguments(params: Dict[str, Any]) -> List[str]:
     property_args = create_bonsai_property_arguments(params)
     if property_args:
         args.extend(property_args)
-      # Add any custom command-line arguments (not properties)
+    
+    # Add any custom command-line arguments (not properties)
     custom_args = params.get('bonsai_arguments', [])
     if custom_args:
         args.extend(custom_args)
@@ -409,28 +378,30 @@ def construct_workflow_arguments(params: Dict[str, Any]) -> List[str]:
     return args
 
 
-def start_workflow(workflow_path: str, arguments: List[str] = None, output_path: str = None) -> subprocess.Popen:
+def start_workflow(workflow_path: str, bonsai_exe_path: str, arguments: List[str] = None, output_path: str = None) -> subprocess.Popen:
     """
     Start a Bonsai workflow as a subprocess.
     
     Args:
         workflow_path: Path to the Bonsai workflow file
+        bonsai_exe_path: Path to Bonsai executable
         arguments: Additional command-line arguments
         output_path: Directory for output files
         
     Returns:
         Subprocess.Popen object for the running workflow
     """
-    if not _bonsai_exe_path:
-        raise ValueError("Bonsai executable path not set")
-
     if not os.path.exists(workflow_path):
         raise FileNotFoundError(f"Workflow file not found: {workflow_path}")
     
+    if not os.path.exists(bonsai_exe_path):
+        raise FileNotFoundError(f"Bonsai executable not found: {bonsai_exe_path}")
+    
     # Normalize both paths for Windows compatibility - ensure consistent path separators
-    bonsai_exe_normalized = os.path.normpath(_bonsai_exe_path)
+    bonsai_exe_normalized = os.path.normpath(bonsai_exe_path)
     workflow_path_normalized = os.path.normpath(workflow_path)
-      # Build command arguments
+    
+    # Build command arguments
     cmd_args = [bonsai_exe_normalized, workflow_path_normalized]
     
     # Add essential arguments for non-interactive execution
@@ -438,7 +409,9 @@ def start_workflow(workflow_path: str, arguments: List[str] = None, output_path:
     cmd_args.append("--no-editor")
     
     if arguments:
-        cmd_args.extend(arguments)        # Set output directory if specified
+        cmd_args.extend(arguments)
+    
+    # Set output directory if specified
     if output_path:
         # Normalize the output path as well
         output_path_normalized = os.path.normpath(output_path)

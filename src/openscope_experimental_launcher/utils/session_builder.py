@@ -149,9 +149,8 @@ def create_script_software(
     return Software(
         name=get_script_name(rig_name),
         version=params.get("script_version", "1.0.0"),
-        url=params.get("repository_url", ""),
-        parameters={
-            "workflow_path": params.get("bonsai_path", ""),
+        url=params.get("repository_url", ""),        parameters={
+            "workflow_path": params.get("script_path", ""),
             "subject_id": subject_id,
             "user_id": user_id,
             "session_uuid": session_uuid,

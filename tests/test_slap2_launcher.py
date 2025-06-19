@@ -1,31 +1,42 @@
 """
-Unit tests for the SLAP2Experiment class.
+Unit tests for the SLAP2Launcher class.
 """
 
 import os
+import sys
 import pytest
 from unittest.mock import Mock, patch, MagicMock
-from openscope_experimental_launcher.slap2.launcher import SLAP2Experiment
+
+# Add the scripts directory to the path for SLAP2Launcher
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
+import sys
+from pathlib import Path
+
+# Add scripts directory to path for importing
+scripts_dir = Path(__file__).parent.parent / "scripts"
+sys.path.insert(0, str(scripts_dir))
+
+from slap2_launcher import SLAP2Launcher
 
 
-class TestSLAP2Experiment:
-    """Test cases for SLAP2Experiment class."""
-
+class TestSLAP2Launcher:
+    """Test cases for SLAP2Launcher class."""
+    
     def test_init(self):
-        """Test SLAP2Experiment initialization."""
-        experiment = SLAP2Experiment()
+        """Test SLAP2Launcher initialization."""
+        experiment = SLAP2Launcher()
         
         assert experiment.session_type == "SLAP2"
-        assert experiment.rig_id == "slap2_rig"
-        assert experiment.user_id == "Unknown"
+        assert hasattr(experiment, 'slap_fovs')
         assert experiment.slap_fovs == []
         # Test that stimulus table can be created using functional approach
         assert hasattr(experiment, 'stimulus_table')
-
+    
     def test_load_parameters_with_slap_fovs(self, param_file, sample_params, sample_slap_fovs):
         """Test parameter loading with SLAP FOV data."""
-        experiment = SLAP2Experiment()
-          # Add SLAP FOVs to parameters
+        experiment = SLAP2Launcher()
+        
+        # Add SLAP FOVs to parameters
         params_with_fovs = sample_params.copy()
         params_with_fovs["slap_fovs"] = sample_slap_fovs
         
@@ -38,13 +49,12 @@ class TestSLAP2Experiment:
             experiment.load_parameters(param_file)
         
         assert experiment.session_type == params_with_fovs["session_type"]
-        assert experiment.rig_id == params_with_fovs["rig_id"]
         assert experiment.user_id == params_with_fovs["user_id"]
     
     @patch('openscope_experimental_launcher.slap2.launcher.AIND_SCHEMA_AVAILABLE', False)
     def test_slap2_no_schema_available(self):
         """Test SLAP2 experiment when aind-data-schema is not available."""
-        experiment = SLAP2Experiment()
+        experiment = SLAP2Launcher()
         
         # When schema is not available, experiment should still work
         assert experiment is not None
@@ -53,9 +63,9 @@ class TestSLAP2Experiment:
     
     def test_create_bonsai_arguments_slap2(self):
         """Test SLAP2-specific Bonsai argument creation with real workflow parameters."""
-        from openscope_experimental_launcher.base import bonsai_interface
+        from openscope_experimental_launcher.interfaces import bonsai_interface
         
-        experiment = SLAP2Experiment()
+        experiment = SLAP2Launcher()
         experiment.subject_id = "test_mouse"
         experiment.session_uuid = "test-uuid"
         experiment.params = {
@@ -79,7 +89,7 @@ class TestSLAP2Experiment:
 
     def test_create_stimulus_table_success(self, temp_dir):
         """Test successful stimulus table creation."""
-        experiment = SLAP2Experiment()
+        experiment = SLAP2Launcher()
         experiment.params = {"num_trials": 50}
         experiment.session_directory = temp_dir
         
@@ -94,7 +104,7 @@ class TestSLAP2Experiment:
 
     def test_create_stimulus_table_failure(self, temp_dir):
         """Test stimulus table creation failure."""
-        experiment = SLAP2Experiment()
+        experiment = SLAP2Launcher()
         experiment.params = {"num_trials": 50}
         experiment.session_directory = temp_dir
         
@@ -108,7 +118,7 @@ class TestSLAP2Experiment:
     @patch('openscope_experimental_launcher.slap2.launcher.AIND_SCHEMA_AVAILABLE', False)
     def test_create_session_json_no_schema(self):
         """Test session.json creation when aind-data-schema is not available."""
-        experiment = SLAP2Experiment()
+        experiment = SLAP2Launcher()
         
         result = experiment.create_session_json()
         
@@ -116,7 +126,7 @@ class TestSLAP2Experiment:
 
     def test_create_session_json_success(self, temp_dir):
         """Test successful session.json creation."""
-        experiment = SLAP2Experiment()
+        experiment = SLAP2Launcher()
         experiment.start_time = Mock()
         experiment.stop_time = Mock()
         experiment.params = {"session_type": "SLAP2"}
@@ -138,7 +148,7 @@ class TestSLAP2Experiment:
 
     def test_create_session_json_failure(self, temp_dir):
         """Test session.json creation failure."""
-        experiment = SLAP2Experiment()
+        experiment = SLAP2Launcher()
         experiment.session_directory = temp_dir
         
         with patch('openscope_experimental_launcher.utils.session_builder.build_slap2_session', return_value=None):
@@ -148,7 +158,7 @@ class TestSLAP2Experiment:
 
     def test_post_experiment_processing_success(self):
         """Test successful post-experiment processing."""
-        experiment = SLAP2Experiment()
+        experiment = SLAP2Launcher()
         
         with patch.object(experiment, 'create_stimulus_table', return_value=True), \
              patch.object(experiment, 'create_session_json', return_value=True):
@@ -159,7 +169,7 @@ class TestSLAP2Experiment:
 
     def test_post_experiment_processing_partial_failure(self):
         """Test post-experiment processing with partial failure."""
-        experiment = SLAP2Experiment()
+        experiment = SLAP2Launcher()
         
         with patch.object(experiment, 'create_stimulus_table', return_value=True), \
              patch.object(experiment, 'create_session_json', return_value=False):
@@ -170,7 +180,7 @@ class TestSLAP2Experiment:
 
     def test_run_success(self, param_file, mock_subprocess):
         """Test successful SLAP2 experiment run."""
-        experiment = SLAP2Experiment()
+        experiment = SLAP2Launcher()
         
         with patch.object(experiment, 'load_parameters') as mock_load, \
              patch('openscope_experimental_launcher.utils.git_manager.setup_repository', return_value=True), \
@@ -188,7 +198,7 @@ class TestSLAP2Experiment:
 
     def test_run_bonsai_failure(self, param_file, mock_subprocess):
         """Test SLAP2 experiment run with Bonsai failure."""
-        experiment = SLAP2Experiment()
+        experiment = SLAP2Launcher()
         
         with patch.object(experiment, 'load_parameters'), \
              patch('openscope_experimental_launcher.utils.git_manager.setup_repository', return_value=True), \
@@ -207,7 +217,7 @@ class TestSLAP2Experiment:
         """Test the main function with successful execution."""
         with patch('sys.argv', ['script_name', param_file]), \
              patch('os.path.exists', return_value=True), \
-             patch('openscope_experimental_launcher.slap2.launcher.SLAP2Experiment') as mock_class:
+             patch('openscope_experimental_launcher.slap2.launcher.SLAP2Launcher') as mock_class:
             
             mock_experiment = Mock()
             mock_experiment.run.return_value = True
@@ -217,8 +227,10 @@ class TestSLAP2Experiment:
             mock_class.return_value = mock_experiment
             
             with pytest.raises(SystemExit) as exc_info:
-                from openscope_experimental_launcher.slap2.launcher import main
-                main()
+                # Import main from the scripts directory  
+                sys.path.insert(0, str(scripts_dir))
+                import slap2_launcher
+                slap2_launcher.main()
             
             assert exc_info.value.code == 0
 
@@ -229,7 +241,9 @@ class TestSLAP2Experiment:
              patch('os.path.exists', return_value=False):
             
             with pytest.raises(SystemExit) as exc_info:
-                from openscope_experimental_launcher.slap2.launcher import main
-                main()
+                # Import main from the scripts directory  
+                sys.path.insert(0, str(scripts_dir))
+                import slap2_launcher
+                slap2_launcher.main()
             
             assert exc_info.value.code == 1

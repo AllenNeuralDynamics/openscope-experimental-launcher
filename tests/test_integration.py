@@ -6,8 +6,13 @@ import os
 import pytest
 import tempfile
 import json
+import sys
 from unittest.mock import Mock, patch
-from openscope_experimental_launcher import BaseExperiment, SLAP2Experiment
+
+# Import from the scripts folder for SLAP2Launcher
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
+from slap2_launcher import SLAP2Launcher
+from openscope_experimental_launcher.launchers import BaseLauncher
 
 
 @pytest.mark.integration
@@ -15,7 +20,7 @@ class TestWorkflowIntegration:
     """Integration tests for complete workflows."""
 
     def test_base_experiment_end_to_end(self, temp_dir):
-        """Test complete BaseExperiment workflow."""
+        """Test complete BaseLauncher workflow."""
         # Create mock workflow file first
         workflow_file = os.path.join(temp_dir, "test_workflow.bonsai")
         with open(workflow_file, 'w') as f:
@@ -30,16 +35,17 @@ class TestWorkflowIntegration:
         params = {
             "subject_id": "integration_test_mouse",
             "user_id": "integration_test_user",
-            "bonsai_path": workflow_file,  # Use absolute path
+            "script_path": workflow_file,  # Use unified script_path parameter
             "bonsai_exe_path": os.path.join(temp_dir, "mock_bonsai.exe"),  # Add mock executable
-            "output_directory": temp_dir
+            "OutputFolder": temp_dir  # Use correct capitalization
         }
         
         param_file = os.path.join(temp_dir, "test_params.json")
         with open(param_file, 'w') as f:
             json.dump(params, f)
         
-        experiment = BaseExperiment()
+        from openscope_experimental_launcher.launchers import BonsaiLauncher
+        experiment = BonsaiLauncher()
         
         # Mock subprocess to simulate Bonsai execution
         with patch('subprocess.Popen') as mock_popen, \
@@ -57,17 +63,18 @@ class TestWorkflowIntegration:
             mock_popen.return_value = mock_process
             
             mock_vmem.return_value.percent = 50.0
-              # Run experiment
+            
+            # Run experiment
             result = experiment.run(param_file)
             
             assert result is True
             assert experiment.subject_id == params["subject_id"]
             assert experiment.user_id == params["user_id"]
-            assert experiment.bonsai_process is not None
+            assert experiment.process is not None  # Updated to use correct attribute
 
     @pytest.mark.integration
     def test_slap2_experiment_end_to_end(self, temp_dir):
-        """Test complete SLAP2Experiment workflow with metadata generation."""
+        """Test complete SLAP2Launcher workflow with metadata generation."""
         # Create mock workflow file first
         workflow_file = os.path.join(temp_dir, "slap2_workflow.bonsai")
         with open(workflow_file, 'w') as f:
@@ -77,21 +84,19 @@ class TestWorkflowIntegration:
         bonsai_exe = os.path.join(temp_dir, "mock_bonsai.exe")
         with open(bonsai_exe, 'w') as f:
             f.write("mock executable")
-        
-        # Create comprehensive test parameters with absolute path
+          # Create comprehensive test parameters with absolute path
         params = {
             "subject_id": "slap2_test_mouse",
-            "user_id": "slap2_test_user",
-            "user_id": "Integration Tester",
+            "user_id": "Integration Tester",  # Fix duplicate user_id
             "session_type": "SLAP2",
             "rig_id": "test_slap2_rig",
             "num_trials": 20,
             "laser_power": 12.0,
             "laser_wavelength": 920,
             "frame_rate": 30.0,
-            "bonsai_path": workflow_file,  # Use absolute path
+            "script_path": workflow_file,  # Use unified script_path parameter
             "bonsai_exe_path": bonsai_exe,  # Add mock executable
-            "output_directory": temp_dir,
+            "OutputFolder": temp_dir,  # Use correct capitalization
             "slap_fovs": [{
                 "index": 0,
                 "imaging_depth": 100,
@@ -105,7 +110,7 @@ class TestWorkflowIntegration:
         with open(param_file, 'w') as f:
             json.dump(params, f)
         
-        experiment = SLAP2Experiment()
+        experiment = SLAP2Launcher()
           # Mock subprocess and post-processing
         with patch('subprocess.Popen') as mock_popen, \
              patch('psutil.virtual_memory') as mock_vmem, \
@@ -207,52 +212,40 @@ monitor_brightness = 50
         assert len(result) >= 10
         assert 'trial_index' in result.columns
         assert 'stimulus_type' in result.columns
-        
-        # Test statistics calculation
+          # Test statistics calculation
         stats = stimulus_table.get_trial_statistics(result)
         assert stats['total_trials'] >= 10
         assert 'trial_types' in stats
 
     @pytest.mark.integration
-    @pytest.mark.slow
-    @pytest.mark.skip(reason="create_stimulus_table implementation depends on session_output_path which no longer exists")
-    def test_full_workflow_with_file_generation(self, temp_dir):
-        """Test complete workflow with actual file generation."""
-        # This is a slow test that generates actual output files
+    def test_stimulus_table_generation_functional(self, temp_dir):
+        """Test stimulus table generation using functional approach."""
+        from openscope_experimental_launcher.utils import stimulus_table
         
-        experiment = SLAP2Experiment()
-        
+        # Create mock experiment parameters
         params = {
-            "subject_id": "full_test_mouse",
-            "user_id": "full_test_user",
+            "subject_id": "test_mouse",
+            "user_id": "test_user",
             "session_type": "SLAP2",
-            "num_trials": 5,  # Keep small for speed
-            "bonsai_path": "test.bonsai",
-            "output_directory": temp_dir
+            "num_trials": 5
         }
         
-        param_file = os.path.join(temp_dir, "full_test_params.json")
-        with open(param_file, 'w') as f:
-            json.dump(params, f)
-        
-        # Create minimal workflow file
-        workflow_file = os.path.join(temp_dir, "test.bonsai")
-        with open(workflow_file, 'w') as f:
-            f.write("<WorkflowBuilder>Minimal Test</WorkflowBuilder>")
-        
-        # Load parameters (without running Bonsai)
-        experiment.load_parameters(param_file)
-        
-        # Note: Output path setup is now handled automatically in _prepare_bonsai_parameters
-        
-        # Test stimulus table generation
-        result = experiment.create_stimulus_table()
-        assert result is True
-        assert experiment.stimulus_table_path is not None
-        assert os.path.exists(experiment.stimulus_table_path)
-        
-        # Verify stimulus table content
-        import pandas as pd
-        stimulus_df = pd.read_csv(experiment.stimulus_table_path)
+        # Test stimulus table generation using functional approach
+        stimulus_df = stimulus_table.generate_slap2_stimulus_table(
+            params=params, 
+            session_output_path=temp_dir
+        )
+        assert stimulus_df is not None
         assert len(stimulus_df) == 5
         assert 'trial_index' in stimulus_df.columns
+        
+        # Test saving stimulus table to file
+        stimulus_table_path = os.path.join(temp_dir, "stimulus_table.csv")
+        save_result = stimulus_table.save_stimulus_table(stimulus_df, stimulus_table_path)
+        assert save_result is True
+        assert os.path.exists(stimulus_table_path)
+        
+        # Test trial statistics calculation
+        stats = stimulus_table.get_trial_statistics(stimulus_df)
+        assert stats['total_trials'] == 5
+        assert 'trial_types' in stats
