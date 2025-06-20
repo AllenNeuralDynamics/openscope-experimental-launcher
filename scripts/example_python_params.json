@@ -1,6 +1,7 @@
 {
     "repository_url": "https://github.com/example/python-experiment.git",
     "repository_commit_hash": "main",
+    "local_repository_path": "C:/repositories",
     "script_path": "experiments/experiment.py",
     "python_exe_path": "python",
     "python_venv_path": "C:/envs/experiment_env",

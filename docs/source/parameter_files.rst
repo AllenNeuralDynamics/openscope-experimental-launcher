@@ -44,13 +44,25 @@ These parameters work across all launcher types:
 **script_arguments** (array, optional)
    Additional command-line arguments passed directly to the script/program
 
+**Repository Parameters** (optional for all launchers)
+   These parameters enable automatic Git repository management:
+
+**repository_url** (string, optional)
+   Git repository URL containing the experiment code/workflows
+
+**repository_commit_hash** (string, optional, default: "main")
+   Specific commit, branch, or tag to checkout
+
+**local_repository_path** (string, optional)
+   Local directory where the repository should be cloned/stored
+
 Launcher-Specific Parameter Files
 ---------------------------------
 
 Bonsai Launcher Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For Bonsai workflows, additional Git repository parameters are supported:
+For Bonsai workflows:
 
 .. code-block:: json
    :caption: Bonsai launcher parameters
@@ -59,6 +71,7 @@ For Bonsai workflows, additional Git repository parameters are supported:
        "repository_url": "https://github.com/user/repo.git",
        "script_path": "workflows/visual_stimulus.bonsai",
        "repository_commit_hash": "main",
+       "local_repository_path": "C:/repositories",
        "OutputFolder": "C:/experiment_data"
    }
 
@@ -92,7 +105,10 @@ Python Launcher Parameters
    :caption: Python launcher parameters
 
    {
+       "repository_url": "https://github.com/user/python-experiment.git",
        "script_path": "experiments/visual_task.py",
+       "repository_commit_hash": "main",
+       "local_repository_path": "C:/repositories",
        "OutputFolder": "C:/experiment_data",
        "script_parameters": {
            "num_trials": 100,
@@ -108,7 +124,10 @@ MATLAB Launcher Parameters
    :caption: MATLAB launcher parameters
 
    {
+       "repository_url": "https://github.com/user/matlab-experiment.git",
        "script_path": "experiments/analysis_script.m",
+       "repository_commit_hash": "main",
+       "local_repository_path": "C:/repositories",
        "OutputFolder": "C:/experiment_data",
        "script_parameters": {
            "data_path": "C:/raw_data",
