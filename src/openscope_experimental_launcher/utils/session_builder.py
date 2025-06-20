@@ -174,7 +174,7 @@ def create_default_stimulus_epoch(
         stimulus_name=f"{rig_name} Stimulus",
         software=[bonsai_software, script_software],
         stimulus_modalities=[StimulusModality.VISUAL],  # Default to visual
-        stimulus_parameters=params.get("stimulus_parameters", {})
+        stimulus_parameters=[]  # Empty list for default implementation
     )
 
 

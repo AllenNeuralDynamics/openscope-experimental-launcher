@@ -36,6 +36,7 @@ except ImportError:
 
 from ..utils import config_loader
 from ..utils import git_manager
+from ..utils import session_builder
 
 
 class BaseLauncher:
@@ -409,8 +410,7 @@ class BaseLauncher:
                 logging.info(f"Duration: {duration}")
             logging.info(f"Final Memory Usage: {psutil.virtual_memory().percent}%")
             logging.info("="*60)
-            
-            # Close and remove file handlers to ensure logs are flushed
+              # Close and remove file handlers to ensure logs are flushed
             root_logger = logging.getLogger()
             handlers_to_remove = []
             
@@ -437,6 +437,82 @@ class BaseLauncher:
             True if successful, False otherwise        """
         logging.info("No post-experiment processing defined for this launcher type")
         return True
+    
+    def create_session_file(self, output_directory: str) -> bool:
+        """
+        Create session.json file with experiment metadata using aind-data-schema.
+        
+        This method creates a standardized session.json file in the output directory
+        containing basic experiment metadata. Derived classes can override this method
+        to add rig-specific metadata or use custom stimulus epoch and data stream builders.
+        
+        Args:
+            output_directory: Directory where session.json should be created
+            
+        Returns:
+            True if session.json was created successfully, False otherwise
+        """
+        try:
+            # Check if aind-data-schema is available
+            if not session_builder.is_schema_available():
+                logging.warning("aind-data-schema not available, skipping session.json creation")
+                return False
+            
+            # Get rig name from launcher type
+            rig_name = self._get_launcher_type_name()
+            
+            # Build session object using the session builder
+            session = session_builder.build_session(
+                start_time=self.start_time,
+                end_time=self.stop_time,
+                params=self.params,
+                subject_id=self.subject_id,
+                user_id=self.user_id,
+                session_uuid=self.session_uuid,
+                rig_name=rig_name,
+                stimulus_epoch_builder=self.get_stimulus_epoch_builder(),
+                data_streams_builder=self.get_data_streams_builder()
+            )
+            
+            if session is None:
+                logging.error("Failed to build session object")
+                return False
+            
+            # Save session.json file
+            session_file_path = os.path.join(output_directory, "session.json")
+            with open(session_file_path, 'w') as f:
+                json.dump(session.model_dump(), f, indent=2, default=str)
+            
+            logging.info(f"Session file created successfully: {session_file_path}")
+            return True
+            
+        except Exception as e:
+            logging.error(f"Failed to create session.json file: {e}")
+            return False
+    
+    def get_stimulus_epoch_builder(self) -> Optional[Any]:
+        """
+        Get stimulus epoch builder function for this launcher type.
+        
+        Derived classes can override this method to provide rig-specific
+        stimulus epoch builders that will be used by the session builder.
+        
+        Returns:
+            Stimulus epoch builder function or None for default behavior
+        """
+        return None
+    
+    def get_data_streams_builder(self) -> Optional[Any]:
+        """
+        Get data streams builder function for this launcher type.
+        
+        Derived classes can override this method to provide rig-specific
+        data streams builders that will be used by the session builder.
+        
+        Returns:
+            Data streams builder function or None for default behavior
+        """
+        return None
     
     def _get_launcher_type_name(self) -> str:
         """
@@ -579,10 +655,13 @@ class BaseLauncher:
             # Check for errors
             if not self.check_experiment_success():
                 logging.error(f"{self._get_launcher_type_name()} experiment failed")
-                return False
-              # Perform rig-specific post-processing
+                return False            # Perform rig-specific post-processing
             if not self.post_experiment_processing():
                 logging.warning("Post-experiment processing failed, but experiment data was collected")
+            
+            # Create session.json file with experiment metadata
+            if output_directory:
+                self.create_session_file(output_directory)
             
             return True
             
