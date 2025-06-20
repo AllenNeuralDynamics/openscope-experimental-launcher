@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 # Add the scripts directory to the path for SLAP2Launcher
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 
-from slap2_launcher import SLAP2Launcher
+from scripts.slap2_launcher import SLAP2Launcher
 
 
 class TestSLAP2LauncherClean:
@@ -74,12 +74,11 @@ class TestSLAP2LauncherClean:
         experiment.params = {"session_type": "SLAP2"}
         experiment.subject_id = "test_mouse"
         experiment.user_id = "Test User"
-        
-        # Mock the session object properly
+          # Mock the session object properly
         mock_session = Mock()
         mock_session.model_dump_json.return_value = '{"test": "session_data"}'
         
-        with patch('openscope_experimental_launcher.utils.session_builder.build_slap2_session', return_value=mock_session):
+        with patch('openscope_experimental_launcher.utils.session_builder.build_session', return_value=mock_session):
             result = experiment._create_session_json()
             assert result is True
 
