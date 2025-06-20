@@ -77,9 +77,8 @@ def construct_matlab_arguments(params: Dict[str, Any]) -> List[str]:
     
     # Use batch mode for non-interactive execution
     args.append('-batch')
-    
-    # Add custom MATLAB arguments if specified
-    custom_args = params.get('matlab_arguments', [])
+      # Add custom MATLAB arguments if specified
+    custom_args = params.get('script_arguments', [])
     if custom_args:
         args.extend(custom_args)
     

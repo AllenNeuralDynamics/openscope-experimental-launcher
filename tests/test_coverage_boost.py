@@ -72,7 +72,7 @@ class TestBonsaiInterfaceFunctions:
     def test_construct_workflow_arguments(self):
         """Test constructing workflow arguments."""
         params = {
-            'bonsai_parameters': {
+            'script_parameters': {
                 'subject_id': 'test_mouse',
                 'user_id': 'test_user',
                 'output_directory': 'C:/Output'

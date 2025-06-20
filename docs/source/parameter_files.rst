@@ -1,7 +1,7 @@
 Parameter Files
 ===============
 
-Parameter files are JSON configuration files that define how experiments are run. They specify script paths, execution parameters, and output locations. The parameter structure is now unified across all launcher types, using ``script_path`` as the primary parameter for specifying the experiment to run.
+Parameter files are JSON configuration files that define how experiments are run. They specify script paths, execution parameters, and output locations. The parameter structure is now unified across all launcher types, using ``script_path`` as the primary parameter for specifying the experiment to run, and ``script_parameters`` for interface-specific configuration.
 
 Basic Parameter Structure
 -------------------------
@@ -11,7 +11,11 @@ Basic Parameter Structure
 
    {
        "script_path": "path/to/script.py",
-       "OutputFolder": "C:/experiment_data"
+       "OutputFolder": "C:/experiment_data",
+       "script_parameters": {
+           "param1": "value1",
+           "param2": 42
+       }
    }
 
 Universal Parameters
@@ -29,6 +33,16 @@ These parameters work across all launcher types:
 
 **OutputFolder** (string)
    Directory where experiment data and outputs will be saved
+
+**script_parameters** (object, optional)
+   Interface-specific parameters passed to the script/workflow. The format and usage depends on the launcher type:
+   
+   - For Bonsai: Passed as ``-p name=value`` command-line arguments
+   - For MATLAB: Available in the workspace during script execution
+   - For Python: Passed as command-line arguments or environment variables
+
+**script_arguments** (array, optional)
+   Additional command-line arguments passed directly to the script/program
 
 Launcher-Specific Parameter Files
 ---------------------------------
@@ -80,7 +94,7 @@ Python Launcher Parameters
    {
        "script_path": "experiments/visual_task.py",
        "OutputFolder": "C:/experiment_data",
-       "python_parameters": {
+       "script_parameters": {
            "num_trials": 100,
            "stimulus_duration": 2.0,
            "subject_id": "mouse_001"
@@ -96,7 +110,7 @@ MATLAB Launcher Parameters
    {
        "script_path": "experiments/analysis_script.m",
        "OutputFolder": "C:/experiment_data",
-       "matlab_parameters": {
+       "script_parameters": {
            "data_path": "C:/raw_data",
            "analysis_type": "spectral",
            "gpu_enabled": true
@@ -141,7 +155,7 @@ Bonsai Parameters
    {
        "script_path": "workflow.bonsai",
        "OutputFolder": "C:/data",
-       "bonsai_parameters": {
+       "script_parameters": {
            "NumTrials": 100,
            "StimulusDuration": 5.0,
            "InterTrialInterval": 2.0,
@@ -157,7 +171,7 @@ Python Parameters
    {
        "script_path": "experiment.py",
        "OutputFolder": "C:/data",
-       "python_parameters": {
+       "script_parameters": {
            "num_trials": 100,
            "stimulus_type": "gratings",
            "save_raw_data": true
@@ -172,7 +186,7 @@ MATLAB Parameters
    {
        "script_path": "analysis.m",
        "OutputFolder": "C:/data",
-       "matlab_parameters": {
+       "script_parameters": {
            "data_file": "raw_data.mat",
            "analysis_type": "spectral",
            "plot_results": true
@@ -180,7 +194,7 @@ MATLAB Parameters
    }
 
 .. note::
-   Parameters are passed to scripts in a format appropriate for each interface. Bonsai receives them as workflow properties, Python as command-line arguments or environment variables, and MATLAB as function parameters.
+   Parameters are passed to scripts in a format appropriate for each interface. Bonsai receives them as workflow properties (``-p name=value``), Python as command-line arguments or environment variables, and MATLAB as function parameters.
 
 
 Parameter Schema Reference

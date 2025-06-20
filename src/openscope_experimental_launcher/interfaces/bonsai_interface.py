@@ -326,22 +326,22 @@ def create_bonsai_property_arguments(params: Dict[str, Any]) -> List[str]:
     """
     Create command-line property arguments for Bonsai.
     
-    Only passes properties that are explicitly requested in bonsai_parameters
+    Only passes properties that are explicitly requested in script_parameters
     to avoid conflicts with workflows that don't have these properties defined.
     
     Args:
-        params: Parameter dictionary containing bonsai_parameters
+        params: Parameter dictionary containing script_parameters
         
     Returns:
         List of -p arguments for Bonsai
     """
     bonsai_args = []
-    # Only add parameters from bonsai_parameters section - no automatic defaults
-    bonsai_parameters = params.get("bonsai_parameters", {})
+    # Only add parameters from script_parameters section - no automatic defaults
+    script_parameters = params.get("script_parameters", {})
         
-    if bonsai_parameters:
-        logging.info(f"Adding {len(bonsai_parameters)} custom Bonsai parameters")
-        for param_name, param_value in bonsai_parameters.items():
+    if script_parameters:
+        logging.info(f"Adding {len(script_parameters)} custom Bonsai parameters")
+        for param_name, param_value in script_parameters.items():
             # Convert parameter value to string for Bonsai
             param_str = str(param_value)
             bonsai_args.extend(["-p", f"{param_name}={param_str}"])
@@ -364,14 +364,13 @@ def construct_workflow_arguments(params: Dict[str, Any]) -> List[str]:
         List of command-line arguments
     """
     args = []
-    
-    # Add property arguments from bonsai_parameters
+      # Add property arguments from script_parameters
     property_args = create_bonsai_property_arguments(params)
     if property_args:
         args.extend(property_args)
     
     # Add any custom command-line arguments (not properties)
-    custom_args = params.get('bonsai_arguments', [])
+    custom_args = params.get('script_arguments', [])
     if custom_args:
         args.extend(custom_args)
     

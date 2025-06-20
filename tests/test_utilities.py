@@ -171,7 +171,7 @@ class TestBonsaiInterface:
         from openscope_experimental_launcher.interfaces import bonsai_interface
         
         params = {
-            "bonsai_parameters": {
+            "script_parameters": {
                 "TestParam1": "value1",
                 "TestParam2": 42
             }

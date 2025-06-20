@@ -114,7 +114,7 @@ def construct_python_arguments(params: Dict[str, Any]) -> List[str]:
     args = []
     
     # Add custom Python arguments if specified
-    custom_args = params.get('python_arguments', [])
+    custom_args = params.get('script_arguments', [])
     if custom_args:
         args.extend(custom_args)
     

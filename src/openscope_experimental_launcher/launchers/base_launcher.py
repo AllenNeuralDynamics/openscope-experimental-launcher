@@ -160,9 +160,7 @@ class BaseLauncher:
             logging.info(f"Parameter file checksum: {self.params_checksum}")
         else:
             logging.warning("No parameter file provided, using default parameters")
-            self.params = {}
-        
-        # Collect runtime information (only for missing values)
+            self.params = {}        # Collect runtime information (only for missing values)
         runtime_info = self.collect_runtime_information()
         # Update parameters with runtime information
         self.params.update(runtime_info)

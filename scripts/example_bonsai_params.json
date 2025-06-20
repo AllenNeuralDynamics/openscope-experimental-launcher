@@ -6,8 +6,7 @@
     "bonsai_exe_path": "code/stimulus-control/bonsai/Bonsai.exe",
     "bonsai_setup_script": "code/stimulus-control/bonsai/setup.cmd",
     "subject_id": "test_mouse",
-    "user_id": "test_user",
-    "OutputFolder": "C:/BonsaiDataPredictiveProcessing", 
-    "bonsai_parameters": {
+    "user_id": "test_user",    "OutputFolder": "C:/BonsaiDataPredictiveProcessing", 
+    "script_parameters": {
     }
 }

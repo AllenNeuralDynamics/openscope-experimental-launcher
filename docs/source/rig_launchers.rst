@@ -3,6 +3,26 @@ Launchers
 
 The OpenScope Experimental Launcher provides a modular architecture with specialized launchers for different experimental environments. Each launcher is built on a common base and handles specific interfaces (Bonsai, MATLAB, Python) with process management and monitoring.
 
+Modular Architecture Benefits
+-----------------------------
+
+**Separation of Concerns:**
+
+- Launchers handle process management and monitoring
+- Interfaces handle process creation
+- Utilities provide shared functionality
+
+**Flexibility:**
+
+- Easy to add new interfaces (e.g., LabVIEW, Julia)
+- Stateless interfaces for better testing
+
+**Maintainability:**
+
+- Clear separation between launcher logic and interface logic
+- Easier to extend and modify individual components
+- Better code reusability
+
 
 Base Launcher
 -------------
@@ -37,7 +57,7 @@ Specialized launcher for Bonsai visual programming workflows.
    from openscope_experimental_launcher.launchers import BonsaiLauncher
 
    launcher = BonsaiLauncher()
-   success = launcher.run("bonsai_parameters.json")
+   success = launcher.run("bonsai_params.json")
 
    if success:
        print(f"Session data: {launcher.session_pkl_path}")
@@ -70,7 +90,7 @@ Specialized launcher for MATLAB-based experiments.
    from openscope_experimental_launcher.launchers import MATLABLauncher
 
    launcher = MATLABLauncher()
-   success = launcher.run("matlab_parameters.json")
+   success = launcher.run("matlab_params.json")
 
 **Required Parameters:**
 
@@ -91,7 +111,7 @@ Specialized launcher for Python-based experiments.
    from openscope_experimental_launcher.launchers import PythonLauncher
 
    launcher = PythonLauncher()
-   success = launcher.run("python_parameters.json")
+   success = launcher.run("python_params.json")
 
 
 **Required Parameters:**
@@ -130,23 +150,6 @@ These interfaces can be used independently for custom launcher implementations:
        def _create_process(self, script_path, parameters):
            return BonsaiInterface.create_process(script_path, parameters)
 
-Modular Architecture Benefits
------------------------------
-
-**Separation of Concerns:**
-- Launchers handle process management and monitoring
-- Interfaces handle process creation
-- Utilities provide shared functionality
-
-**Flexibility:**
-- Easy to add new interfaces (e.g., Julia, R)
-- Stateless interfaces for better testing
-
-**Maintainability:**
-- Clear separation between launcher logic and interface logic
-- Easier to extend and modify individual components
-- Better code reusability
-
 
 Custom Launcher Development
 ---------------------------
@@ -176,6 +179,7 @@ Create custom launchers by extending BaseLauncher:
            )
 
 **Custom Launcher Guidelines:**
+
 - Always extend ``BaseLauncher``
 - Implement ``_create_process()`` method
 - Return a ``subprocess.Popen`` object

@@ -196,7 +196,7 @@ if __name__ == "__main__":
     "bonsai_exe_path": "C:/Bonsai/Bonsai.exe",
     "OutputFolder": "C:/experiment_data",
     "repository_url": "https://github.com/example/bonsai-workflow.git",
-    "bonsai_parameters": {
+    "script_parameters": {
         "StimDuration": 30,
         "ISI": 5
     }
@@ -212,7 +212,7 @@ if __name__ == "__main__":
     "matlab_exe_path": "matlab",
     "OutputFolder": "C:/experiment_data",
     "repository_url": "https://github.com/example/matlab-experiment.git",
-    "matlab_arguments": ["-nosplash", "-nodesktop"]
+    "script_arguments": ["-nosplash", "-nodesktop"]
 }
 ```
 
