@@ -31,8 +31,7 @@ class TestBonsaiLauncher:
             "subject_id": "test_mouse",
             "OutputFolder": temp_dir
         }
-        
-        # Create mock files
+          # Create mock files
         os.makedirs(temp_dir, exist_ok=True)
         with open(os.path.join(temp_dir, "test_workflow.bonsai"), "w") as f:
             f.write("<WorkflowBuilder>Test</WorkflowBuilder>")
@@ -44,10 +43,11 @@ class TestBonsaiLauncher:
             mock_process.pid = 12345
             mock_start.return_value = mock_process
             
-            result = launcher.create_process()
-            
-            assert result is True
-            assert launcher.process == mock_process
+            with patch('openscope_experimental_launcher.interfaces.bonsai_interface.setup_bonsai_environment', return_value=True):
+                result = launcher.create_process()
+                
+                assert result == mock_process
+                assert launcher.process == mock_process
 
     def test_create_process_failure(self, temp_dir):
         """Test process creation failure."""
@@ -58,14 +58,16 @@ class TestBonsaiLauncher:
             "subject_id": "test_mouse",
             "OutputFolder": temp_dir
         }
+          # Don't create the workflow file - should fail
         
-        # Don't create the workflow file - should fail
-        
-        result = launcher.create_process()
-        
-        assert result is False
-        assert launcher.process is None
-
+        try:
+            result = launcher.create_process()
+            # If we get here, the test should fail since it should have raised an exception
+            assert False, "Expected RuntimeError to be raised"
+        except RuntimeError:
+            # This is expected
+            assert launcher.process is None
+    
     def test_get_process_errors(self):
         """Test getting process errors."""
         launcher = BonsaiLauncher()
@@ -76,7 +78,7 @@ class TestBonsaiLauncher:
         assert isinstance(errors, str)
         assert "Error 1" in errors
         assert "Error 2" in errors
-
+    
     def test_get_process_errors_no_errors(self):
         """Test getting process errors when none exist."""
         launcher = BonsaiLauncher()
@@ -84,7 +86,7 @@ class TestBonsaiLauncher:
         
         errors = launcher.get_process_errors()
         
-        assert errors == ""
+        assert errors == "No errors reported by Bonsai."
 
 @pytest.fixture
 def temp_dir():

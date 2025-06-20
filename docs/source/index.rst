@@ -136,21 +136,6 @@ Contents
    quickstart
    parameter_files
    rig_launchers
-   examples
-
-.. toctree::
-   :maxdepth: 2
-   :caption: API Reference
-   
-   api/launchers
-   api/interfaces  
-   api/utils
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Additional Resources
-   
-   troubleshooting
 
 Indices and Tables
 ==================

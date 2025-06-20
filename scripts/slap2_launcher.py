@@ -150,9 +150,8 @@ class SLAP2Launcher(BonsaiLauncher):
             
         try:
             logging.info("Creating session.json using aind-data-schema...")
-            
-            # Build session metadata using utility
-            self.session_metadata = session_builder.create_slap2_session(
+              # Build session metadata using utility
+            self.session_metadata = session_builder.build_slap2_session(
                 subject_id=self.subject_id,
                 session_uuid=self.session_uuid,
                 params=self.params,

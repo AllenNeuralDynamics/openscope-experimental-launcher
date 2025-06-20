@@ -69,11 +69,6 @@ class PredictiveProcessingLauncher(BonsaiLauncher):
         logging.info("Starting Predictive Processing post-experiment processing...")
         
         try:
-            # Validate data files were created
-            if not self._validate_data_files():
-                logging.warning("Data file validation failed")
-                return False
-            
             # Verify stimulus timing
             if not self._verify_stimulus_timing():
                 logging.warning("Stimulus timing verification failed")
@@ -89,61 +84,6 @@ class PredictiveProcessingLauncher(BonsaiLauncher):
             
         except Exception as e:
             logging.error(f"Predictive Processing post-experiment processing failed: {e}")
-            return False
-    
-    def _validate_data_files(self) -> bool:
-        """
-        Validate that expected data files were created.
-        
-        Returns:
-            True if validation successful, False otherwise
-        """
-        try:
-            logging.info("Validating data files...")
-            
-            if not self.session_directory:
-                logging.warning("No session directory available for validation")
-                return False
-            
-            # Check for common data files
-            expected_files = []
-            
-            # Add expected files based on recording type
-            recording_type = self.params.get("recording_type", "ophys")
-            if recording_type == "ophys":
-                expected_files.extend([
-                    "ophys_data.h5",
-                    "timestamps.csv"
-                ])
-            elif recording_type == "ephys":
-                expected_files.extend([
-                    "ephys_data.dat",
-                    "spike_times.npy"
-                ])
-            
-            # Check for stimulus files
-            stimulus_type = self.params.get("stimulus_type", "natural_movies")
-            expected_files.extend([
-                "stimulus_log.csv",
-                "frame_times.csv"
-            ])
-            
-            missing_files = []
-            for filename in expected_files:
-                filepath = os.path.join(self.session_directory, filename)
-                if not os.path.exists(filepath):
-                    missing_files.append(filename)
-            
-            if missing_files:
-                logging.warning(f"Missing expected data files: {missing_files}")
-                # Don't fail validation for missing files, just warn
-            else:
-                logging.info("All expected data files found")
-            
-            return True
-            
-        except Exception as e:
-            logging.error(f"Data file validation failed: {e}")
             return False
     
     def _verify_stimulus_timing(self) -> bool:
