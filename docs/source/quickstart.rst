@@ -9,9 +9,7 @@ Basic Experiment Setup
 1. **Create a Parameter File**   Create a JSON file with your experiment parameters:
 
    .. code-block:: json
-      :caption: example_params.json
-
-      {
+      :caption: example_params.json      {
           "subject_id": "test_mouse_001",
           "user_id": "researcher_name",
           "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
@@ -19,7 +17,9 @@ Basic Experiment Setup
           "local_repository_path": "C:/BonsaiExperiments",
           "script_path": "code/stimulus-control/src/Standard_oddball_slap2.bonsai",
           "bonsai_exe_path": "code/stimulus-control/bonsai/Bonsai.exe",
-          "OutputFolder": "C:/experiment_data"
+          "OutputFolder": "C:/experiment_data",
+          "collect_mouse_runtime_data": true,
+          "protocol_id": ["protocol_001"]
       }
 
 2. **Choose Your Interface**
@@ -87,13 +87,22 @@ Command Line Usage
 
 You can also run experiments directly from the command line:
 
-.. code-block:: bash
-
-   # Run with parameter file
+.. code-block:: bash   # Run with parameter file
    python -m openscope_experimental_launcher.base.experiment example_params.json
 
    # Run SLAP2 experiment
    python -m openscope_experimental_launcher.slap2.launcher slap2_params.json
+
+Runtime Data Collection (Optional)
+----------------------------------
+
+The launcher supports interactive data collection at runtime. When ``collect_mouse_runtime_data: true`` is set in your parameter file:
+
+- **Protocol Confirmation**: Confirms protocol and platform settings before starting
+- **Animal Weight Collection**: Prompts for pre- and post-experiment animal weights
+- **Simple Interface**: Press Enter to keep existing values, or type new values to change them
+
+All runtime data is automatically included in the generated ``session.json`` file. This feature is completely optional and experiments will run normally without it.
 
 Rig-Specific Launchers
 ----------------------

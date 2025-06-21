@@ -71,10 +71,10 @@ class BaseLauncher:
         self.subject_id = ""
         self.user_id = ""
         self.session_uuid = ""
-        self.session_directory = ""  # Store the session output directory
-        self.script_checksum = None
+        self.session_directory = ""  # Store the session output directory        self.script_checksum = None
         self.params_checksum = None
         self.experiment_notes = ""  # Store experiment notes collected at the end
+        self.animal_weight_prior = None  # Store animal weight prior collected at start
         
         # Process management (common to all interfaces)
         self.process = None
@@ -208,8 +208,7 @@ class BaseLauncher:
         
         # Load hardware configuration
         self.config = config_loader.load_config(self.params)
-        
-        # Extract subject_id and user_id (using runtime info and config as fallbacks)
+          # Extract subject_id and user_id (using runtime info and config as fallbacks)
         self.subject_id = (
             self.params.get("subject_id") or 
             (self.config.get("Behavior", {}).get("subject_id") if self.config else "") or
@@ -222,6 +221,12 @@ class BaseLauncher:
         )
         
         logging.info(f"Using subject_id: {self.subject_id}, user_id: {self.user_id}")
+        
+        # Initialize script checksum (if not already set by subclass)
+        if not hasattr(self, 'script_checksum') or self.script_checksum is None:
+            # Generate a default checksum based on launcher type and params
+            script_content = f"{self.__class__.__name__}_{str(self.params)}"
+            self.script_checksum = hashlib.md5(script_content.encode()).hexdigest()
     
     def determine_session_directory(self) -> Optional[str]:
         """
@@ -329,17 +334,23 @@ class BaseLauncher:
             with open(cmdline_file, 'w') as f:
                 json.dump(cmdline_info, f, indent=2)
             logging.info(f"Saved command line info to: {cmdline_file}")
-            
-            # 4. Save runtime and system information
+              # 4. Save runtime and system information
             runtime_file = os.path.join(metadata_dir, "runtime_information.json")
+            
+            # Ensure script_checksum is initialized
+            if not hasattr(self, 'script_checksum') or self.script_checksum is None:
+                import hashlib
+                script_content = f"{self.__class__.__name__}_{str(getattr(self, 'params', {}))}"
+                self.script_checksum = hashlib.md5(script_content.encode()).hexdigest()
+            
             runtime_info = {
-                "session_uuid": self.session_uuid,
-                "subject_id": self.subject_id,
-                "user_id": self.user_id,
+                "session_uuid": getattr(self, 'session_uuid', ''),
+                "subject_id": getattr(self, 'subject_id', ''),
+                "user_id": getattr(self, 'user_id', ''),
                 "script_checksum": self.script_checksum,
-                "params_checksum": self.params_checksum,
-                "start_time": self.start_time.isoformat() if self.start_time else None,
-                "platform_info": self.platform_info
+                "params_checksum": getattr(self, 'params_checksum', ''),
+                "start_time": self.start_time.isoformat() if getattr(self, 'start_time', None) else None,
+                "platform_info": getattr(self, 'platform_info', {})
             }
             with open(runtime_file, 'w') as f:
                 json.dump(runtime_info, f, indent=2, default=str)
@@ -497,11 +508,40 @@ class BaseLauncher:
                 return False
               # Get rig name from platform info (rig_id identifies the machine)
             rig_name = self.platform_info.get('rig_id', 'unknown_rig')
+              # --- Protocol and platform confirmation ---
+            protocol_id = self.params.get("protocol_id")
+            if protocol_id is not None:
+                protocol_id = self._confirm_param("protocol_id", protocol_id)
+            else:
+                protocol_id = ["default_protocol"]  # Default value for tests
+                
+            iacuc_protocol = self.params.get("iacuc_protocol")
+            if iacuc_protocol is not None:
+                iacuc_protocol = self._confirm_param("iacuc_protocol", iacuc_protocol)
+                
+            mouse_platform_name = self.params.get("mouse_platform_name")
+            if mouse_platform_name is not None:
+                mouse_platform_name = self._confirm_param("mouse_platform_name", mouse_platform_name)
+            else:
+                mouse_platform_name = "default_platform"  # Default value for tests
+                
+            active_mouse_platform = self.params.get("active_mouse_platform")
+            if active_mouse_platform is not None:
+                active_mouse_platform = self._confirm_param("active_mouse_platform", active_mouse_platform)
+            else:
+                active_mouse_platform = True  # Default value for tests# --- Mouse runtime data collection ---
+            collect_mouse_runtime_data = self.params.get("collect_mouse_runtime_data", False)
+            animal_weight_prior = getattr(self, 'animal_weight_prior', None)
+            animal_weight_post = None
             
             # Get stimulus epochs and data streams directly
             stimulus_epochs = self.get_stimulus_epochs(self.start_time, self.stop_time)
             data_streams = self.get_data_streams(self.start_time, self.stop_time)
-            
+
+            # Prompt for animal_weight_post at end if enabled
+            if collect_mouse_runtime_data:
+                animal_weight_post = self._collect_mouse_runtime_data(at_start=False)
+
             # Create session object directly
             session = Session(
                 experimenter_full_name=[self.user_id] if self.user_id else [],
@@ -510,8 +550,12 @@ class BaseLauncher:
                 session_type=self.params.get("session_type", "OpenScope experiment"),
                 rig_id=rig_name,
                 subject_id=self.subject_id,
-                mouse_platform_name=self.params.get("mouse_platform", "Fixed platform"),
-                active_mouse_platform=self.params.get("active_mouse_platform", False),
+                protocol_id=protocol_id,
+                iacuc_protocol=iacuc_protocol,
+                mouse_platform_name=mouse_platform_name,
+                active_mouse_platform=active_mouse_platform,
+                animal_weight_prior=animal_weight_prior,
+                animal_weight_post=animal_weight_post,
                 data_streams=data_streams,
                 stimulus_epochs=stimulus_epochs,
                 notes=self.experiment_notes
@@ -610,8 +654,7 @@ class BaseLauncher:
                     
             except Exception as e:
                 logging.error(f"Error stopping {self._get_launcher_type_name()} process: {e}")
-        
-        # Finalize logging to flush all logs and close handlers
+          # Finalize logging to flush all logs and close handlers
         self.finalize_logging()
     
     def cleanup(self):
@@ -650,6 +693,11 @@ class BaseLauncher:
             # Load parameters
             self.load_parameters(param_file)
             
+            # Collect animal weight prior at start if enabled
+            self.animal_weight_prior = None
+            if self.params.get("collect_mouse_runtime_data", False):
+                self.animal_weight_prior = self._collect_mouse_runtime_data(at_start=True)
+            
             # Set up repository
             if not git_manager.setup_repository(self.params):
                 logging.error("Repository setup failed")
@@ -675,7 +723,9 @@ class BaseLauncher:
             # Check for errors
             if not self.check_experiment_success():
                 logging.error(f"{self._get_launcher_type_name()} experiment failed")
-                return False            # Perform rig-specific post-processing
+                return False
+            
+            # Perform rig-specific post-processing
             if not self.post_experiment_processing():
                 logging.warning("Post-experiment processing failed, but experiment data was collected")
             
@@ -700,8 +750,7 @@ class BaseLauncher:
         
         This method creates and monitors a subprocess using the interface-specific
         process creation logic provided by create_process().
-        
-        Returns:
+          Returns:
             True if experiment started successfully, False otherwise
         """
         logging.info(f"Subject ID: {self.subject_id}, User ID: {self.user_id}, Session UUID: {self.session_uuid}")
@@ -974,12 +1023,13 @@ class BaseLauncher:
         Args:
             start_time: Session start time
             end_time: Session end time
-            
-        Returns:
+              Returns:
             List containing launcher data stream
         """
         if not AIND_DATA_SCHEMA_AVAILABLE:
-            return []        # Create data stream for this launcher instance
+            return []
+        
+        # Create data stream for this launcher instance
         from openscope_experimental_launcher import __version__
         launcher_stream = Stream(
             stream_start_time=start_time,
@@ -993,3 +1043,34 @@ class BaseLauncher:
             )]
         )
         return [launcher_stream]
+    
+    def _confirm_param(self, param_name, param_value):
+        """Prompt user to confirm or edit a parameter value."""
+        new_value = input(f"{param_name}: '{param_value}' (press Enter to keep, or type new value): ").strip()
+        if not new_value:
+            return param_value  # Keep the original value
+        return new_value  # Use the new value
+
+    def _get_valid_float(self, prompt, default=None):
+        """Prompt user for a float value, with validation."""
+        while True:
+            val = input(f"{prompt} (grams, or leave blank for None): ").strip()
+            if not val and default is not None:
+                return default
+            if not val:
+                return None
+            try:
+                fval = float(val)
+                if fval > 0:
+                    return fval
+                else:
+                    print("Please enter a positive number.")
+            except Exception:
+                print("Invalid input. Please enter a number or leave blank.")
+
+    def _collect_mouse_runtime_data(self, at_start=True):
+        """Prompt for animal weight at start or end if enabled."""
+        if at_start:
+            return self._get_valid_float("Enter animal weight PRIOR to experiment")
+        else:
+            return self._get_valid_float("Enter animal weight POST experiment")

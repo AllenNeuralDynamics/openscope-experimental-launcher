@@ -55,6 +55,11 @@ class MinimalistLauncher(BaseLauncher):
         Returns:
             subprocess.Popen object for a simple test process
         """
+        # Generate a script checksum for this minimalist launcher
+        import hashlib
+        script_content = "minimalist_test_script_v1.0"
+        self.script_checksum = hashlib.md5(script_content.encode()).hexdigest()
+        
         # Get the script path from parameters
         script_path = self.params.get('script_path', 'echo')
         

@@ -226,9 +226,30 @@ if __name__ == "__main__":
     "python_exe_path": "python",
     "python_venv_path": "C:/envs/experiment_env",
     "OutputFolder": "C:/experiment_data",
-    "repository_url": "https://github.com/example/python-experiment.git",    "script_arguments": ["--verbose", "--save-plots"]
+    "repository_url": "https://github.com/example/python-experiment.git",
+    "script_arguments": ["--verbose", "--save-plots"]
 }
 ```
+
+#### Runtime Data Collection Parameters
+```json
+{
+    "subject_id": "test_mouse_001",
+    "user_id": "researcher_name",
+    "script_path": "workflows/experiment.bonsai",
+    "OutputFolder": "C:/experiment_data",
+    "collect_mouse_runtime_data": true,
+    "protocol_id": ["protocol_001"],
+    "mouse_platform_name": "behavior_platform",
+    "active_mouse_platform": true
+}
+```
+
+**Runtime Features:**
+- **Protocol Confirmation**: Interactive confirmation of protocol and platform parameters at experiment start
+- **Mouse Weight Collection**: When `collect_mouse_runtime_data: true`, prompts for animal weight before and after the experiment
+- **Simplified Interface**: Just press Enter to keep existing values, or type new values to change them
+- **Automatic Session Tracking**: All runtime data is automatically included in the generated `session.json` file
 
 ## Session Metadata and File Creation
 
@@ -239,6 +260,7 @@ All experiments automatically generate a comprehensive `session.json` file in th
 - **Session Information**: Start/end times, session UUID, subject and user IDs
 - **Data Streams**: Information about data collection streams and software
 - **Platform Details**: Rig identification, mouse platform configuration
+- **Animal Data**: Pre/post experiment weights (when collected)
 - **Software Information**: Details about the launcher and specific script/workflow executed
 - **Experiment Parameters**: Complete parameter sets used during the experiment
 

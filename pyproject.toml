@@ -29,7 +29,7 @@ dynamic = ["version"]
 
 dependencies = [
     'pandas',
-    'aind-data-schema',
+    'aind-data-schema==1.4.0',
     'aind-data-schema-models',
     'psutil',
     'pywin32; sys_platform == "win32"',  # Only install on Windows

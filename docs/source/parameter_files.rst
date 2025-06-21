@@ -87,13 +87,43 @@ Runtime Information Collection
 The following information is collected interactively when you run an experiment:
 
 **subject_id** (string)
-   Unique identifier for the experimental subject (collected at runtime)
+   Unique identifier for the experimental subject (collected at runtime if not provided)
 
 **user_id** (string)  
-   Identifier for the person running the experiment (collected at runtime)
+   Identifier for the person running the experiment (collected at runtime if not provided)
 
-**rig_id** (string, optional)
-   Identifier for the experimental rig (collected at runtime if needed)
+**Mouse Weight Collection** (optional)
+   When enabled, prompts for animal weights before and after experiments:
+
+.. code-block:: json
+   :caption: Enable mouse weight collection
+
+   {
+       "script_path": "experiment.bonsai",
+       "OutputFolder": "C:/experiment_data",
+       "collect_mouse_runtime_data": true,
+       "protocol_id": ["protocol_001"],
+       "mouse_platform_name": "behavior_platform",
+       "active_mouse_platform": true
+   }
+
+**collect_mouse_runtime_data** (boolean, optional)
+   When true, prompts for animal weight before and after the experiment
+
+**protocol_id** (array, optional)
+   Protocol identifiers (user will be prompted to confirm at runtime)
+
+**mouse_platform_name** (string, optional)
+   Platform identifier (user will be prompted to confirm at runtime)
+
+**active_mouse_platform** (boolean, optional)
+   Platform status (user will be prompted to confirm at runtime)
+
+**Runtime Prompts:**
+   - Animal weight prior to experiment (at start)
+   - Protocol and platform confirmation (simplified: press Enter to keep, or type new value)
+   - Animal weight post experiment (at end)
+   - Final experiment notes (optional)
 
 Additional Parameter Examples
 -----------------------------

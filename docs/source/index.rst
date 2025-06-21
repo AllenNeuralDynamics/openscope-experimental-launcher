@@ -48,6 +48,9 @@ Key Features
 🎯 **Project Flexibility**
    Custom project launchers via scripts without modifying core code
 
+🐁 **Runtime Data Collection**
+   Interactive prompts for protocol confirmation and animal weight collection
+
 🧪 **Stateless Design**
    Interface modules provide pure functions with no global state for better testability
 
@@ -80,14 +83,14 @@ Quick Start
 
 3. **Parameter File Example**:
 
-   .. code-block:: json
-
-      {
+   .. code-block:: json      {
           "subject_id": "test_mouse_001",
           "user_id": "researcher_name",
           "script_path": "path/to/workflow.bonsai",
           "repository_url": "https://github.com/user/repo.git",
-          "OutputFolder": "C:/experiment_data"
+          "OutputFolder": "C:/experiment_data",
+          "collect_mouse_runtime_data": true,
+          "protocol_id": ["protocol_001"]
       }
 
 Architecture
