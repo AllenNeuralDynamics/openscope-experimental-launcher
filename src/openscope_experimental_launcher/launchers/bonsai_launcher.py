@@ -8,6 +8,7 @@ Windows-specific optimizations.
 import os
 import logging
 import subprocess
+import datetime
 from typing import Dict
 
 # Import Windows-specific modules for process management
@@ -145,3 +146,45 @@ class BonsaiLauncher(BaseLauncher):
             self._assign_to_job_object()
         
         return process
+    
+    def get_data_streams(self, start_time: datetime.datetime, end_time: datetime.datetime) -> list:
+        """
+        Get data streams for Bonsai experiments.
+        
+        Extends base launcher stream with Bonsai-specific stream.
+        
+        Args:
+            start_time: Session start time
+            end_time: Session end time
+            
+        Returns:
+            List containing launcher stream + Bonsai stream
+        """
+        import datetime
+        from aind_data_schema.core.session import Stream
+        from aind_data_schema.components.devices import Software
+        from aind_data_schema_models.modalities import Modality
+        
+        # Get base launcher stream
+        streams = super().get_data_streams(start_time, end_time)
+          # Add Bonsai script stream
+        try:
+            script_path = self.params.get('script_path', 'Unknown')
+            script_name = os.path.basename(script_path) if script_path != 'Unknown' else 'Unknown'
+            
+            bonsai_script_stream = Stream(
+                stream_start_time=start_time,
+                stream_end_time=end_time,
+                stream_modalities=[Modality.BEHAVIOR],
+                software=[Software(
+                    name=f"Bonsai Script: {script_name}",
+                    version=self.params.get("script_version", "Unknown"),
+                    url=script_path,
+                    parameters=self.params
+                )]
+            )
+            streams.append(bonsai_script_stream)
+        except Exception as e:
+            logging.warning(f"Could not create Bonsai script stream: {e}")
+        
+        return streams

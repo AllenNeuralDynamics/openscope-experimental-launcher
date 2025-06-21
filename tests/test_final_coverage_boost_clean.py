@@ -10,7 +10,7 @@ import subprocess
 
 from src.openscope_experimental_launcher.utils import git_manager
 from src.openscope_experimental_launcher.interfaces import bonsai_interface, python_interface
-from src.openscope_experimental_launcher.utils import process_monitor, session_builder
+from src.openscope_experimental_launcher.utils import process_monitor
 from src.openscope_experimental_launcher.launchers import python_launcher, matlab_launcher
 
 
@@ -226,22 +226,8 @@ class TestFinalCoverageBoost:
         assert bonsai_interface._versions_match('1.2', '1.2.0') is True
         assert bonsai_interface._versions_match('1.2.0', '1.2') is True
         
-        # Mismatches
-        assert bonsai_interface._versions_match('1.2.3', '1.2.4') is False
+        # Mismatches        assert bonsai_interface._versions_match('1.2.3', '1.2.4') is False
         assert bonsai_interface._versions_match('1.2', '1.3') is False
-        
-    def test_session_builder_get_additional_script_parameters_filtering(self):
-        """Test additional script parameters filtering."""
-        params = {
-            'script_parameters': {'param1': 'value1'},
-            'extra_param': 'extra_value',
-            'another_param': 'another_value'
-        }
-        
-        result = session_builder.get_additional_script_parameters(params, 'test_rig')
-        
-        # Should be empty dict if no additional params beyond script_parameters
-        assert isinstance(result, dict)
         
     def test_git_manager_force_remove_directory_success(self):
         """Test force remove directory success."""

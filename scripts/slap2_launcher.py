@@ -26,7 +26,6 @@ except ImportError:
     logging.warning("aind-data-schema modules not available. Session.json creation will be disabled.")
 
 from openscope_experimental_launcher.launchers import BonsaiLauncher
-from openscope_experimental_launcher.utils import session_builder
 from openscope_experimental_launcher.utils import stimulus_table
 
 
@@ -136,10 +135,10 @@ class SLAP2Launcher(BonsaiLauncher):
         except Exception as e:
             logging.error(f"Failed to generate stimulus table: {e}")
             return False
-    
-    def _create_session_json(self) -> bool:  
+
+    def _create_session_json(self) -> bool:
         """
-        Create session.json file using aind-data-schema.
+        Create session.json file using the base class functionality.
         
         Returns:
             True if successful, False otherwise
@@ -149,28 +148,14 @@ class SLAP2Launcher(BonsaiLauncher):
             return True
             
         try:
-            logging.info("Creating session.json using aind-data-schema...")            # Build session metadata using utility
-            self.session_metadata = session_builder.build_session(
-                subject_id=self.subject_id,
-                session_uuid=self.session_uuid,
-                params=self.params
-            )
+            logging.info("Creating session.json using base class method...")
             
-            # Save session.json to output directory
+            # Use the base class method to create session.json
             if self.session_directory:
-                self.session_json_path = os.path.join(
-                    self.session_directory,
-                    'session.json'
-                )
-                
-                # Convert to JSON and save
-                session_json = self.session_metadata.model_dump_json(indent=2)
-                with open(self.session_json_path, 'w') as f:
-                    f.write(session_json)
-                    
-                logging.info(f"Session.json saved to: {self.session_json_path}")
-            
-            return True
+                return self.create_session_file(self.session_directory)
+            else:
+                logging.warning("No session directory set, skipping session.json creation")
+                return True
             
         except Exception as e:
             logging.error(f"Failed to create session.json: {e}")

@@ -146,9 +146,45 @@ These interfaces can be used independently for custom launcher implementations:
    )
 
    # Custom launcher with interface
-   class CustomLauncher(BaseLauncher):
-       def _create_process(self, script_path, parameters):
+   class CustomLauncher(BaseLauncher):       def _create_process(self, script_path, parameters):
            return BonsaiInterface.create_process(script_path, parameters)
+
+
+Session Files and Metadata
+---------------------------
+
+All launchers automatically create comprehensive session files using the AIND data schema:
+
+**Automatic Creation:**
+
+- ``session.json`` file created for every experiment run
+- Contains session timing, subject info, and software details
+- Follows AIND data schema standards for interoperability
+
+**Custom Data Streams:**
+
+Override ``get_data_streams()`` to add rig-specific metadata:
+
+.. code-block:: python
+
+   from aind_data_schema.core.session import Stream
+   from aind_data_schema_models.modalities import Modality as StreamModality
+
+   class MyRigLauncher(BonsaiLauncher):
+       def get_data_streams(self, start_time, end_time):
+           # Get base streams (launcher info)
+           streams = super().get_data_streams(start_time, end_time)
+           
+           # Add rig-specific stream
+           rig_stream = Stream(
+               stream_start_time=start_time,
+               stream_end_time=end_time,
+               daq_names=["MyRig_DAQ"],
+               stream_modalities=[StreamModality.ECEPHYS]
+           )
+           streams.append(rig_stream)
+           
+           return streams
 
 
 Custom Launcher Development
@@ -185,3 +221,39 @@ Create custom launchers by extending BaseLauncher:
 - Return a ``subprocess.Popen`` object
 - Handle parameters appropriately for your interface
 - Add interface-specific validation as needed
+
+Session Files and Metadata
+--------------------------
+
+All launchers automatically create comprehensive session files using the AIND data schema:
+
+**Automatic Creation:**
+
+- ``session.json`` file created for every experiment run
+- Contains session timing, subject info, and software details
+- Follows AIND data schema standards for interoperability
+
+**Custom Data Streams:**
+
+Override ``get_data_streams()`` to add rig-specific metadata:
+
+.. code-block:: python
+
+   from aind_data_schema.core.session import Stream
+   from aind_data_schema_models.modalities import Modality as StreamModality
+
+   class MyRigLauncher(BonsaiLauncher):
+       def get_data_streams(self, start_time, end_time):
+           # Get base streams (launcher info)
+           streams = super().get_data_streams(start_time, end_time)
+           
+           # Add rig-specific stream
+           rig_stream = Stream(
+               stream_start_time=start_time,
+               stream_end_time=end_time,
+               daq_names=["MyRig_DAQ"],
+               stream_modalities=[StreamModality.ECEPHYS]
+           )
+           streams.append(rig_stream)
+           
+           return streams

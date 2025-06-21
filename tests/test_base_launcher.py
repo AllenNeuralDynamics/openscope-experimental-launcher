@@ -281,18 +281,18 @@ class TestBaseLauncher:
         
         output_dir = str(tmp_path)
         
-        # Mock the session_builder to simulate schema not available
-        with patch('openscope_experimental_launcher.utils.session_builder.is_schema_available', return_value=False):
+        # Mock the AIND_DATA_SCHEMA_AVAILABLE constant to simulate it not being available
+        with patch('openscope_experimental_launcher.launchers.base_launcher.AIND_DATA_SCHEMA_AVAILABLE', False):
             result = experiment.create_session_file(output_dir)
         
         # Should return False when schema is not available
         assert result is False
-          # session.json should not be created
+        # session.json should not be created
         session_file = tmp_path / "session.json"
         assert not session_file.exists()
 
     def test_create_session_file_with_schema(self, tmp_path):
-        """Test session file creation when aind-data-schema is available."""
+        """Test session file creation with aind-data-schema available."""
         
         experiment = BaseLauncher()
         experiment.start_time = datetime.datetime.now()
@@ -304,17 +304,8 @@ class TestBaseLauncher:
         
         output_dir = str(tmp_path)
         
-        # Mock session builder to simulate successful session creation
-        mock_session = Mock()
-        mock_session.model_dump.return_value = {
-            "subject_id": "test_mouse",
-            "user_id": "test_user",
-            "session_uuid": "test_session"
-        }
-        
-        with patch('openscope_experimental_launcher.utils.session_builder.is_schema_available', return_value=True), \
-             patch('openscope_experimental_launcher.utils.session_builder.build_session', return_value=mock_session):
-            result = experiment.create_session_file(output_dir)
+        # Test the actual session creation (aind-data-schema should be available)
+        result = experiment.create_session_file(output_dir)
         
         # Should return True when session is created successfully
         assert result is True
@@ -323,23 +314,13 @@ class TestBaseLauncher:
         session_file = tmp_path / "session.json"
         assert session_file.exists()
         
-        # Verify the contents
+        # Verify the contents - the new system creates a proper aind-data-schema Session object
         import json
         with open(session_file, 'r') as f:
             session_data = json.load(f)
         
+        # Check for key fields that should be present in the aind-data-schema Session
         assert session_data["subject_id"] == "test_mouse"
-        assert session_data["user_id"] == "test_user"
-        assert session_data["session_uuid"] == "test_session"
-
-    def test_get_stimulus_epoch_builder_default(self):
-        """Test that default stimulus epoch builder returns None."""
-        experiment = BaseLauncher()
-        result = experiment.get_stimulus_epoch_builder()
-        assert result is None
-
-    def test_get_data_streams_builder_default(self):
-        """Test that default data streams builder returns None.""" 
-        experiment = BaseLauncher()
-        result = experiment.get_data_streams_builder()
-        assert result is None
+        assert "session_start_time" in session_data
+        assert "session_end_time" in session_data
+        assert "data_streams" in session_data

@@ -6,6 +6,7 @@ import os
 import sys
 import pytest
 import tempfile
+import datetime
 from unittest.mock import Mock, patch
 
 # Add the scripts directory to the path for SLAP2Launcher
@@ -69,18 +70,15 @@ class TestSLAP2LauncherClean:
         experiment = SLAP2Launcher()
         experiment.session_directory = temp_dir
         experiment.session_uuid = "test-uuid"
-        experiment.start_time = Mock()
-        experiment.stop_time = Mock()
+        experiment.start_time = datetime.datetime.now()
+        experiment.stop_time = datetime.datetime.now()
         experiment.params = {"session_type": "SLAP2"}
         experiment.subject_id = "test_mouse"
         experiment.user_id = "Test User"
-          # Mock the session object properly
-        mock_session = Mock()
-        mock_session.model_dump_json.return_value = '{"test": "session_data"}'
         
-        with patch('openscope_experimental_launcher.utils.session_builder.build_session', return_value=mock_session):
-            result = experiment._create_session_json()
-            assert result is True
+        # Test the updated method that uses base class functionality
+        result = experiment._create_session_json()
+        assert result is True
 
 
 if __name__ == "__main__":

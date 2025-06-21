@@ -29,6 +29,9 @@ from decimal import Decimal
 # Import AIND data schema utilities for standardized folder naming
 try:
     from aind_data_schema_models.data_name_patterns import build_data_name
+    from aind_data_schema.core.session import Session, Stream, StimulusModality, Modality
+    from aind_data_schema.components.devices import Software
+    from aind_data_schema_models.modalities import Modality as StreamModality
     AIND_DATA_SCHEMA_AVAILABLE = True
 except ImportError:
     AIND_DATA_SCHEMA_AVAILABLE = False
@@ -36,7 +39,6 @@ except ImportError:
 
 from ..utils import config_loader
 from ..utils import git_manager
-from ..utils import session_builder
 
 
 class BaseLauncher:
@@ -65,14 +67,14 @@ class BaseLauncher:
         self.start_time = None
         self.stop_time = None
         self.config = {}
-        
-        # Session tracking variables
+          # Session tracking variables
         self.subject_id = ""
         self.user_id = ""
         self.session_uuid = ""
         self.session_directory = ""  # Store the session output directory
         self.script_checksum = None
         self.params_checksum = None
+        self.experiment_notes = ""  # Store experiment notes collected at the end
         
         # Process management (common to all interfaces)
         self.process = None
@@ -101,14 +103,17 @@ class BaseLauncher:
         return {
             "python": sys.version.split()[0],
             "os": (platform.system(), platform.release(), platform.version()),
-            "hardware": (platform.processor(), platform.machine()),
-            "computer_name": platform.node(),
+            "hardware": (platform.processor(), platform.machine()),            "computer_name": platform.node(),
             "rig_id": os.environ.get('RIG_ID', socket.gethostname()),
         }
     
     def collect_runtime_information(self) -> Dict[str, str]:
         """
-        Collect key information from user at runtime.
+        Collect key information from user at runtime (beginning of experiment).
+        
+        This method collects essential experiment information at the start:
+        - Subject ID
+        - User ID  
         
         This method can be extended in derived classes to collect 
         rig-specific information.
@@ -141,7 +146,42 @@ class BaseLauncher:
             runtime_info["user_id"] = user_id
         
         logging.info(f"Collected runtime info - {runtime_info}")
+
         return runtime_info
+
+    def collect_end_experiment_information(self) -> Dict[str, str]:
+        """
+        Collect information from user at the end of the experiment.
+        
+        This method collects experiment wrap-up information:
+        - Final experiment notes
+        
+        This method can be extended in derived classes to collect 
+        rig-specific post-experiment information.
+        
+        Returns:
+            Dictionary containing collected end-of-experiment information
+        """
+        end_info = {}
+        
+        try:
+            print("\n" + "="*60)
+            print("EXPERIMENT COMPLETED - Please provide final information")
+            print("="*60)
+            
+            # Collect final experiment notes
+            final_notes = input("Enter final experiment notes/observations (optional): ").strip()
+            if final_notes:
+                end_info["final_notes"] = final_notes
+                self.experiment_notes = final_notes  # Store for session.json
+            
+        except (EOFError, OSError):
+            # Handle cases where input is not available (e.g., during testing)
+            logging.info("End-of-experiment information collection skipped (no interactive input available)")
+            pass
+        
+        logging.info(f"Collected end-of-experiment info - {end_info}")
+        return end_info
 
     def load_parameters(self, param_file: Optional[str]):
         """
@@ -319,8 +359,7 @@ class BaseLauncher:
             centralized_log_dir: Optional centralized logging directory
         """
         try:
-            # Create log filename with timestamp and session info
-            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+            # Create log filename with session info
             subject_id = self.params.get('subject_id')
             log_filename = f"experiment_{self.session_uuid}.log"
             
@@ -448,30 +487,34 @@ class BaseLauncher:
         
         Args:
             output_directory: Directory where session.json should be created
-            
-        Returns:
+              Returns:
             True if session.json was created successfully, False otherwise
         """
         try:
             # Check if aind-data-schema is available
-            if not session_builder.is_schema_available():
+            if not AIND_DATA_SCHEMA_AVAILABLE:
                 logging.warning("aind-data-schema not available, skipping session.json creation")
                 return False
+              # Get rig name from platform info (rig_id identifies the machine)
+            rig_name = self.platform_info.get('rig_id', 'unknown_rig')
             
-            # Get rig name from launcher type
-            rig_name = self._get_launcher_type_name()
+            # Get stimulus epochs and data streams directly
+            stimulus_epochs = self.get_stimulus_epochs(self.start_time, self.stop_time)
+            data_streams = self.get_data_streams(self.start_time, self.stop_time)
             
-            # Build session object using the session builder
-            session = session_builder.build_session(
-                start_time=self.start_time,
-                end_time=self.stop_time,
-                params=self.params,
+            # Create session object directly
+            session = Session(
+                experimenter_full_name=[self.user_id] if self.user_id else [],
+                session_start_time=self.start_time,
+                session_end_time=self.stop_time,
+                session_type=self.params.get("session_type", "OpenScope experiment"),
+                rig_id=rig_name,
                 subject_id=self.subject_id,
-                user_id=self.user_id,
-                session_uuid=self.session_uuid,
-                rig_name=rig_name,
-                stimulus_epoch_builder=self.get_stimulus_epoch_builder(),
-                data_streams_builder=self.get_data_streams_builder()
+                mouse_platform_name=self.params.get("mouse_platform", "Fixed platform"),
+                active_mouse_platform=self.params.get("active_mouse_platform", False),
+                data_streams=data_streams,
+                stimulus_epochs=stimulus_epochs,
+                notes=self.experiment_notes
             )
             
             if session is None:
@@ -489,30 +532,7 @@ class BaseLauncher:
         except Exception as e:
             logging.error(f"Failed to create session.json file: {e}")
             return False
-    
-    def get_stimulus_epoch_builder(self) -> Optional[Any]:
-        """
-        Get stimulus epoch builder function for this launcher type.
-        
-        Derived classes can override this method to provide rig-specific
-        stimulus epoch builders that will be used by the session builder.
-        
-        Returns:
-            Stimulus epoch builder function or None for default behavior
-        """
-        return None
-    
-    def get_data_streams_builder(self) -> Optional[Any]:
-        """
-        Get data streams builder function for this launcher type.
-        
-        Derived classes can override this method to provide rig-specific
-        data streams builders that will be used by the session builder.
-        
-        Returns:
-            Data streams builder function or None for default behavior
-        """
-        return None
+
     
     def _get_launcher_type_name(self) -> str:
         """
@@ -658,6 +678,9 @@ class BaseLauncher:
                 return False            # Perform rig-specific post-processing
             if not self.post_experiment_processing():
                 logging.warning("Post-experiment processing failed, but experiment data was collected")
+            
+            # Collect end-of-experiment information (notes, outcome, etc.)
+            self.collect_end_experiment_information()
             
             # Create session.json file with experiment metadata
             if output_directory:
@@ -923,3 +946,50 @@ class BaseLauncher:
         if not self.stderr_data:
             return f"No errors reported by {self._get_launcher_type_name()}."
         return "\n".join(self.stderr_data)
+
+    def get_stimulus_epochs(self, start_time: datetime.datetime, end_time: datetime.datetime) -> list:
+        """
+        Get stimulus epochs for session creation.
+        
+        Base launcher has no stimulus epochs - these should be implemented in project-specific
+        launchers based on the experimental protocol and Bonsai scripts used.
+        
+        Args:
+            start_time: Session start time
+            end_time: Session end time
+            
+        Returns:
+            Empty list (stimulus epochs should be defined in derived classes)
+        """
+        return []
+
+    def get_data_streams(self, start_time: datetime.datetime, end_time: datetime.datetime) -> list:
+        """
+        Get data streams for session creation.
+        
+        Base launcher creates a data stream that refers to itself (the launcher).
+        Subclasses can call super().get_data_streams() and extend the returned list
+        with additional streams (e.g., Bonsai, Python scripts, MATLAB, etc.).
+        
+        Args:
+            start_time: Session start time
+            end_time: Session end time
+            
+        Returns:
+            List containing launcher data stream
+        """
+        if not AIND_DATA_SCHEMA_AVAILABLE:
+            return []        # Create data stream for this launcher instance
+        from openscope_experimental_launcher import __version__
+        launcher_stream = Stream(
+            stream_start_time=start_time,
+            stream_end_time=end_time,
+            stream_modalities=[StreamModality.BEHAVIOR],  # Launcher is behavioral control
+            software=[Software(
+                name=self.__class__.__name__,  # Use actual class name
+                version=__version__,  # Package version
+                url="https://github.com/AllenInstitute/openscope-experimental-launcher",  # GitHub repo
+                parameters=self.params
+            )]
+        )
+        return [launcher_stream]

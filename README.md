@@ -4,7 +4,7 @@
 ![Code Style](https://img.shields.io/badge/code%20style-black-black)
 [![semantic-release: angular](https://img.shields.io/badge/semantic--release-angular-e10079?logo=semantic-release)](https://github.com/semantic-release/semantic-release)
 ![Interrogate](https://img.shields.io/badge/interrogate-100.0%25-brightgreen)
-![Coverage](https://img.shields.io/badge/coverage-70.88%25-green?logo=codecov)
+![Coverage](https://img.shields.io/badge/coverage-62.5%25-orange?logo=codecov)
 ![Python](https://img.shields.io/badge/python->=3.8-blue?logo=python)
 ![Platform](https://img.shields.io/badge/platform-Windows-blue?logo=windows)
 
@@ -45,7 +45,6 @@ src/openscope_experimental_launcher/
 └── utils/                   # Shared utilities
     ├── config_loader.py     # Configuration management
     ├── git_manager.py       # Repository management
-    ├── session_builder.py   # Session metadata and AIND schema integration
     └── process_monitor.py   # Process monitoring
 
 scripts/                     # Project-specific launcher scripts
@@ -238,15 +237,14 @@ if __name__ == "__main__":
 All experiments automatically generate a comprehensive `session.json` file in the output directory using the AIND data schema format. This file contains:
 
 - **Session Information**: Start/end times, session UUID, subject and user IDs
-- **Stimulus Epochs**: Details about the experimental stimuli with software information
+- **Data Streams**: Information about data collection streams and software
 - **Platform Details**: Rig identification, mouse platform configuration
-- **Software Metadata**: Information about Bonsai, MATLAB, Python, and custom scripts used
+- **Software Information**: Details about the launcher and specific script/workflow executed
 - **Experiment Parameters**: Complete parameter sets used during the experiment
-- **Session Notes**: Comprehensive notes combining user input and system-generated information
 
 ### Session File Structure
 
-The generated `session.json` follows this structure:
+The generated `session.json` follows the AIND data schema format:
 ```json
 {
   "describedBy": "https://raw.githubusercontent.com/AllenNeuralDynamics/aind-data-schema/main/src/aind_data_schema/core/session.py",
@@ -254,46 +252,42 @@ The generated `session.json` follows this structure:
   "experimenter_full_name": ["researcher_name"],
   "session_start_time": "2025-06-20T00:22:54.742371-07:00",
   "session_end_time": "2025-06-20T00:22:56.856767-07:00",
-  "session_type": "YourExperimentType",
+  "session_type": "OpenScope experiment",
   "rig_id": "your_rig_id",
   "subject_id": "test_mouse_001",
-  "stimulus_epochs": [
+  "data_streams": [
     {
-      "stimulus_name": "YourRig Stimulus",
-      "software": [
-        {
-          "name": "Bonsai",
-          "version": "2.8.5",
-          "parameters": { /* complete parameter set */ }
-        }
-      ],
-      "stimulus_modalities": ["Visual"],
-      "stimulus_parameters": []
+      "stream_start_time": "2025-06-20T00:22:54.742371-07:00",
+      "stream_end_time": "2025-06-20T00:22:56.856767-07:00",
+      "daq_names": ["Launcher"],
+      "stream_modalities": [{"abbreviation": "BEH", "name": "Behavior"}]
     }
   ],
-  "notes": "Comprehensive session notes with experiment details"
+  "notes": "Session notes with experiment details"
 }
 ```
 
 ### Extending Session Metadata
 
-Custom launchers can extend session metadata by overriding the session builder methods:
+Custom launchers can add specific data streams by overriding the `get_data_streams` method:
 
 ```python
 class MyCustomLauncher(BonsaiLauncher):
-    def get_stimulus_epoch_builder(self):
-        """Return custom stimulus epoch builder function."""
-        def build_stimulus_epoch(start_time, end_time, params, bonsai_software, script_software, **kwargs):
-            # Create custom stimulus epoch with rig-specific information
-            return create_custom_stimulus_epoch(start_time, end_time, params, **kwargs)
-        return build_stimulus_epoch
-    
-    def get_data_streams_builder(self):
-        """Return custom data streams builder function.""" 
-        def build_data_streams(params, **kwargs):
-            # Create rig-specific data streams information
-            return create_custom_data_streams(params, **kwargs)
-        return build_data_streams
+    def get_data_streams(self, start_time, end_time):
+        """Add custom data streams for this rig."""
+        # Get the base data streams (launcher info)
+        streams = super().get_data_streams(start_time, end_time)
+        
+        # Add rig-specific streams
+        custom_stream = Stream(
+            stream_start_time=start_time,
+            stream_end_time=end_time,
+            daq_names=["MyRig_DAQ"],
+            stream_modalities=[StreamModality.ECEPHYS, StreamModality.BEHAVIOR]
+        )
+        streams.append(custom_stream)
+        
+        return streams
 ```
 
 ### Output Directory Structure
@@ -310,56 +304,6 @@ subject_id_2025-06-20_00-22-54/
     ├── command_line_arguments.json  # Command line used
     └── runtime_information.json     # System and runtime info
 ```
-
-
-### Session Builder Architecture
-
-The package includes a comprehensive session builder architecture for automatic metadata generation:
-
-- **Automatic Integration**: Session files are created automatically by the `BaseLauncher` for all experiment types
-- **AIND Schema Compliance**: Session files follow AIND data schema standards for interoperability
-- **Functional Design**: Core session building functionality in `utils/session_builder.py`
-- **Rig-specific Extensions**: Custom session builders can be implemented for specialized rig types
-- **Graceful Fallback**: Works with or without aind-data-schema installed
-- **Easy Extensibility**: Simple to add support for new experiment types and metadata
-
-#### Customizing Session Metadata for Your Rig
-
-```python
-from openscope_experimental_launcher.launchers import BonsaiLauncher
-from openscope_experimental_launcher.utils import session_builder
-
-class MyRigLauncher(BonsaiLauncher):
-    def _get_launcher_type_name(self):
-        return "MyRig"
-    
-    def get_stimulus_epoch_builder(self):
-        """Return custom stimulus epoch builder for MyRig."""
-        def build_my_rig_stimulus_epoch(start_time, end_time, params, bonsai_software, script_software, **kwargs):
-            # Use the session builder utilities with rig-specific customizations
-            return session_builder.create_default_stimulus_epoch(
-                start_time, end_time, params, bonsai_software, script_software, "MyRig"
-            )
-        return build_my_rig_stimulus_epoch
-    
-    def get_data_streams_builder(self):
-        """Return custom data streams builder for MyRig."""
-        def build_my_rig_data_streams(params, **kwargs):
-            # Create rig-specific data streams
-            return [
-                session_builder.Stream(
-                    stream_start_time=kwargs.get('start_time'),
-                    stream_end_time=kwargs.get('end_time'),
-                    stream_modalities=['Visual', 'Behavior'],
-                    daq_names=['MyRig_DAQ'],
-                    # Add more rig-specific stream information
-                )
-            ]
-        return build_my_rig_data_streams
-```
-
-Session files are automatically created at the end of every experiment run, providing comprehensive metadata for data analysis and experiment reproducibility.
-
 
 ## License
 
