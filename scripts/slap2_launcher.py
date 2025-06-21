@@ -17,14 +17,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 src_dir = os.path.join(current_dir, '..', 'src')
 sys.path.insert(0, src_dir)
 
-# Import aind-data-schema components
-try:
-    from aind_data_schema.core.session import Session
-    AIND_SCHEMA_AVAILABLE = True
-except ImportError:
-    AIND_SCHEMA_AVAILABLE = False
-    logging.warning("aind-data-schema modules not available. Session.json creation will be disabled.")
-
+# Import the launcher and utilities
 from openscope_experimental_launcher.launchers import BonsaiLauncher
 from openscope_experimental_launcher.utils import stimulus_table
 
@@ -143,10 +136,6 @@ class SLAP2Launcher(BonsaiLauncher):
         Returns:
             True if successful, False otherwise
         """
-        if not AIND_SCHEMA_AVAILABLE:
-            logging.warning("aind-data-schema not available, skipping session.json creation")
-            return True
-            
         try:
             logging.info("Creating session.json using base class method...")
             
