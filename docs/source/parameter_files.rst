@@ -250,3 +250,67 @@ Parameter Schema Reference
 --------------------------
 
 For a complete schema definition, see the :doc:`api/base` documentation for the ``BaseExperiment.load_parameters()`` method.
+
+Session Files and Output
+-------------------------
+
+Every experiment automatically generates a comprehensive ``session.json`` file in the output directory using the AIND data schema format.
+
+Session File Contents
+~~~~~~~~~~~~~~~~~~~~~
+
+The generated ``session.json`` includes:
+
+- **Session Information**: Start/end times, session UUID, subject and user IDs
+- **Data Streams**: Information about data collection streams and software  
+- **Platform Details**: Rig identification, mouse platform configuration
+- **Animal Data**: Pre/post experiment weights (when collected)
+- **Software Information**: Details about the launcher and specific script/workflow executed
+- **Experiment Parameters**: Complete parameter sets used during the experiment
+
+Example Session File Structure
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: json
+
+   {
+     "describedBy": "https://raw.githubusercontent.com/AllenNeuralDynamics/aind-data-schema/main/src/aind_data_schema/core/session.py",
+     "schema_version": "1.4.0", 
+     "experimenter_full_name": ["researcher_name"],
+     "session_start_time": "2025-06-21T10:30:00.000000-07:00",
+     "session_end_time": "2025-06-21T10:45:30.000000-07:00",
+     "session_type": "OpenScope experiment",
+     "rig_id": "your_rig_id",
+     "subject_id": "test_mouse_001",
+     "data_streams": [
+       {
+         "stream_start_time": "2025-06-21T10:30:00.000000-07:00",
+         "stream_end_time": "2025-06-21T10:45:30.000000-07:00",
+         "daq_names": ["Launcher"],
+         "stream_modalities": [{"abbreviation": "BEH", "name": "Behavior"}]
+       }
+     ],
+     "notes": "Experiment completed successfully with runtime data collection"
+   }
+
+Extending Session Metadata
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Custom launchers can add specific data streams by overriding the ``get_data_streams`` method:
+
+.. code-block:: python
+
+   class MyCustomLauncher(BonsaiLauncher):
+       def get_data_streams(self, start_time, end_time):
+           """Add custom data streams for this rig."""
+           streams = super().get_data_streams(start_time, end_time)
+           
+           # Add custom stream for this rig
+           streams.append({
+               "stream_start_time": start_time,
+               "stream_end_time": end_time, 
+               "daq_names": ["MyCustomDAQ"],
+               "stream_modalities": [{"abbreviation": "EPHYS", "name": "Electrophysiology"}]
+           })
+           
+           return streams
