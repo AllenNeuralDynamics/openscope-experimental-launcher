@@ -146,44 +146,6 @@ For testing, you can use a custom rig config file:
    Custom rig config paths should only be used for testing or special setups.
    Normal operation should always use the default location.
 
-Validation
-----------
-
-The launcher validates rig config on startup:
-
-**Required Fields:**
-   - ``rig_id`` must be present and non-empty
-
-**Automatic Fixes:**
-   - Missing fields are filled with defaults
-   - Invalid values are corrected where possible
-
-**Error Handling:**
-   - If the file is corrupted, a new default file is created
-   - Validation errors are logged with helpful messages
-
-Best Practices
---------------
-
-1. **Use descriptive rig_id**: e.g., "ophys-rig-001" not just "rig1"
-2. **Keep it minimal**: Only add settings that are truly rig-specific
-3. **Document custom settings**: Add comments explaining non-standard configurations
-4. **Version control**: Keep template rig configs in git for new rig setups
-5. **Backup before major changes**: Save a copy before making significant edits
-
-Multiple Rigs
--------------
-
-If you manage multiple rigs:
-
-**Option 1: Default locations per machine**
-   Each rig computer has its own rig config at the default location.
-
-**Option 2: Custom locations (advanced)**
-   Use custom rig config paths for each rig, but this requires updating launcher scripts.
-
-**Recommended**: Use Option 1 for simplicity and consistency.
-
 Related Documentation
 ---------------------
 
