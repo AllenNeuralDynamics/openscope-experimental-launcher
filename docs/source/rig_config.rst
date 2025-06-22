@@ -97,7 +97,6 @@ What NOT to Put Here
    - ``user_id`` - changes per session
    - ``protocol_id`` - experiment design parameter
    - ``script_path`` - experiment workflow
-   - ``output_root_folder`` - session-specific output location
 
 ✅ **Do put in rig config:**
    - ``rig_id`` - hardware identifier

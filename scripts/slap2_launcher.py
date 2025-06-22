@@ -29,8 +29,7 @@ class SLAP2Launcher(BonsaiLauncher):
     Provides:
     - SLAP2-specific parameter handling
     - Automated stimulus table generation
-    - Session.json creation using aind-data-schema
-    - SLAP field of view management
+    - Inherits session.json creation from base class
     """
     
     def __init__(self):
@@ -39,10 +38,6 @@ class SLAP2Launcher(BonsaiLauncher):
         
         # SLAP2-specific variables
         self.stimulus_table = None
-        self.session_metadata = None
-        self.slap_fovs = []
-        self.trial_data = []
-        self.session_json_path = None
         self.stimulus_table_path = None
         
         # Additional session parameters for SLAP2
@@ -60,8 +55,7 @@ class SLAP2Launcher(BonsaiLauncher):
         
         This includes:
         - Stimulus table generation
-        - Session.json creation using aind-data-schema
-        - FOV metadata collection
+        - Standard session.json creation (using base class)
         
         Returns:
             True if successful, False otherwise
@@ -69,20 +63,13 @@ class SLAP2Launcher(BonsaiLauncher):
         logging.info("Starting SLAP2 post-experiment processing...")
         
         try:
-            # Generate stimulus table
+            # Generate stimulus table (SLAP2-specific)
             if not self._generate_stimulus_table():
-                logging.warning("Failed to generate stimulus table")
+                logging.error("Failed to generate stimulus table")
                 return False
             
-            # Create session.json using aind-data-schema
-            if not self._create_session_json():
-                logging.warning("Failed to create session.json")
-                return False
-            
-            # Process field of view data if available
-            if not self._process_fov_data():
-                logging.warning("Failed to process FOV data")
-                # Don't fail the entire post-processing for FOV issues
+            # Session.json creation is already handled by base class in the main run() method
+            # No need to duplicate it here
             
             logging.info("SLAP2 post-experiment processing completed successfully")
             return True
@@ -126,68 +113,6 @@ class SLAP2Launcher(BonsaiLauncher):
             
         except Exception as e:
             logging.error(f"Failed to generate stimulus table: {e}")
-            return False
-
-    def _create_session_json(self) -> bool:
-        """
-        Create session.json file using the base class functionality.
-        
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            logging.info("Creating session.json using base class method...")
-              # Use the base class method to create session.json
-            if self.output_session_folder:
-                return self.create_session_file(self.output_session_folder)
-            else:
-                logging.warning("No output session folder set, skipping session.json creation")
-                return True
-            
-        except Exception as e:
-            logging.error(f"Failed to create session.json: {e}")
-            return False
-    
-    def _process_fov_data(self) -> bool:
-        """
-        Process field of view specific data for SLAP2.
-        
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            logging.info("Processing SLAP2 field of view data...")
-            
-            # Extract FOV information from parameters
-            fov_id = self.params.get('field_of_view_id', 'FOV001')
-            imaging_depth = self.params.get('imaging_depth', 200)
-            
-            # Store FOV data
-            fov_data = {
-                'fov_id': fov_id,
-                'imaging_depth_um': imaging_depth,
-                'session_uuid': self.session_uuid,
-                'timestamp': self.start_time.isoformat() if self.start_time else None
-            }
-            
-            self.slap_fovs.append(fov_data)
-              # Save FOV metadata if output directory exists
-            if self.output_session_folder:
-                fov_metadata_path = os.path.join(
-                    self.output_session_folder,
-                    'fov_metadata.json'
-                )
-                
-                import json
-                with open(fov_metadata_path, 'w') as f:
-                    json.dump({'fields_of_view': self.slap_fovs}, f, indent=2)
-                
-                logging.info(f"FOV metadata saved to: {fov_metadata_path}")
-            
-            return True
-            
-        except Exception as e:
-            logging.error(f"Failed to process FOV data: {e}")
             return False
 
 
