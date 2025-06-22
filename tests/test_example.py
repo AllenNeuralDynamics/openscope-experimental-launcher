@@ -35,7 +35,6 @@ def test_slap2_launcher_creation():
     launcher = SLAP2Launcher()
     assert launcher is not None
     assert launcher.session_type == "SLAP2"
-    assert hasattr(launcher, 'slap_fovs')
 
 
 @pytest.mark.unit

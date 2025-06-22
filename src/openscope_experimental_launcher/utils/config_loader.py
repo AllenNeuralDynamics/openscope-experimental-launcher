@@ -18,14 +18,6 @@ except ImportError:
 import io
 import ast
 
-# Issue deprecation warning
-warnings.warn(
-    "config_loader.py is deprecated and will be removed in a future version. "
-    "Use rig_config.py for new code.",
-    DeprecationWarning,
-    stacklevel=2
-)
-
 # Default CamStim configuration
 DEFAULTCONFIG = """
 [Behavior]
