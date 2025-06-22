@@ -1,8 +1,8 @@
 # openscope-experimental-launcher
 
 [![License](https://img.shields.io/badge/license-MIT-brightgreen)](LICENSE)
-![Interrogate](https://img.shields.io/badge/interrogate-100.0%25-brightgreen)
-![Coverage](https://img.shields.io/badge/coverage-61%25-orange?logo=codecov)
+![Interrogate](https://img.shields.io/badge/interrogate-97.4%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-60.7%25-orange?logo=codecov)
 ![Python](https://img.shields.io/badge/python->=3.8-blue?logo=python)
 ![Platform](https://img.shields.io/badge/platform-Windows-blue?logo=windows)
 [![Documentation](https://img.shields.io/badge/docs-latest-blue?logo=gitbook)](https://allenneuraldynamics.github.io/openscope-experimental-launcher/)
@@ -96,7 +96,7 @@ launcher.initialize_launcher(param_file="experiment.json")  # Uses default rig c
     "subject_id": "test_mouse_001",
     "user_id": "researcher_name", 
     "script_path": "path/to/workflow.bonsai",
-    "OutputFolder": "C:/experiment_data",
+    "output_root_folder": "C:/experiment_data",
     "collect_mouse_runtime_data": true,
     "protocol_id": ["protocol_001"]
 }

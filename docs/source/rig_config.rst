@@ -9,7 +9,7 @@ Purpose
 Rig configuration handles:
 
 - **Hardware identification**: Unique rig identifier
-- **Data storage paths**: Base directories for experiment data
+- **Data storage paths**: Base directory for experiment data  
 - **Hardware settings**: Camera configs, sync settings, etc.
 - **Setup constants**: Values that remain the same across all experiments on this rig
 
@@ -38,10 +38,8 @@ The rig config uses TOML format for easy reading and editing:
    # These settings should remain constant across different experiments.
    #
    # DO NOT put experiment-specific parameters here!
-   # Experiment parameters belong in JSON parameter files.
-
-   rig_id = "rig-001-behavior"
-   data_root_directory = "C:/experiment_data"
+   # Experiment parameters belong in JSON parameter files.   rig_id = "rig-001-behavior"
+   output_root_folder = "C:/experiment_data"
 
 Default Settings
 ----------------
@@ -51,22 +49,28 @@ When first created, the rig config contains:
 **rig_id**
    Defaults to the computer's hostname. This uniquely identifies your rig.
 
-**data_root_directory**
-   Base path for storing experiment data. Defaults to:
+**output_root_folder** 
+   Default base directory for experiments. When experiments don't specify a custom output_root_folder,
+   this directory will be used as the base for creating timestamped SessionFolders.
    
+   Defaults to:
    - Windows: ``C:/experiment_data``
-   - Linux: ``/home/experiment_data``
+   - Linux: ``/home/experiment_data``   .. note::
+      **Folder System**: The launcher uses a two-tier folder system:
+      
+      - **output_root_folder**: Base directory (from rig config or parameter override)
+      - **output_session_folder**: output_root_folder + timestamped session name (automatically created)
+      
+      Your experiment processes receive the full output_session_folder path.
 
 Adding Custom Settings
 ----------------------
 
 You can add rig-specific hardware settings:
 
-.. code-block:: toml
-
-   # Basic required settings
+.. code-block:: toml   # Basic required settings
    rig_id = "ophys-rig-003"
-   data_root_directory = "D:/experiment_data"
+   output_root_folder = "D:/experiment_data"
 
    # Example: Camera settings
    [camera]
@@ -93,11 +97,11 @@ What NOT to Put Here
    - ``user_id`` - changes per session
    - ``protocol_id`` - experiment design parameter
    - ``script_path`` - experiment workflow
-   - ``OutputFolder`` - session-specific output location
+   - ``output_root_folder`` - session-specific output location
 
 ✅ **Do put in rig config:**
    - ``rig_id`` - hardware identifier
-   - ``data_root_directory`` - base data path
+   - ``output_root_folder`` - base data path
    - Camera settings, sync settings, hardware configs
 
 Editing the Rig Config
@@ -127,7 +131,7 @@ You can also access rig config programmatically:
    # Load current rig configuration
    config = get_rig_config()
    print(f"Current rig: {config['rig_id']}")
-   print(f"Data directory: {config['data_root_directory']}")
+   print(f"Data directory: {config['output_root_folder']}")
 
 Testing with Custom Configs
 ----------------------------

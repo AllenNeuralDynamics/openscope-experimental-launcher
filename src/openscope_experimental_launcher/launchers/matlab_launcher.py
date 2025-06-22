@@ -44,7 +44,7 @@ class MatlabLauncher(BaseLauncher):
             script_path=script_path,
             matlab_exe_path=matlab_exe_path,
             arguments=script_args,
-            output_path=self.session_directory
+            output_folder=self.output_session_folder
         )
         
         return process

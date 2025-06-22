@@ -28,7 +28,7 @@ class TestSLAP2LauncherClean:
     def test_post_experiment_processing_success(self):
         """Test successful post-experiment processing."""
         experiment = SLAP2Launcher()
-        experiment.session_directory = "/tmp/test"
+        experiment.output_session_folder = "/tmp/test"
         
         with patch.object(experiment, '_generate_stimulus_table', return_value=True):
             with patch.object(experiment, '_create_session_json', return_value=True):
@@ -39,7 +39,7 @@ class TestSLAP2LauncherClean:
     def test_post_experiment_processing_failure(self):
         """Test post-experiment processing with session failure."""
         experiment = SLAP2Launcher()
-        experiment.session_directory = "/tmp/test"
+        experiment.output_session_folder = "/tmp/test"
         
         # Mock stimulus success but session failure
         with patch.object(experiment, '_generate_stimulus_table', return_value=True):
@@ -58,7 +58,7 @@ class TestSLAP2LauncherClean:
         """Test stimulus table generation."""
         experiment = SLAP2Launcher()
         experiment.params = {"num_trials": 50}
-        experiment.session_directory = temp_dir
+        experiment.output_session_folder = temp_dir
         
         with patch('openscope_experimental_launcher.utils.stimulus_table.generate_slap2_stimulus_table') as mock_gen:
             mock_gen.return_value = Mock()
@@ -68,16 +68,15 @@ class TestSLAP2LauncherClean:
     def test_create_session_json(self, temp_dir):
         """Test session json creation."""
         experiment = SLAP2Launcher()
-        experiment.session_directory = temp_dir
+        experiment.output_session_folder = temp_dir
         experiment.session_uuid = "test-uuid"
         experiment.start_time = datetime.datetime.now()
         experiment.stop_time = datetime.datetime.now()
         experiment.params = {"session_type": "SLAP2"}
         experiment.subject_id = "test_mouse"
         experiment.user_id = "Test User"
-        
-        # Initialize rig_config (required by base class)
-        experiment.rig_config = {"rig_id": "test_rig", "data_root_directory": "/tmp"}
+          # Initialize rig_config (required by base class)
+        experiment.rig_config = {"rig_id": "test_rig", "output_root_folder": "/tmp"}
         
         # Test the updated method that uses base class functionality
         result = experiment._create_session_json()

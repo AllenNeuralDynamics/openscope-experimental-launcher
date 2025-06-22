@@ -7,5 +7,5 @@
     "script_arguments": ["-nosplash", "-nodesktop"],
     "subject_id": "test_mouse_001",
     "user_id": "researcher_name",
-    "OutputFolder": "C:/experiment_data/matlab_output"
+    "output_root_folder": "C:/experiment_data/matlab_output"
 }

@@ -86,10 +86,10 @@ class TestMATLABInterface:
         with patch('subprocess.Popen', return_value=mock_process) as mock_popen, \
              patch('os.path.exists', return_value=True):
             process = matlab_interface.start_matlab_script(
-                'test_script.m', 
+                'test_script.m',
                 'matlab',
                 arguments=['-batch'],
-                output_path='C:/output'
+                output_folder='C:/output'
             )
             
             assert process == mock_process
@@ -105,7 +105,7 @@ class TestMATLABInterface:
                 'test_script.m',
                 'matlab',
                 arguments=['-batch', '-nosplash'],
-                output_path='C:/output'
+                output_folder='C:/output'
             )
             
             assert process == mock_process

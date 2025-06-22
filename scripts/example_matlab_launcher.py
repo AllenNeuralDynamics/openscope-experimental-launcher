@@ -48,8 +48,8 @@ class ExampleMatlabLauncher(MatlabLauncher):
         
         try:
             # Example: check for output files
-            if self.session_directory:
-                output_files = [f for f in os.listdir(self.session_directory) if f.endswith('.mat')]
+            if self.output_session_folder:
+                output_files = [f for f in os.listdir(self.output_session_folder) if f.endswith('.mat')]
                 logging.info(f"Found {len(output_files)} .mat output files")
             
             logging.info("Example MATLAB post-experiment processing completed successfully")

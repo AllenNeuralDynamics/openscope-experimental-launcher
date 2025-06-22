@@ -377,7 +377,7 @@ def construct_workflow_arguments(params: Dict[str, Any]) -> List[str]:
     return args
 
 
-def start_workflow(workflow_path: str, bonsai_exe_path: str, arguments: List[str] = None, output_path: str = None) -> subprocess.Popen:
+def start_workflow(workflow_path: str, bonsai_exe_path: str, arguments: List[str] = None, output_folder: str = None) -> subprocess.Popen:
     """
     Start a Bonsai workflow as a subprocess.
     
@@ -385,7 +385,7 @@ def start_workflow(workflow_path: str, bonsai_exe_path: str, arguments: List[str
         workflow_path: Path to the Bonsai workflow file
         bonsai_exe_path: Path to Bonsai executable
         arguments: Additional command-line arguments
-        output_path: Directory for output files
+        output_folder: Directory for output files
         
     Returns:
         Subprocess.Popen object for the running workflow
@@ -409,13 +409,12 @@ def start_workflow(workflow_path: str, bonsai_exe_path: str, arguments: List[str
     
     if arguments:
         cmd_args.extend(arguments)
-    
-    # Set output directory if specified
-    if output_path:
-        # Normalize the output path as well
-        output_path_normalized = os.path.normpath(output_path)
-        cmd_args.extend(["-p", f"OutputFolder={output_path_normalized}"])
-        logging.info(f"Output will be saved to: {output_path_normalized}")
+      # Set output directory if specified
+    if output_folder:
+        # Normalize the output folder path as well
+        output_folder_normalized = os.path.normpath(output_folder)
+        cmd_args.extend(["-p", f"OutputFolder={output_folder_normalized}"])
+        logging.info(f"Output will be saved to: {output_folder_normalized}")
     
     logging.info(f"Starting Bonsai workflow: {' '.join(cmd_args)}")
     

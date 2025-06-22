@@ -127,7 +127,7 @@ def construct_python_arguments(params: Dict[str, Any]) -> List[str]:
 
 
 def start_python_script(script_path: str, python_exe_path: str = None, 
-                       arguments: List[str] = None, output_path: str = None,
+                       arguments: List[str] = None, output_folder: str = None,
                        venv_path: str = None) -> subprocess.Popen:
     """
     Start a Python script as a subprocess.
@@ -136,7 +136,7 @@ def start_python_script(script_path: str, python_exe_path: str = None,
         script_path: Path to the Python script file
         python_exe_path: Path to Python executable
         arguments: Additional command-line arguments
-        output_path: Directory for output files
+        output_folder: Directory for output files
         venv_path: Path to virtual environment (if applicable)
         
     Returns:
@@ -164,12 +164,12 @@ def start_python_script(script_path: str, python_exe_path: str = None,
     
     if arguments:
         cmd_args.extend(arguments)
-    
-    # Set environment variables
+      # Set environment variables
     env = os.environ.copy()
-    if output_path:
-        env['OUTPUT_PATH'] = output_path
-        logging.info(f"Output path set as environment variable: {output_path}")
+    
+    if output_folder:
+        env['OUTPUT_FOLDER'] = output_folder
+        logging.info(f"Output folder set as environment variable: {output_folder}")
     
     logging.info(f"Starting Python script: {' '.join(cmd_args)}")
     

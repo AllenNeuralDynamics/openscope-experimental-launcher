@@ -17,7 +17,7 @@ class TestBaseLauncher:
         """Test BaseLauncher initialization."""
         experiment = BaseLauncher()        
         assert experiment.platform_info is not None
-        assert experiment.session_directory == ""
+        assert experiment.output_session_folder == ""
         assert experiment.params == {}
         assert experiment.process is None
         assert experiment.session_uuid is not None
@@ -26,30 +26,27 @@ class TestBaseLauncher:
         """Test runtime information collection."""
         experiment = BaseLauncher()
         runtime_info = experiment.collect_runtime_information()
-        assert isinstance(runtime_info, dict)
-        # The current implementation only collects subject_id and user_id if not already in params
+        assert isinstance(runtime_info, dict)        # The current implementation only collects subject_id and user_id if not already in params
         assert "subject_id" in runtime_info or "user_id" in runtime_info
 
     def test_initialize_launcher_with_file(self, param_file, sample_params):
         """Test launcher initialization from file."""
         experiment = BaseLauncher()        
-        with patch('openscope_experimental_launcher.utils.rig_config.get_rig_config', return_value={'rig_id': 'test_rig', 'data_root_directory': '/tmp'}):
+        with patch('openscope_experimental_launcher.utils.rig_config.get_rig_config', return_value={'rig_id': 'test_rig', 'output_root_folder': '/tmp'}):
             experiment.initialize_launcher(param_file)
         
         assert experiment.params == sample_params
         assert experiment.subject_id == sample_params["subject_id"]
         assert experiment.user_id == sample_params["user_id"]
-        assert experiment.params_checksum is not None
 
     def test_initialize_launcher_without_file(self):
         """Test launcher initialization without file."""
         experiment = BaseLauncher()
         
-        with patch('openscope_experimental_launcher.utils.rig_config.get_rig_config', return_value={'rig_id': 'test_rig', 'data_root_directory': '/tmp'}):
+        with patch('openscope_experimental_launcher.utils.rig_config.get_rig_config', return_value={'rig_id': 'test_rig', 'output_root_folder': '/tmp'}):
             experiment.initialize_launcher(None)
         # The experiment may load default parameters, so we check if params is a dict
         assert isinstance(experiment.params, dict)
-        assert experiment.params_checksum is None
 
     def test_start_process_success(self, temp_dir):
         """Test successful process start via BaseLauncher (should fail without implementation)."""
@@ -57,13 +54,15 @@ class TestBaseLauncher:
         experiment.params = {
             "script_path": os.path.join(temp_dir, "test_script.txt"),
             "subject_id": "test_mouse",
-            "OutputFolder": temp_dir
+            "output_root_folder": temp_dir
         }
         
         # Create a mock script file
         os.makedirs(temp_dir, exist_ok=True)
         with open(os.path.join(temp_dir, "test_script.txt"), "w") as f:
-            f.write("test script")        # BaseLauncher.create_process should raise NotImplementedError
+            f.write("test script")
+        
+        # BaseLauncher.create_process should raise NotImplementedError
         with pytest.raises(NotImplementedError):
             experiment.create_process()
 
@@ -164,7 +163,7 @@ class TestBaseLauncher:
         
         with patch('openscope_experimental_launcher.utils.git_manager.setup_repository', return_value=True), \
              patch.object(experiment, 'create_process', return_value=mock_process), \
-             patch.object(experiment, 'determine_session_directory', return_value=temp_dir), \
+             patch.object(experiment, 'determine_output_session_folder', return_value=temp_dir), \
              patch.object(experiment, 'save_experiment_metadata'), \
              patch.object(experiment, 'post_experiment_processing', return_value=True):
             
@@ -177,29 +176,44 @@ class TestBaseLauncher:
         experiment = BaseLauncher()
         
         with patch('openscope_experimental_launcher.utils.git_manager.setup_repository', return_value=False), \
-             patch.object(experiment, 'initialize_launcher'):
-            
+             patch.object(experiment, 'initialize_launcher'):            
             result = experiment.run(param_file)
             
             assert result is False
 
-    def test_determine_session_directory_with_output_folder(self):
-        """Test session directory determination with OutputFolder."""
+    def test_determine_output_session_folder_with_output_root_folder(self):
+        """Test session directory determination with output_root_folder parameter."""
         experiment = BaseLauncher()
-        experiment.params = {"OutputFolder": "/test/output"}
+        experiment.params = {"output_root_folder": "/test/root"}
+        experiment.subject_id = "test_mouse"
         
-        result = experiment.determine_session_directory()
+        result = experiment.determine_output_session_folder()
         
         assert result is not None
-        assert "/test/output" in result
+        assert result.startswith("/test/root")
+        assert "test_mouse" in result
 
-    def test_determine_session_directory_without_output_folder(self):
-        """Test session directory determination without OutputFolder."""
+    def test_determine_output_session_folder_with_rig_config(self):
+        """Test session directory determination using rig config output_root_folder."""
         experiment = BaseLauncher()
         experiment.params = {}
+        experiment.rig_config = {"output_root_folder": "/rig/data"}
+        experiment.subject_id = "test_mouse"
         
-        result = experiment.determine_session_directory()
-          # Should return None when no output folder is specified
+        result = experiment.determine_output_session_folder()
+        
+        assert result is not None
+        assert result.startswith("/rig/data")
+        assert "test_mouse" in result
+
+    def test_determine_output_session_folder_without_subject_id(self):
+        """Test session directory determination without subject_id."""
+        experiment = BaseLauncher()
+        experiment.params = {"output_root_folder": "/test/root"}
+        experiment.subject_id = None
+        
+        result = experiment.determine_output_session_folder()
+        # Should return None when no subject_id is specified
         assert result is None
 
     def test_save_experiment_metadata(self, temp_dir):
@@ -301,7 +315,7 @@ class TestBaseLauncher:
         experiment.session_uuid = "test_session"
         
         # Initialize rig_config for session creation
-        experiment.rig_config = {"rig_id": "test_rig", "data_root_directory": "/tmp"}
+        experiment.rig_config = {"rig_id": "test_rig", "output_root_folder": "/tmp"}
         
         output_dir = str(tmp_path)
         

@@ -3,7 +3,7 @@
     "user_id": "test_user",
     "script_path": "echo",
     "collect_mouse_runtime_data": true,
-    "OutputFolder": "C:\\temp\\minimalist_test",
+    "output_root_folder": "C:\\temp\\minimalist_test",
     "protocol_id": ["test_protocol_001"],
     "mouse_platform_name": "test_platform",
     "active_mouse_platform": true,

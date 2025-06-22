@@ -113,11 +113,10 @@ class SLAP2Launcher(BonsaiLauncher):
                     'field_of_view_id': self.params.get('field_of_view_id', 'FOV001')
                 }
             )
-            
-            # Save stimulus table to output directory
-            if self.session_directory:
+              # Save stimulus table to output directory
+            if self.output_session_folder:
                 self.stimulus_table_path = os.path.join(
-                    self.session_directory, 
+                    self.output_session_folder, 
                     'stimulus_table.csv'
                 )
                 self.stimulus_table.to_csv(self.stimulus_table_path, index=False)
@@ -138,12 +137,11 @@ class SLAP2Launcher(BonsaiLauncher):
         """
         try:
             logging.info("Creating session.json using base class method...")
-            
-            # Use the base class method to create session.json
-            if self.session_directory:
-                return self.create_session_file(self.session_directory)
+              # Use the base class method to create session.json
+            if self.output_session_folder:
+                return self.create_session_file(self.output_session_folder)
             else:
-                logging.warning("No session directory set, skipping session.json creation")
+                logging.warning("No output session folder set, skipping session.json creation")
                 return True
             
         except Exception as e:
@@ -173,11 +171,10 @@ class SLAP2Launcher(BonsaiLauncher):
             }
             
             self.slap_fovs.append(fov_data)
-            
-            # Save FOV metadata if output directory exists
-            if self.session_directory:
+              # Save FOV metadata if output directory exists
+            if self.output_session_folder:
                 fov_metadata_path = os.path.join(
-                    self.session_directory,
+                    self.output_session_folder,
                     'fov_metadata.json'
                 )
                 

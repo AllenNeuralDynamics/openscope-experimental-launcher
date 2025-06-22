@@ -71,8 +71,7 @@ class BaseLauncher:
         self.subject_id = ""
         self.user_id = ""
         self.session_uuid = ""
-        self.session_directory = ""  # Store the session output directory        self.script_checksum = None
-        self.params_checksum = None
+        self.output_session_folder = ""  # Store the session output directory      
         self.experiment_notes = ""  # Store experiment notes collected at the end
         self.animal_weight_prior = None  # Store animal weight prior collected at start
         
@@ -223,11 +222,6 @@ class BaseLauncher:
             with open(param_file, 'r') as f:
                 self.params = json.load(f)
                 logging.info(f"Loaded experiment parameters from {param_file}")
-                
-            # Generate parameter checksum for provenance tracking
-            with open(param_file, 'rb') as f:
-                self.params_checksum = hashlib.md5(f.read()).hexdigest()
-            logging.info(f"Parameter file checksum: {self.params_checksum}")
         else:
             logging.warning("No parameter file provided, using default parameters")
             self.params = {}
@@ -235,82 +229,93 @@ class BaseLauncher:
         # Step 2: Collect runtime information (only for missing values)
         runtime_info = self.collect_runtime_information()
         self.params.update(runtime_info)
-        
-        # Step 3: Load rig configuration  
+          # Step 3: Load rig configuration  
         self.rig_config = rig_config.get_rig_config(rig_config_path)
         
         # Extract subject_id and user_id from params
         self.subject_id = self.params.get("subject_id", "")
         self.user_id = self.params.get("user_id", "")
-        
         logging.info(f"Using subject_id: {self.subject_id}, user_id: {self.user_id}")
         logging.info(f"Using rig: {self.rig_config['rig_id']}")
-        
-        # Initialize script checksum (if not already set by subclass)
-        if not hasattr(self, 'script_checksum') or self.script_checksum is None:
-            script_content = f"{self.__class__.__name__}_{str(self.params)}"
-            self.script_checksum = hashlib.md5(script_content.encode()).hexdigest()
-    
-    def determine_session_directory(self) -> Optional[str]:
+
+    def determine_output_session_folder(self) -> Optional[str]:
         """
-        Determine or generate output directory path using AIND data schema standards.
+        Determine the session output directory using a clear two-tier system:
+        
+        1. output_root_folder (base directory for experiments):
+           - First priority: "output_root_folder" parameter (experiment override)  
+           - Second priority: rig_config["output_root_folder"] (rig default)
+           - Fallback: Current working directory
+             2. SessionFolder (specific session directory):
+           - output_root_folder + generated session name (subject_id + timestamp)
 
         Returns:
-            Full path to the output directory, or None if not determinable
+            Full path to the SessionFolder where experiment data will be saved
         """
         try:
-            # Check if OutputFolder is already specified
-            if "OutputFolder" in self.params:
-                output_dir = self.params["OutputFolder"]
-                logging.info(f"Using OutputFolder from parameters: {output_dir}")
+            # Step 1: Determine output_root_folder (base directory for experiments)
+            output_root_folder = None
+            
+            # Priority 1: Check for output_root_folder parameter (allows experiment override)
+            if "output_root_folder" in self.params:
+                output_root_folder = self.params["output_root_folder"]
+                logging.info(f"Using output_root_folder from parameters: {output_root_folder}")
+            
+            # Priority 2: Use rig config output_root_folder (rig default)
+            elif "output_root_folder" in self.rig_config and self.rig_config["output_root_folder"]:
+                output_root_folder = self.rig_config["output_root_folder"]
+                logging.info(f"Using output_root_folder from rig config: {output_root_folder}")
+            
+            # Fallback: Current working directory
             else:
-                logging.error("OutputFolder not specified in parameters")
-                raise ValueError("OutputFolder not specified in parameters")
+                output_root_folder = os.getcwd()
+                logging.warning(f"No output_root_folder specified, using current directory: {output_root_folder}")
 
+            # Step 2: Generate SessionFolder (specific session directory)
             subject_id = self.subject_id
-
-            # At this point, we should have root_folder and subject_id to generate a directory
-            if subject_id is None:
-                logging.error("Cannot generate output directory: missing subject_id")
+            if not subject_id:
+                logging.error("Cannot generate session directory: missing subject_id")
                 raise ValueError("Missing subject_id")
             
-            # Generate directory using AIND data schema standards
+            # Generate timestamped session folder name
             date_time_offset = datetime.datetime.now()
             
             if AIND_DATA_SCHEMA_AVAILABLE:
                 try:
                     # Use AIND standard naming: {subject_id}_{datetime}
-                    folder_name = build_data_name(
+                    session_name = build_data_name(
                         label=subject_id,
                         creation_datetime=date_time_offset
                     )
-                    logging.info(f"Generated AIND-compliant folder name: {folder_name}")
+                    logging.info(f"Generated AIND-compliant session name: {session_name}")
                 except Exception as e:
                     logging.warning(f"Failed to use AIND data schema naming, falling back to default: {e}")
                     # Fallback to default naming
-                    folder_name = f"{subject_id}_{date_time_offset.strftime('%Y-%m-%d_%H-%M-%S')}"
+                    session_name = f"{subject_id}_{date_time_offset.strftime('%Y-%m-%d_%H-%M-%S')}"
             else:
                 # Fallback naming when AIND data schema is not available
-                folder_name = f"{subject_id}_{date_time_offset.strftime('%Y-%m-%d_%H-%M-%S')}"
-                logging.info(f"Using fallback folder name: {folder_name}")
+                session_name = f"{subject_id}_{date_time_offset.strftime('%Y-%m-%d_%H-%M-%S')}"
+                logging.info(f"Using fallback session name: {session_name}")
             
-            # We also assign the session UUID to the output directory
-            self.session_uuid = folder_name
+            # Store session UUID for metadata
+            self.session_uuid = session_name
 
-            # Create full output directory path
-            output_dir = os.path.join(output_dir, folder_name)
+            # Create full output_session_folder path: output_root_folder + session_name
+            output_session_folder = os.path.join(output_root_folder, session_name)
             
-            # Create the directory if it doesn't exist
-            if not os.path.exists(output_dir):
-                os.makedirs(output_dir)
-                logging.info(f"Created output directory: {output_dir}")
+            # Create the output_session_folder if it doesn't exist
+            if not os.path.exists(output_session_folder):
+                os.makedirs(output_session_folder)
+                logging.info(f"Created output_session_folder: {output_session_folder}")
             else:
-                logging.info(f"Output directory already exists: {output_dir}")
+                logging.info(f"output_session_folder already exists: {output_session_folder}")
                 
-            return output_dir
+            return output_session_folder
             
         except Exception as e:
-            logging.error(f"Failed to determine/generate output directory: {e}")
+            logging.error(f"Failed to determine output_session_folder: {e}")
+            return None
+            logging.error(f"Failed to determine SessionFolder: {e}")
             return None
     
     def save_experiment_metadata(self, output_directory: str, param_file: Optional[str] = None):
@@ -357,21 +362,14 @@ class BaseLauncher:
             with open(cmdline_file, 'w') as f:
                 json.dump(cmdline_info, f, indent=2)
             logging.info(f"Saved command line info to: {cmdline_file}")
+
               # 4. Save runtime and system information
             runtime_file = os.path.join(metadata_dir, "runtime_information.json")
-            
-            # Ensure script_checksum is initialized
-            if not hasattr(self, 'script_checksum') or self.script_checksum is None:
-                import hashlib
-                script_content = f"{self.__class__.__name__}_{str(getattr(self, 'params', {}))}"
-                self.script_checksum = hashlib.md5(script_content.encode()).hexdigest()
             
             runtime_info = {
                 "session_uuid": getattr(self, 'session_uuid', ''),
                 "subject_id": getattr(self, 'subject_id', ''),
                 "user_id": getattr(self, 'user_id', ''),
-                "script_checksum": self.script_checksum,
-                "params_checksum": getattr(self, 'params_checksum', ''),
                 "start_time": self.start_time.isoformat() if getattr(self, 'start_time', None) else None,
                 "platform_info": getattr(self, 'platform_info', {})
             }
@@ -724,19 +722,18 @@ class BaseLauncher:
             # Set up repository
             if not git_manager.setup_repository(self.params):
                 logging.error("Repository setup failed")
-                return False
+                return False            
+            # Determine output_session_folder (specific directory where experiment data will be saved)
+            output_session_folder = self.determine_output_session_folder()
+            self.output_session_folder = output_session_folder  # Store for post-processing and interface use
             
-            # Determine output directory for data saving
-            output_directory = self.determine_session_directory()
-            self.session_directory = output_directory  # Store for post-processing
-            
-            # Set up continuous logging to output directory
-            if output_directory:
+            # Set up continuous logging to output_session_folder
+            if output_session_folder:
                 centralized_log_dir = self.params.get("centralized_log_directory")
-                self.setup_continuous_logging(output_directory, centralized_log_dir)
+                self.setup_continuous_logging(output_session_folder, centralized_log_dir)
                 
                 # Save experiment metadata after logging is set up
-                self.save_experiment_metadata(output_directory, param_file)
+                self.save_experiment_metadata(output_session_folder, param_file)
             
             # Start the experiment (implemented by interface-specific launchers)
             if not self.start_experiment():
@@ -753,11 +750,9 @@ class BaseLauncher:
                 logging.warning("Post-experiment processing failed, but experiment data was collected")
             
             # Collect end-of-experiment information (notes, outcome, etc.)
-            self.collect_end_experiment_information()
-            
-            # Create session.json file with experiment metadata
-            if output_directory:
-                self.create_session_file(output_directory)
+            self.collect_end_experiment_information()            # Create session.json file with experiment metadata
+            if output_session_folder:
+                self.create_session_file(output_session_folder)
             
             return True
             
@@ -776,7 +771,7 @@ class BaseLauncher:
           Returns:
             True if experiment started successfully, False otherwise
         """
-        logging.info(f"Subject ID: {self.subject_id}, User ID: {self.user_id}, Session UUID: {self.session_uuid}")
+        logging.info(f"Subject ID: {self.subject_id}, User ID: {self.user_id}, Session UUID: {self.session_uuid}, Rig ID: {self.rig_config['rig_id']}")
         
         # Store current memory usage for monitoring
         vmem = psutil.virtual_memory()
@@ -795,8 +790,7 @@ class BaseLauncher:
             self._start_output_readers()
             
             # Log experiment start
-            logging.info(f"MID, {self.subject_id}, UID, {self.user_id}, Action, Executing, "
-                        f"Checksum, {self.script_checksum}, Json_checksum, {self.params_checksum}")
+            logging.info(f"Session UUID: {self.session_uuid} Starting.")
             
             # Monitor process
             self._monitor_process()

@@ -34,7 +34,7 @@ Basic Experiment Setup
           "local_repository_path": "C:/BonsaiExperiments",
           "script_path": "code/stimulus-control/src/Standard_oddball_slap2.bonsai",
           "bonsai_exe_path": "code/stimulus-control/bonsai/Bonsai.exe",
-          "OutputFolder": "C:/experiment_data",
+          "output_root_folder": "C:/experiment_data",
           "collect_mouse_runtime_data": true,
           "protocol_id": ["protocol_001"]
       }
@@ -57,7 +57,7 @@ Basic Experiment Setup
       success = launcher.run("example_params.json")
       if success:
           print("Experiment completed successfully!")
-          print(f"Data saved to: {launcher.session_directory}")
+          print(f"Data saved to: {launcher.output_session_folder}")
       else:
           print("Experiment failed. Check logs for details.")   .. note::
       For testing, you can specify a custom rig config path, but this is rarely needed:
@@ -141,7 +141,7 @@ SLAP2 Imaging Experiments
    experiment = SLAP2Experiment()
    success = experiment.run("slap2_params.json")   # Check generated outputs
    if success:
-       print(f"Experiment data: {experiment.session_directory}")
+       print(f"Experiment data: {experiment.output_session_folder}")
        print(f"Stimulus table: {experiment.stimulus_table_path}")
        print(f"Session metadata: {experiment.session_json_path}")
 

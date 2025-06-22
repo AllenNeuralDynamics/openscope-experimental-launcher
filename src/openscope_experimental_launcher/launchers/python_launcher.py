@@ -48,7 +48,7 @@ class PythonLauncher(BaseLauncher):
             script_path=script_path,
             python_exe_path=python_exe_path,
             arguments=script_args,
-            output_path=self.session_directory,
+            output_folder=self.output_session_folder,
             venv_path=venv_path
         )
         

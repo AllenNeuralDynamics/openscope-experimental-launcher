@@ -136,7 +136,7 @@ class BonsaiLauncher(BaseLauncher):
             workflow_path=workflow_path,
             bonsai_exe_path=bonsai_params.get('bonsai_exe_path'),
             arguments=workflow_args,
-            output_path=self.session_directory
+            output_folder=self.output_session_folder
         )
         
         # Assign process to Windows job object if available

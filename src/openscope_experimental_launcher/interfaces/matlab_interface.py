@@ -86,7 +86,7 @@ def construct_matlab_arguments(params: Dict[str, Any]) -> List[str]:
 
 
 def start_matlab_script(script_path: str, matlab_exe_path: str = 'matlab', 
-                       arguments: List[str] = None, output_path: str = None) -> subprocess.Popen:
+                       arguments: List[str] = None, output_folder: str = None) -> subprocess.Popen:
     """
     Start a MATLAB script as a subprocess.
     
@@ -94,7 +94,7 @@ def start_matlab_script(script_path: str, matlab_exe_path: str = 'matlab',
         script_path: Path to the MATLAB script file
         matlab_exe_path: Path to MATLAB executable
         arguments: Additional command-line arguments
-        output_path: Directory for output files
+        output_folder: Directory for output files
         
     Returns:
         Subprocess.Popen object for the running MATLAB process
@@ -111,13 +111,12 @@ def start_matlab_script(script_path: str, matlab_exe_path: str = 'matlab',
     # Add the script execution command
     script_dir = os.path.dirname(script_path)
     script_name = os.path.splitext(os.path.basename(script_path))[0]
-    
-    # Change to script directory and run the script
+      # Change to script directory and run the script
     matlab_command = f"cd('{script_dir}'); {script_name}; exit"
     
-    if output_path:
-        # Add output path as a MATLAB variable
-        matlab_command = f"cd('{script_dir}'); output_path='{output_path}'; {script_name}; exit"
+    if output_folder:
+        # Add output folder as a MATLAB variable
+        matlab_command = f"cd('{script_dir}'); output_folder='{output_folder}'; {script_name}; exit"
     
     cmd_args.extend(['-batch', matlab_command])
     

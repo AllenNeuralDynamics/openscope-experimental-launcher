@@ -3,7 +3,7 @@
 This module handles rig-specific configuration that stays constant across experiments.
 Rig configuration provides hardware and setup specific settings like:
 - rig_id: Unique identifier for this physical rig setup  
-- data_root_directory: Base path for experiment data storage
+- output_root_folder: Base path for experiment data storage
 - Hardware-specific settings (camera configs, sync settings, etc.)
 
 IMPORTANT: Experiment-specific parameters should be in JSON parameter files, NOT in rig config.
@@ -37,7 +37,7 @@ DEFAULT_CONFIG_PATH = Path("C:/RigConfig/rig_config.toml") if os.name == 'nt' el
 # Default configuration values - single source of truth
 DEFAULT_CONFIG = {
     'rig_id': socket.gethostname(),  # Use hostname to identify this rig
-    'data_root_directory': 'C:/experiment_data',
+    'output_root_folder': 'C:/experiment_data',
 }
 
 
@@ -62,7 +62,7 @@ def create_default_config(config_path: Path) -> None:
         f.write("# - stimulus parameters, session settings, etc.\n")
         f.write("#\n")
         f.write("# rig_id: Unique identifier for this rig (defaults to hostname)\n")
-        f.write("# data_root_directory: Base path for storing experiment data\n")
+        f.write("# output_root_folder: Base path for storing experiment data\n")
         f.write("#\n\n")
         toml.dump(DEFAULT_CONFIG, f)
     

@@ -26,10 +26,9 @@ class TestBonsaiLauncher:
         """Test successful process creation."""
         launcher = BonsaiLauncher()
         launcher.params = {
-            "script_path": os.path.join(temp_dir, "test_workflow.bonsai"),
-            "bonsai_exe_path": os.path.join(temp_dir, "Bonsai.exe"),
+            "script_path": os.path.join(temp_dir, "test_workflow.bonsai"),            "bonsai_exe_path": os.path.join(temp_dir, "Bonsai.exe"),
             "subject_id": "test_mouse",
-            "OutputFolder": temp_dir
+            "output_root_folder": temp_dir
         }
         
         # Create mock files
@@ -54,10 +53,9 @@ class TestBonsaiLauncher:
         """Test process creation failure."""
         launcher = BonsaiLauncher()
         launcher.params = {
-            "script_path": os.path.join(temp_dir, "nonexistent.bonsai"),
-            "bonsai_exe_path": os.path.join(temp_dir, "Bonsai.exe"),
+            "script_path": os.path.join(temp_dir, "nonexistent.bonsai"),            "bonsai_exe_path": os.path.join(temp_dir, "Bonsai.exe"),
             "subject_id": "test_mouse",
-            "OutputFolder": temp_dir
+            "output_root_folder": temp_dir
         }
           # Don't create the workflow file - should fail
         

@@ -78,7 +78,7 @@ class MinimalistLauncher(BaseLauncher):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            cwd=self.session_directory or os.getcwd()
+            cwd=self.output_session_folder or os.getcwd()
         )
         
         logging.info(f"Test process created with PID: {process.pid}")

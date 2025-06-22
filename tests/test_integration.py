@@ -37,7 +37,7 @@ class TestWorkflowIntegration:
             "user_id": "integration_test_user",
             "script_path": workflow_file,  # Use unified script_path parameter
             "bonsai_exe_path": os.path.join(temp_dir, "mock_bonsai.exe"),  # Add mock executable
-            "OutputFolder": temp_dir  # Use correct capitalization
+            "output_root_folder": temp_dir  # Use new naming
         }
         
         param_file = os.path.join(temp_dir, "test_params.json")
@@ -96,7 +96,7 @@ class TestWorkflowIntegration:
             "frame_rate": 30.0,
             "script_path": workflow_file,  # Use unified script_path parameter
             "bonsai_exe_path": bonsai_exe,  # Add mock executable
-            "OutputFolder": temp_dir,  # Use correct capitalization
+            "output_root_folder": temp_dir,  # Use new naming
             "slap_fovs": [{
                 "index": 0,
                 "imaging_depth": 100,

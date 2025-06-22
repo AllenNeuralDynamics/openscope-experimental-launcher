@@ -75,12 +75,16 @@ What Goes Where
      - ✅
      - ❌
      - ❌
-     - Hardware identifier
-   * - data_root_directory
+     - Hardware identifier   * - output_root_folder
      - ✅
      - ❌
      - ❌
-     - Base data path
+     - Default base directory
+   * - output_root_folder
+     - ❌
+     - ✅
+     - ❌
+     - Experiment base directory
    * - subject_id
      - ❌
      - ✅
@@ -101,3 +105,22 @@ What Goes Where
      - ✅
      - ❌
      - Experiment workflow
+
+Folder Structure System
+-----------------------
+
+The launcher uses a clear two-tier folder structure:
+
+**output_root_folder** (Base Directory)
+   - **Source Priority**: Parameter file ``output_root_folder`` > Rig config ``output_root_folder`` > Current directory
+   - **Purpose**: Base directory where all experiments for this rig are stored
+   - **Example**: ``C:/experiment_data``
+
+**output_session_folder** (Specific Session)
+   - **Creation**: Automatically created as output_root_folder + timestamped session name
+   - **Format**: ``{subject_id}_{YYYY-MM-DD_HH-MM-SS}`` (AIND compliant when available)
+   - **Purpose**: Specific directory passed to experiment processes
+   - **Example**: ``C:/experiment_data/mouse_001_2025-06-22_14-30-15``
+
+**Process Integration**
+   Your experiment scripts/workflows receive the full **output_session_folder** path, not the output_root_folder.

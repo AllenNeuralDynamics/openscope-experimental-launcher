@@ -88,7 +88,7 @@ Quick Start
           "user_id": "researcher_name",
           "script_path": "path/to/workflow.bonsai",
           "repository_url": "https://github.com/user/repo.git",
-          "OutputFolder": "C:/experiment_data",
+          "output_root_folder": "C:/experiment_data",
           "collect_mouse_runtime_data": true,
           "protocol_id": ["protocol_001"]
       }

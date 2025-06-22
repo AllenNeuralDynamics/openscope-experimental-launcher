@@ -21,14 +21,23 @@ These are the essential parameters that define your experiment:
    - ``.m`` files for MATLABLauncher
    - Any executable for BaseLauncher
 
-**OutputFolder** (string, required)
-   Directory where experiment data and outputs will be saved
+**output_root_folder** (string, optional)
+   Base directory for storing experiment data. If not specified, uses the rig configuration default.
+   The launcher creates a timestamped SessionFolder within this output_root_folder for each experiment.
 
 **subject_id** (string, optional)
    Identifier for the experimental subject. If not provided, you'll be prompted at runtime.
 
 **user_id** (string, optional)
    Identifier for the person running the experiment. If not provided, you'll be prompted at runtime.
+
+.. note::
+   **Folder Structure**: The system uses a two-tier folder structure:
+   
+   - **output_root_folder**: Base directory (from parameter file or rig config)
+   - **output_session_folder**: output_root_folder + timestamped session name (automatically created)
+   
+   Your experiment processes receive the full output_session_folder path.
 
 Basic Example
 ~~~~~~~~~~~~~
@@ -38,8 +47,17 @@ Basic Example
 
    {
        "script_path": "workflows/my_experiment.bonsai",
-       "OutputFolder": "C:/experiment_data/session_001",
        "subject_id": "mouse_001",
+       "user_id": "researcher"
+   }
+   
+.. code-block:: json
+   :caption: With custom output_root_folder override
+
+   {
+       "script_path": "workflows/my_experiment.bonsai",
+       "output_root_folder": "D:/special_experiments",
+       "subject_id": "mouse_001", 
        "user_id": "researcher"
    }
 
@@ -80,7 +98,7 @@ The launcher can collect mouse weight and experiment information interactively:
 
    {
        "script_path": "experiment.bonsai",
-       "OutputFolder": "C:/experiment_data",
+       "output_root_folder": "C:/experiment_data",
        "collect_mouse_runtime_data": true,
        "protocol_id": ["protocol_001"],
        "mouse_platform_name": "behavior_platform",
@@ -119,7 +137,6 @@ Python Launcher Parameters
        "script_path": "experiments/visual_task.py",
        "repository_commit_hash": "main",
        "local_repository_path": "C:/repositories",
-       "OutputFolder": "C:/experiment_data",
        "script_parameters": {
            "num_trials": 100,
            "stimulus_duration": 2.0,
@@ -138,7 +155,6 @@ MATLAB Launcher Parameters
        "script_path": "experiments/analysis_script.m",
        "repository_commit_hash": "main",
        "local_repository_path": "C:/repositories",
-       "OutputFolder": "C:/experiment_data",
        "script_parameters": {
            "data_path": "C:/raw_data",
            "analysis_type": "spectral",
@@ -154,7 +170,7 @@ Minimalist Launcher Parameters
 
    {
        "script_path": "C:/local/workflows/simple_task.bonsai",
-       "OutputFolder": "C:/experiment_data"
+       "subject_id": "mouse_001"
    }
 
 Additional Parameters
@@ -177,11 +193,8 @@ Pass parameters directly to your scripts using interface-specific sections:
 Bonsai Parameters
 ~~~~~~~~~~~~~~~~~
 
-.. code-block:: json
-
-   {
+.. code-block:: json   {
        "script_path": "workflow.bonsai",
-       "OutputFolder": "C:/data",
        "script_parameters": {
            "NumTrials": 100,
            "StimulusDuration": 5.0,
@@ -197,7 +210,6 @@ Python Parameters
 
    {
        "script_path": "experiment.py",
-       "OutputFolder": "C:/data",
        "script_parameters": {
            "num_trials": 100,
            "stimulus_type": "gratings",
@@ -212,7 +224,6 @@ MATLAB Parameters
 
    {
        "script_path": "analysis.m",
-       "OutputFolder": "C:/data",
        "script_parameters": {
            "data_file": "raw_data.mat",
            "analysis_type": "spectral",

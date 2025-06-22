@@ -48,8 +48,8 @@ class ExamplePythonLauncher(PythonLauncher):
         
         try:
             # Example: check for output files
-            if self.session_directory:
-                python_files = [f for f in os.listdir(self.session_directory) 
+            if self.output_session_folder:
+                python_files = [f for f in os.listdir(self.output_session_folder)
                               if f.endswith(('.pkl', '.npy', '.csv'))]
                 logging.info(f"Found {len(python_files)} Python output files")
             
