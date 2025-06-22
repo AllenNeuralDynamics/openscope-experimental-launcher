@@ -35,7 +35,13 @@ class TestBaseLauncher:
         with patch('openscope_experimental_launcher.utils.rig_config.get_rig_config', return_value={'rig_id': 'test_rig', 'output_root_folder': '/tmp'}):
             experiment.initialize_launcher(param_file)
         
-        assert experiment.params == sample_params
+        # Check that all original params are present
+        for key, value in sample_params.items():
+            assert experiment.params[key] == value
+        
+        # Check that rig_config fields are also merged into params
+        assert experiment.params["output_root_folder"] == "/tmp"
+        
         assert experiment.subject_id == sample_params["subject_id"]
         assert experiment.user_id == sample_params["user_id"]
 
@@ -194,10 +200,11 @@ class TestBaseLauncher:
         assert "test_mouse" in result
 
     def test_determine_output_session_folder_with_rig_config(self):
-        """Test session directory determination using rig config output_root_folder."""
+        """Test session directory determination using rig config output_root_folder merged into params."""
         experiment = BaseLauncher()
-        experiment.params = {}
-        experiment.rig_config = {"output_root_folder": "/rig/data"}
+        # Simulate the rig_config being merged into params (as done in initialize_launcher)
+        experiment.params = {"output_root_folder": "/rig/data"}
+        experiment.rig_config = {"output_root_folder": "/rig/data"}  # Original source
         experiment.subject_id = "test_mouse"
         
         result = experiment.determine_output_session_folder()

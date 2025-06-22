@@ -204,11 +204,11 @@ class BaseLauncher:
            
         3. **Runtime Information**: Any missing required values are collected interactively
            from the user at runtime (e.g., if subject_id is not in the JSON file).
-        
-        Configuration Hierarchy & Priority:
+          Configuration Hierarchy & Priority:
         - Runtime prompts override everything (highest priority)
         - JSON parameters override rig config for overlapping keys
         - Rig config provides the base defaults (lowest priority)
+        - All rig_config fields are now available in self.params for easy access
         
         Args:
             param_file: Path to JSON file containing experiment-specific parameters.
@@ -225,12 +225,18 @@ class BaseLauncher:
         else:
             logging.warning("No parameter file provided, using default parameters")
             self.params = {}
-        
-        # Step 2: Collect runtime information (only for missing values)
-        runtime_info = self.collect_runtime_information()
-        self.params.update(runtime_info)
-          # Step 3: Load rig configuration  
+          # Step 2: Load rig configuration  
         self.rig_config = rig_config.get_rig_config(rig_config_path)
+        
+        # Step 3: Merge rig_config into params with proper priority
+        # rig_config provides defaults, params (from JSON) override rig_config
+        merged_params = dict(self.rig_config)  # Start with rig_config as base
+        merged_params.update(self.params)      # Override with experiment-specific params
+        self.params = merged_params
+        
+        # Step 4: Collect runtime information (only for missing values)
+        runtime_info = self.collect_runtime_information()
+        self.params.update(runtime_info)       # Runtime info has highest priority
         
         # Extract subject_id and user_id from params
         self.subject_id = self.params.get("subject_id", "")
@@ -240,42 +246,23 @@ class BaseLauncher:
 
     def determine_output_session_folder(self) -> Optional[str]:
         """
-        Determine the session output directory using a clear two-tier system:
+        Determine the session output directory.
         
-        1. output_root_folder (base directory for experiments):
-           - First priority: "output_root_folder" parameter (experiment override)  
-           - Second priority: rig_config["output_root_folder"] (rig default)
-           - Fallback: Current working directory
-             2. SessionFolder (specific session directory):
-           - output_root_folder + generated session name (subject_id + timestamp)
-
+        Uses output_root_folder from params (which includes rig_config with proper override),
+        then creates a session-specific subdirectory with subject_id and timestamp.
+        
         Returns:
-            Full path to the SessionFolder where experiment data will be saved
+            Full path to the session folder where experiment data will be saved
         """
         try:
-            # Step 1: Determine output_root_folder (base directory for experiments)
-            output_root_folder = None
-            
-            # Priority 1: Check for output_root_folder parameter (allows experiment override)
-            if "output_root_folder" in self.params:
-                output_root_folder = self.params["output_root_folder"]
-                logging.info(f"Using output_root_folder from parameters: {output_root_folder}")
-            
-            # Priority 2: Use rig config output_root_folder (rig default)
-            elif "output_root_folder" in self.rig_config and self.rig_config["output_root_folder"]:
-                output_root_folder = self.rig_config["output_root_folder"]
-                logging.info(f"Using output_root_folder from rig config: {output_root_folder}")
-            
-            # Fallback: Current working directory
-            else:
-                output_root_folder = os.getcwd()
-                logging.warning(f"No output_root_folder specified, using current directory: {output_root_folder}")
+            # Get output_root_folder from params (already merged from rig_config with proper priority)
+            output_root_folder = self.params.get("output_root_folder", os.getcwd())
+            logging.info(f"Using output_root_folder: {output_root_folder}")
 
-            # Step 2: Generate SessionFolder (specific session directory)
-            subject_id = self.subject_id
-            if not subject_id:
+            # Validate subject_id is available
+            if not self.subject_id:
                 logging.error("Cannot generate session directory: missing subject_id")
-                raise ValueError("Missing subject_id")
+                return None
             
             # Generate timestamped session folder name
             date_time_offset = datetime.datetime.now()
@@ -284,26 +271,26 @@ class BaseLauncher:
                 try:
                     # Use AIND standard naming: {subject_id}_{datetime}
                     session_name = build_data_name(
-                        label=subject_id,
+                        label=self.subject_id,
                         creation_datetime=date_time_offset
                     )
                     logging.info(f"Generated AIND-compliant session name: {session_name}")
                 except Exception as e:
                     logging.warning(f"Failed to use AIND data schema naming, falling back to default: {e}")
                     # Fallback to default naming
-                    session_name = f"{subject_id}_{date_time_offset.strftime('%Y-%m-%d_%H-%M-%S')}"
+                    session_name = f"{self.subject_id}_{date_time_offset.strftime('%Y-%m-%d_%H-%M-%S')}"
             else:
                 # Fallback naming when AIND data schema is not available
-                session_name = f"{subject_id}_{date_time_offset.strftime('%Y-%m-%d_%H-%M-%S')}"
+                session_name = f"{self.subject_id}_{date_time_offset.strftime('%Y-%m-%d_%H-%M-%S')}"
                 logging.info(f"Using fallback session name: {session_name}")
             
             # Store session UUID for metadata
             self.session_uuid = session_name
 
-            # Create full output_session_folder path: output_root_folder + session_name
+            # Create full session folder path
             output_session_folder = os.path.join(output_root_folder, session_name)
             
-            # Create the output_session_folder if it doesn't exist
+            # Create the directory if it doesn't exist
             if not os.path.exists(output_session_folder):
                 os.makedirs(output_session_folder)
                 logging.info(f"Created output_session_folder: {output_session_folder}")
@@ -314,8 +301,6 @@ class BaseLauncher:
             
         except Exception as e:
             logging.error(f"Failed to determine output_session_folder: {e}")
-            return None
-            logging.error(f"Failed to determine SessionFolder: {e}")
             return None
     
     def save_experiment_metadata(self, output_directory: str, param_file: Optional[str] = None):
@@ -1048,6 +1033,7 @@ class BaseLauncher:
         
         # Create data stream for this launcher instance
         from openscope_experimental_launcher import __version__
+        saved_parameters = {"parameters": self.params, "rig_config": self.rig_config}
         launcher_stream = Stream(
             stream_start_time=start_time,
             stream_end_time=end_time,
@@ -1056,7 +1042,7 @@ class BaseLauncher:
                 name=self.__class__.__name__,  # Use actual class name
                 version=__version__,  # Package version
                 url="https://github.com/AllenInstitute/openscope-experimental-launcher",  # GitHub repo
-                parameters=self.params
+                parameters=saved_parameters
             )]
         )
         return [launcher_stream]
