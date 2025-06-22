@@ -138,6 +138,7 @@ Contents
    installation
    quickstart
    configuration
+   rig_config
    parameter_files
    rig_launchers
 

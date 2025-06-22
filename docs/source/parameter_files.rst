@@ -1,67 +1,65 @@
 Parameter Files
 ===============
 
-Parameter files are JSON configuration files that define experiment-specific settings. They work together with rig configuration and runtime prompts as part of the launcher's three-tier configuration system.
+Parameter files are JSON configuration files that define experiment-specific settings. They specify script paths, execution parameters, and output locations for individual experiments.
 
-.. important::
-   Parameter files contain **experiment-specific settings** only. Rig-specific settings 
-   (like rig_id and data paths) belong in the rig configuration file. 
-   See :doc:`configuration` for complete details on the configuration system.
+.. note::
+   Parameter files contain **experiment-specific settings** only. Hardware settings 
+   like rig_id belong in the rig configuration file. See :doc:`rig_config` for rig 
+   configuration details and :doc:`configuration` for the complete system overview.
 
-Configuration Context
----------------------
+Core Parameters
+---------------
 
-Parameter files are one part of the configuration hierarchy:
+These are the essential parameters that define your experiment:
 
-1. **Rig Config** (``rig_config.toml``) - Hardware/setup constants
-2. **Parameter Files** (``*.json``) - **Experiment-specific settings** ← This document
-3. **Runtime Prompts** - Interactive collection of missing values
-
-For the complete picture, see the :doc:`configuration` guide.
-
-Basic Parameter Structure
--------------------------
-
-.. code-block:: json
-   :caption: Basic parameter file structure
-
-   {
-       "script_path": "path/to/script.py",
-       "OutputFolder": "C:/experiment_data",
-       "script_parameters": {
-           "param1": "value1",
-           "param2": 42
-       }
-   }
-
-Universal Parameters
---------------------
-
-These parameters work across all launcher types:
-
-**script_path** (string)
-   Path to the experiment script, workflow, or program to execute. This can be:
+**script_path** (string, required)
+   Path to the experiment script, workflow, or program to execute:
    
    - ``.bonsai`` files for BonsaiLauncher
    - ``.py`` files for PythonLauncher  
    - ``.m`` files for MATLABLauncher
    - Any executable for BaseLauncher
 
-**OutputFolder** (string)
+**OutputFolder** (string, required)
    Directory where experiment data and outputs will be saved
 
+**subject_id** (string, optional)
+   Identifier for the experimental subject. If not provided, you'll be prompted at runtime.
+
+**user_id** (string, optional)
+   Identifier for the person running the experiment. If not provided, you'll be prompted at runtime.
+
+Basic Example
+~~~~~~~~~~~~~
+
+.. code-block:: json
+   :caption: Minimal parameter file
+
+   {
+       "script_path": "workflows/my_experiment.bonsai",
+       "OutputFolder": "C:/experiment_data/session_001",
+       "subject_id": "mouse_001",
+       "user_id": "researcher"
+   }
+
+Optional Parameters
+-------------------
+
 **script_parameters** (object, optional)
-   Interface-specific parameters passed to the script/workflow. The format and usage depends on the launcher type:
+   Interface-specific parameters passed to the script/workflow:
    
-   - For Bonsai: Passed as ``-p name=value`` command-line arguments
-   - For MATLAB: Available in the workspace during script execution
-   - For Python: Passed as command-line arguments or environment variables
+   - **Bonsai**: Passed as ``-p name=value`` command-line arguments
+   - **MATLAB**: Available in the workspace during script execution
+   - **Python**: Passed as command-line arguments or environment variables
 
 **script_arguments** (array, optional)
    Additional command-line arguments passed directly to the script/program
 
-**Repository Parameters** (optional for all launchers)
-   These parameters enable automatic Git repository management:
+Git Repository Parameters
+--------------------------
+
+For experiments stored in Git repositories:
 
 **repository_url** (string, optional)
    Git repository URL containing the experiment code/workflows
@@ -72,44 +70,10 @@ These parameters work across all launcher types:
 **local_repository_path** (string, optional)
    Local directory where the repository should be cloned/stored
 
-Launcher-Specific Parameter Files
----------------------------------
+Runtime Data Collection
+------------------------
 
-Bonsai Launcher Parameters
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-For Bonsai workflows:
-
-.. code-block:: json
-   :caption: Bonsai launcher parameters
-
-   {
-       "repository_url": "https://github.com/user/repo.git",
-       "script_path": "workflows/visual_stimulus.bonsai",
-       "repository_commit_hash": "main",
-       "local_repository_path": "C:/repositories",
-       "OutputFolder": "C:/experiment_data"
-   }
-
-**repository_url** (string, optional)
-   Git repository URL containing the Bonsai workflow
-
-**repository_commit_hash** (string, optional, default: "main")
-   Specific commit, branch, or tag to checkout
-
-Runtime Information Collection
------------------------------
-
-The following information is collected interactively when you run an experiment:
-
-**subject_id** (string)
-   Unique identifier for the experimental subject (collected at runtime if not provided)
-
-**user_id** (string)  
-   Identifier for the person running the experiment (collected at runtime if not provided)
-
-**Mouse Weight Collection** (optional)
-   When enabled, prompts for animal weights before and after experiments:
+The launcher can collect mouse weight and experiment information interactively:
 
 .. code-block:: json
    :caption: Enable mouse weight collection
@@ -193,10 +157,8 @@ Minimalist Launcher Parameters
        "OutputFolder": "C:/experiment_data"
    }
 
-Optional Parameters
--------------------
-
-These parameters can be added to any parameter file:
+Additional Parameters
+--------------------
 
 **local_repository_path** (string, default: "C:/BonsaiTemp")
    Local directory for cloning Git repositories (BonsaiLauncher only)
@@ -265,7 +227,7 @@ MATLAB Parameters
 Parameter Schema Reference
 --------------------------
 
-For a complete schema definition, see the :doc:`api/base` documentation for the ``BaseExperiment.load_parameters()`` method.
+For implementation details, see the ``initialize_launcher()`` method in the ``BaseLauncher`` class.
 
 Session Files and Output
 -------------------------

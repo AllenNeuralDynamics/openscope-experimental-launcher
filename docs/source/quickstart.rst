@@ -3,36 +3,22 @@ Quick Start Guide
 
 This guide will help you run your first experiment with the OpenScope Experimental Launcher.
 
-Configuration System Overview
-------------------------------
+Configuration Overview
+----------------------
 
-The launcher uses a **three-tier configuration system** for clean separation of concerns:
+The launcher uses a **three-tier configuration system**:
 
-.. list-table::
-   :header-rows: 1
-   :widths: 25 25 50
-
-   * - Configuration Type
-     - File Format
-     - Purpose
-   * - **Rig Config**
-     - TOML
-     - Hardware/setup constants (rig_id, data paths)
-   * - **Parameter Files**
-     - JSON
-     - Experiment-specific settings (subject_id, protocols)
-   * - **Runtime Prompts**
-     - Interactive
-     - Fill missing values or confirm parameters
+- **Rig Config** (TOML): Hardware constants (rig_id, data paths)
+- **Parameter Files** (JSON): Experiment settings (subject_id, protocols)  
+- **Runtime Prompts**: Interactive collection of missing values
 
 **Priority**: Runtime Prompts > JSON Parameters > Rig Config
 
 .. tip::
    **First Time Setup**: The launcher automatically creates a default rig configuration 
-   file on first run at ``C:/RigConfig/rig_config.toml`` (Windows) or 
-   ``/opt/rigconfig/rig_config.toml`` (Linux). The rig_id defaults to your computer's hostname.
+   file on first run. The rig_id defaults to your computer's hostname.
 
-For complete configuration details, see the `Configuration Guide <../configuration-guide.md>`_.
+For complete details, see :doc:`configuration`.
 
 Basic Experiment Setup
 -----------------------
@@ -73,15 +59,11 @@ Basic Experiment Setup
           print("Experiment completed successfully!")
           print(f"Data saved to: {launcher.session_directory}")
       else:
-          print("Experiment failed. Check logs for details.")
-
-   .. note::
-      The launcher automatically loads rig configuration from the default location.
-      For testing or special setups, you can specify a custom rig config path:
+          print("Experiment failed. Check logs for details.")   .. note::
+      For testing, you can specify a custom rig config path, but this is rarely needed:
       
       .. code-block:: python
       
-         # Only for testing/special cases!
          launcher.initialize_launcher(param_file="test.json", rig_config_path="/custom/path")
 
    **For MATLAB Scripts:**
