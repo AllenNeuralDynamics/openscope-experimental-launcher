@@ -72,12 +72,10 @@ Specialized launcher for Bonsai visual programming workflows.
 
 **Required Parameters:**
 
-.. code-block:: json
-
-   {
+.. code-block:: json   {
        "repository_url": "https://github.com/user/workflow.git",
        "script_path": "path/to/workflow.bonsai",
-       "OutputFolder": "C:/experiment_data"
+       "output_root_folder": "C:/experiment_data"
    }
 
 MATLAB Launcher
@@ -94,11 +92,9 @@ Specialized launcher for MATLAB-based experiments.
 
 **Required Parameters:**
 
-.. code-block:: json
-
-   {
+.. code-block:: json   {
        "script_path": "path/to/script.m",
-       "OutputFolder": "C:/experiment_data"
+       "output_root_folder": "C:/experiment_data"
    }
 
 Python Launcher
@@ -116,11 +112,9 @@ Specialized launcher for Python-based experiments.
 
 **Required Parameters:**
 
-.. code-block:: json
-
-   {
+.. code-block:: json   {
        "script_path": "path/to/script.py",
-       "OutputFolder": "C:/experiment_data"
+       "output_root_folder": "C:/experiment_data"
    }
 
 Launcher Interfaces

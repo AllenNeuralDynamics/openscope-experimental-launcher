@@ -40,6 +40,12 @@ The launcher will prompt for any required values not found in the rig config or 
 Configuration Priority
 -----------------------
 
+The system merges configuration from all sources, with later sources overriding earlier ones:
+
+1. **Base**: Rig configuration provides hardware defaults
+2. **Override**: JSON parameter file values override rig config defaults  
+3. **Final**: Runtime prompts override both rig config and JSON parameters
+
 When the same parameter appears in multiple places:
 
 .. list-table::
@@ -70,21 +76,16 @@ What Goes Where
      - Rig Config
      - JSON File
      - Runtime
-     - Notes
-   * - rig_id
+     - Notes   * - rig_id
      - ✅
      - ❌
      - ❌
-     - Hardware identifier   * - output_root_folder
-     - ✅
-     - ❌
-     - ❌
-     - Default base directory
+     - Hardware identifier
    * - output_root_folder
-     - ❌
+     - ✅
      - ✅
      - ❌
-     - Experiment base directory
+     - Base directory (JSON overrides rig config default)
    * - subject_id
      - ❌
      - ✅
