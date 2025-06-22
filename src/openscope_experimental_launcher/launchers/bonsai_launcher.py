@@ -171,7 +171,8 @@ class BonsaiLauncher(BaseLauncher):
         try:
             script_path = self.params.get('script_path', 'Unknown')
             script_name = os.path.basename(script_path) if script_path != 'Unknown' else 'Unknown'
-            
+            script_parameters = self.params.get("script_parameters", {})
+
             bonsai_script_stream = Stream(
                 stream_start_time=start_time,
                 stream_end_time=end_time,
@@ -180,7 +181,7 @@ class BonsaiLauncher(BaseLauncher):
                     name=f"Bonsai Script: {script_name}",
                     version=self.params.get("script_version", "Unknown"),
                     url=script_path,
-                    parameters=self.params
+                    parameters=script_parameters
                 )]
             )
             streams.append(bonsai_script_stream)

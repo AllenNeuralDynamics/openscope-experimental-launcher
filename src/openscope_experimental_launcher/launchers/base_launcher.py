@@ -1033,7 +1033,7 @@ class BaseLauncher:
         
         # Create data stream for this launcher instance
         from openscope_experimental_launcher import __version__
-        saved_parameters = {"parameters": self.params, "rig_config": self.rig_config}
+
         launcher_stream = Stream(
             stream_start_time=start_time,
             stream_end_time=end_time,
@@ -1042,7 +1042,7 @@ class BaseLauncher:
                 name=self.__class__.__name__,  # Use actual class name
                 version=__version__,  # Package version
                 url="https://github.com/AllenInstitute/openscope-experimental-launcher",  # GitHub repo
-                parameters=saved_parameters
+                parameters=self.params
             )]
         )
         return [launcher_stream]
