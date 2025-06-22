@@ -24,6 +24,23 @@ This package provides a modular, extensible launcher for neuroscience experiment
 - **Runtime Data Collection**: Interactive prompts for protocol confirmation and animal weight collection
 - **Project Flexibility**: Custom launchers via scripts without modifying core code
 
+## Architecture Overview
+
+The launcher uses a modular architecture with clean separation of concerns:
+
+```
+src/openscope_experimental_launcher/
+├── launchers/               # Interface-specific launchers
+├── interfaces/              # Stateless interface functions  
+└── utils/                   # Shared utilities
+scripts/                     # Project-specific launcher scripts
+```
+
+**Design Principles:**
+- **Interface Separation**: Clean separation between launchers and interfaces
+- **Stateless Functions**: Interface modules provide pure functions with no global state
+- **Project Flexibility**: Custom launchers via scripts without modifying core code
+
 ## Quick Start
 
 ### Installation
@@ -91,29 +108,6 @@ python scripts/slap2_launcher.py path/to/slap2_parameters.json
 python scripts/minimalist_launcher.py scripts/example_minimalist_params.json
 ```
 
-## Architecture Overview
-
-The launcher uses a modular architecture with clean separation of concerns:
-
-```
-src/openscope_experimental_launcher/
-├── launchers/               # Interface-specific launchers
-├── interfaces/              # Stateless interface functions  
-└── utils/                   # Shared utilities
-scripts/                     # Project-specific launcher scripts
-```
-
-**Design Principles:**
-- **Interface Separation**: Clean separation between launchers and interfaces
-- **Stateless Functions**: Interface modules provide pure functions with no global state
-- **Project Flexibility**: Custom launchers via scripts without modifying core code
-
-## System Requirements
-
-- **Operating System**: Windows 10 or Windows 11 (primary support)
-- **Python**: 3.8 or higher
-- **Dependencies**: Bonsai, MATLAB, or Python environments as needed
-
 ## Documentation
 
 For complete documentation, tutorials, and examples:
@@ -125,20 +119,6 @@ For complete documentation, tutorials, and examples:
 - **[Quick Start Tutorial](docs/source/quickstart.rst)** - Step-by-step first experiment walkthrough  
 - **[Parameter Reference](docs/source/parameter_files.rst)** - Complete parameter documentation and examples
 - **[Launcher Guide](docs/source/rig_launchers.rst)** - Architecture details and launcher customization
-
-## Session Files and Metadata
-
-All experiments automatically generate comprehensive `session.json` files using the AIND data schema format, containing:
-
-- Session start/end times and unique IDs
-- Subject and experimenter information  
-- Data stream details and software provenance
-- Runtime collected data (weights, protocol confirmations)
-- Complete parameter sets used during experiments
-
-## Contributing
-
-For development installation and contribution guidelines, see the [full documentation](https://allenneuraldynamics.github.io/openscope-experimental-launcher/).
 
 ## License
 

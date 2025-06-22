@@ -116,10 +116,9 @@ System Requirements
 -------------------
 
 .. note::
-   Primary support is for **Windows** but the package has cross-platform compatibility:
+   Primary support is for **Windows** with untested cross-platform compatibility:
    
    - Windows 10 or Windows 11 (primary platform)
-   - macOS and Linux (limited support)
    - Python 3.8 or higher
    - Interface-specific requirements:
    

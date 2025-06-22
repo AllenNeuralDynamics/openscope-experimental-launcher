@@ -16,7 +16,6 @@ System Requirements
 **Optional Dependencies:**
 
 - Bonsai (required for running experiments)
-- Visual Studio Build Tools (for compiling certain dependencies)
 
 Pre-Installation Setup
 ----------------------
@@ -32,9 +31,6 @@ Pre-Installation Setup
 
    Download and install Git from `git-scm.com <https://git-scm.com/download/win>`_
 
-3. **Install Bonsai** (if running experiments)
-
-   Download and install Bonsai from `bonsai-rx.org <https://bonsai-rx.org/>`_
 
 Installation Methods
 --------------------
