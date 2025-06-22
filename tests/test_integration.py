@@ -158,34 +158,6 @@ class TestWorkflowIntegration:
             assert result is True
 
     @pytest.mark.integration
-    def test_config_loader_integration(self, temp_dir):
-        """Test configuration loading integration."""
-        from openscope_experimental_launcher.utils import config_loader
-        
-        # Create test config file
-        config_content = """
-[Behavior]
-subject_id = integration_test
-user_id = test_user
-nidevice = Dev1
-
-[Stim]
-fps = 60.0
-monitor_brightness = 50
-"""
-        config_path = os.path.join(temp_dir, "test_config.cfg")
-        with open(config_path, 'w') as f:
-            f.write(config_content)
-        
-        params = {"config_path": config_path}
-        config = config_loader.load_config(params)
-        
-        assert "Behavior" in config
-        assert "Stim" in config
-        assert config["Behavior"]["subject_id"] == "integration_test"
-        assert config["Stim"]["fps"] == 60.0
-
-    @pytest.mark.integration
     def test_stimulus_table_generation_integration(self, temp_dir):
         """Test stimulus table generation integration."""
         from openscope_experimental_launcher.utils import stimulus_table

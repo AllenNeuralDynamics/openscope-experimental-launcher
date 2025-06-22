@@ -9,7 +9,6 @@ import tempfile
 import shutil
 import subprocess
 
-from openscope_experimental_launcher.utils import config_loader
 from openscope_experimental_launcher.utils import git_manager  
 from openscope_experimental_launcher.utils import process_monitor
 
@@ -85,8 +84,7 @@ class TestProcessMonitorFunctions:
     
     @patch('psutil.Process')
     def test_is_process_responsive(self, mock_process_class):
-        """Test process responsiveness check."""
-        # Create mock process
+        """Test process responsiveness check."""        # Create mock process
         mock_process = MagicMock()
         mock_process.pid = 1234
         mock_real_process = MagicMock()
@@ -97,55 +95,11 @@ class TestProcessMonitorFunctions:
         assert result is True
 
 
-class TestConfigLoaderFunctions:
-    """Test config_loader utility functions."""
-    
-    def test_load_config_default(self):
-        """Test config loading with default parameters."""
-        params = {}
-        config = config_loader.load_config(params)
-        
-        # Should return a dictionary with expected sections
-        assert isinstance(config, dict)
-        expected_sections = ['Behavior', 'Encoder', 'Reward', 'Licksensing', 
-                           'Sync', 'Stim', 'LIMS', 'SweepStim', 'Display', 'Datastream']
-        for section in expected_sections:
-            assert section in config
-            assert isinstance(config[section], dict)
-    
-    def test_load_config_custom_path(self):
-        """Test config loading with custom path."""
-        # Create a temporary config file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.cfg', delete=False) as f:
-            f.write("""
-[TestSection]
-test_key = test_value
-""")
-            temp_config_path = f.name
-        
-        try:
-            params = {"config_path": temp_config_path}
-            config = config_loader.load_config(params)
-            
-            # Should still have all default sections plus any custom ones
-            assert isinstance(config, dict)
-            assert len(config) >= 10  # At least the default sections
-            
-        finally:
-            os.unlink(temp_config_path)
-    
-    def test_get_default_config_dir(self):
-        """Test default config directory function."""
-        result = config_loader._get_default_config_dir()
-        assert isinstance(result, str)
-        assert len(result) > 0
-
-
 class TestUtilityIntegration:
     """Test utilities working together (simplified version)."""
     
-    def test_config_and_git_integration(self):
-        """Test config_loader and git_manager working together."""
+    def test_git_integration(self):
+        """Test git_manager functionality."""
         # Test basic functionality without complex mocking
         params = {
             'repository_url': 'https://github.com/test/repo.git',
@@ -155,11 +109,6 @@ class TestUtilityIntegration:
         # Test git manager
         repo_path = git_manager.get_repository_path(params)
         assert repo_path is not None
-        
-        # Test config loader
-        config = config_loader.load_config(params)
-        assert isinstance(config, dict)
-        assert len(config) > 0
 
 
 # Keep the BonsaiInterface tests but update them for functional approach

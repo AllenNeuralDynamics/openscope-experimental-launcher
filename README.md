@@ -1,8 +1,8 @@
 # openscope-experimental-launcher
 
 [![License](https://img.shields.io/badge/license-MIT-brightgreen)](LICENSE)
-![Interrogate](https://img.shields.io/badge/interrogate-97.4%25-brightgreen)
-![Coverage](https://img.shields.io/badge/coverage-60.7%25-orange?logo=codecov)
+![Interrogate](https://img.shields.io/badge/interrogate-100.0%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-60%25-orange?logo=codecov)
 ![Python](https://img.shields.io/badge/python->=3.8-blue?logo=python)
 ![Platform](https://img.shields.io/badge/platform-Windows-blue?logo=windows)
 [![Documentation](https://img.shields.io/badge/docs-latest-blue?logo=gitbook)](https://allenneuraldynamics.github.io/openscope-experimental-launcher/)

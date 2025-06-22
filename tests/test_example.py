@@ -9,7 +9,7 @@ def test_package_imports():
     """Test that all main package components can be imported."""
     try:
         from openscope_experimental_launcher import BaseLauncher, BonsaiLauncher, SLAP2Launcher
-        from openscope_experimental_launcher.utils import git_manager, config_loader, process_monitor
+        from openscope_experimental_launcher.utils import git_manager, process_monitor
         assert True
     except ImportError as e:
         pytest.fail(f"Failed to import package components: {e}")
