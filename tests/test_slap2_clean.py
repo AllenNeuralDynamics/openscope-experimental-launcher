@@ -76,6 +76,9 @@ class TestSLAP2LauncherClean:
         experiment.subject_id = "test_mouse"
         experiment.user_id = "Test User"
         
+        # Initialize rig_config (required by base class)
+        experiment.rig_config = {"rig_id": "test_rig", "data_root_directory": "/tmp"}
+        
         # Test the updated method that uses base class functionality
         result = experiment._create_session_json()
         assert result is True

@@ -1,17 +1,30 @@
 """
 Configuration loader for OpenScope experimental launchers.
 
-Handles loading and parsing of CamStim-compatible configuration files.
+DEPRECATED: This module uses CamStim-compatible configuration files.
+It will be replaced by the new rig_config.py system.
+
+New code should use: from ..utils import rig_config
 """
 
 import os
 import logging
+import warnings
 from typing import Dict, Any
 try:
     import configparser
 except ImportError:
     import ConfigParser as configparser
 import io
+import ast
+
+# Issue deprecation warning
+warnings.warn(
+    "config_loader.py is deprecated and will be removed in a future version. "
+    "Use rig_config.py for new code.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 # Default CamStim configuration
 DEFAULTCONFIG = """
@@ -111,10 +124,10 @@ def _load_config_section(section: str, config: configparser.RawConfigParser) -> 
         if config.has_section(section):
             for key, value in config.items(section):
                 try:
-                    # Convert string to Python object
-                    section_config[key] = eval(value)
-                except (SyntaxError, NameError):
-                    # If eval fails, keep as string
+                    # Use ast.literal_eval for safe evaluation (SECURITY FIX)
+                    section_config[key] = ast.literal_eval(value)
+                except (ValueError, SyntaxError):
+                    # If literal_eval fails, keep as string
                     section_config[key] = value
         
         logging.debug(f"Loaded config section: {section}")

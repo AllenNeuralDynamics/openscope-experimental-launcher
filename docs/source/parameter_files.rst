@@ -1,7 +1,23 @@
 Parameter Files
 ===============
 
-Parameter files are JSON configuration files that define how experiments are run. They specify script paths, execution parameters, and output locations. The parameter structure is now unified across all launcher types, using ``script_path`` as the primary parameter for specifying the experiment to run, and ``script_parameters`` for interface-specific configuration.
+Parameter files are JSON configuration files that define experiment-specific settings. They work together with rig configuration and runtime prompts as part of the launcher's three-tier configuration system.
+
+.. important::
+   Parameter files contain **experiment-specific settings** only. Rig-specific settings 
+   (like rig_id and data paths) belong in the rig configuration file. 
+   See :doc:`configuration` for complete details on the configuration system.
+
+Configuration Context
+---------------------
+
+Parameter files are one part of the configuration hierarchy:
+
+1. **Rig Config** (``rig_config.toml``) - Hardware/setup constants
+2. **Parameter Files** (``*.json``) - **Experiment-specific settings** ← This document
+3. **Runtime Prompts** - Interactive collection of missing values
+
+For the complete picture, see the :doc:`configuration` guide.
 
 Basic Parameter Structure
 -------------------------

@@ -33,7 +33,8 @@ dependencies = [
     'aind-data-schema-models',
     'psutil',
     'pywin32; sys_platform == "win32"',  # Only install on Windows
-    'PyYAML'
+    'PyYAML',
+    'toml'
 ]
 
 [project.optional-dependencies]

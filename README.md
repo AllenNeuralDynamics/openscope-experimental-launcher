@@ -1,8 +1,8 @@
 # openscope-experimental-launcher
 
 [![License](https://img.shields.io/badge/license-MIT-brightgreen)](LICENSE)
-![Interrogate](https://img.shields.io/badge/interrogate-98.8%25-brightgreen)
-![Coverage](https://img.shields.io/badge/coverage-61.7%25-orange?logo=codecov)
+![Interrogate](https://img.shields.io/badge/interrogate-100.0%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-61%25-orange?logo=codecov)
 ![Python](https://img.shields.io/badge/python->=3.8-blue?logo=python)
 ![Platform](https://img.shields.io/badge/platform-Windows-blue?logo=windows)
 [![Documentation](https://img.shields.io/badge/docs-latest-blue?logo=gitbook)](https://allenneuraldynamics.github.io/openscope-experimental-launcher/)
@@ -57,11 +57,21 @@ launcher = PythonLauncher()
 success = launcher.run("path/to/parameters.json")
 ```
 
-**Using Project Scripts:**
-```bash
-python scripts/slap2_launcher.py path/to/slap2_parameters.json
-python scripts/minimalist_launcher.py scripts/example_minimalist_params.json
+## Configuration System
+
+The launcher uses a **three-tier configuration system** that cleanly separates rig-specific settings from experiment parameters:
+
+1. **Rig Config** (`rig_config.toml`) - Hardware/setup constants (rig_id, data paths)
+2. **Parameter Files** (`*.json`) - Experiment-specific settings (subject_id, protocols)  
+3. **Runtime Prompts** - Interactive collection of missing values
+
+```python
+# Normal usage - clean and simple
+launcher = BonsaiLauncher()
+launcher.initialize_launcher(param_file="experiment.json")  # Uses default rig config
 ```
+
+**[📖 Complete Configuration Guide →](docs/configuration-guide.md)**
 
 ### Basic Parameter File
 ```json
@@ -73,6 +83,12 @@ python scripts/minimalist_launcher.py scripts/example_minimalist_params.json
     "collect_mouse_runtime_data": true,
     "protocol_id": ["protocol_001"]
 }
+```
+
+**Using Project Scripts:**
+```bash
+python scripts/slap2_launcher.py path/to/slap2_parameters.json
+python scripts/minimalist_launcher.py scripts/example_minimalist_params.json
 ```
 
 ## Architecture Overview
@@ -104,6 +120,7 @@ For complete documentation, tutorials, and examples:
 
 📖 **[Full Documentation](https://allenneuraldynamics.github.io/openscope-experimental-launcher/)**
 
+- **[Configuration Guide](docs/configuration-guide.md)** - Complete configuration system guide and best practices
 - **[Installation Guide](docs/source/installation.rst)** - Detailed setup instructions and troubleshooting
 - **[Quick Start Tutorial](docs/source/quickstart.rst)** - Step-by-step first experiment walkthrough  
 - **[Parameter Reference](docs/source/parameter_files.rst)** - Complete parameter documentation and examples

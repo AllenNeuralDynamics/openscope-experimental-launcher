@@ -26,29 +26,28 @@ class TestBaseLauncher:
         """Test runtime information collection."""
         experiment = BaseLauncher()
         runtime_info = experiment.collect_runtime_information()
-        
         assert isinstance(runtime_info, dict)
         # The current implementation only collects subject_id and user_id if not already in params
         assert "subject_id" in runtime_info or "user_id" in runtime_info
 
-    def test_load_parameters_with_file(self, param_file, sample_params):
-        """Test parameter loading from file."""
+    def test_initialize_launcher_with_file(self, param_file, sample_params):
+        """Test launcher initialization from file."""
         experiment = BaseLauncher()        
-        with patch('openscope_experimental_launcher.utils.config_loader.load_config', return_value=sample_params):
-            experiment.load_parameters(param_file)
+        with patch('openscope_experimental_launcher.utils.rig_config.get_rig_config', return_value={'rig_id': 'test_rig', 'data_root_directory': '/tmp'}):
+            experiment.initialize_launcher(param_file)
         
         assert experiment.params == sample_params
         assert experiment.subject_id == sample_params["subject_id"]
         assert experiment.user_id == sample_params["user_id"]
         assert experiment.params_checksum is not None
 
-    def test_load_parameters_without_file(self):
-        """Test parameter loading without file."""
+    def test_initialize_launcher_without_file(self):
+        """Test launcher initialization without file."""
         experiment = BaseLauncher()
         
-        with patch('openscope_experimental_launcher.utils.config_loader.load_config', return_value={}):
-            experiment.load_parameters(None)
-          # The experiment may load default parameters, so we check if params is a dict
+        with patch('openscope_experimental_launcher.utils.rig_config.get_rig_config', return_value={'rig_id': 'test_rig', 'data_root_directory': '/tmp'}):
+            experiment.initialize_launcher(None)
+        # The experiment may load default parameters, so we check if params is a dict
         assert isinstance(experiment.params, dict)
         assert experiment.params_checksum is None
 
@@ -178,7 +177,7 @@ class TestBaseLauncher:
         experiment = BaseLauncher()
         
         with patch('openscope_experimental_launcher.utils.git_manager.setup_repository', return_value=False), \
-             patch.object(experiment, 'load_parameters'):
+             patch.object(experiment, 'initialize_launcher'):
             
             result = experiment.run(param_file)
             
@@ -286,11 +285,10 @@ class TestBaseLauncher:
             result = experiment.create_session_file(output_dir)
         
         # Should return False when schema is not available
-        assert result is False
-        # session.json should not be created
+        assert result is False        # session.json should not be created
         session_file = tmp_path / "session.json"
         assert not session_file.exists()
-
+    
     def test_create_session_file_with_schema(self, tmp_path):
         """Test session file creation with aind-data-schema available."""
         
@@ -301,6 +299,9 @@ class TestBaseLauncher:
         experiment.subject_id = "test_mouse"
         experiment.user_id = "test_user"
         experiment.session_uuid = "test_session"
+        
+        # Initialize rig_config for session creation
+        experiment.rig_config = {"rig_id": "test_rig", "data_root_directory": "/tmp"}
         
         output_dir = str(tmp_path)
         

@@ -3,6 +3,37 @@ Quick Start Guide
 
 This guide will help you run your first experiment with the OpenScope Experimental Launcher.
 
+Configuration System Overview
+------------------------------
+
+The launcher uses a **three-tier configuration system** for clean separation of concerns:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 25 50
+
+   * - Configuration Type
+     - File Format
+     - Purpose
+   * - **Rig Config**
+     - TOML
+     - Hardware/setup constants (rig_id, data paths)
+   * - **Parameter Files**
+     - JSON
+     - Experiment-specific settings (subject_id, protocols)
+   * - **Runtime Prompts**
+     - Interactive
+     - Fill missing values or confirm parameters
+
+**Priority**: Runtime Prompts > JSON Parameters > Rig Config
+
+.. tip::
+   **First Time Setup**: The launcher automatically creates a default rig configuration 
+   file on first run at ``C:/RigConfig/rig_config.toml`` (Windows) or 
+   ``/opt/rigconfig/rig_config.toml`` (Linux). The rig_id defaults to your computer's hostname.
+
+For complete configuration details, see the `Configuration Guide <../configuration-guide.md>`_.
+
 Basic Experiment Setup
 -----------------------
 
@@ -24,9 +55,7 @@ Basic Experiment Setup
 
 2. **Choose Your Interface**
 
-   Select the appropriate launcher for your experiment type:
-
-   **For Bonsai Workflows:**
+   Select the appropriate launcher for your experiment type:   **For Bonsai Workflows:**
 
    .. code-block:: python
 
@@ -35,6 +64,9 @@ Basic Experiment Setup
       # Create launcher instance
       launcher = BonsaiLauncher()
 
+      # Initialize with parameter file (uses default rig config)
+      launcher.initialize_launcher(param_file="example_params.json")
+      
       # Run the experiment
       success = launcher.run("example_params.json")
       if success:
@@ -42,6 +74,15 @@ Basic Experiment Setup
           print(f"Data saved to: {launcher.session_directory}")
       else:
           print("Experiment failed. Check logs for details.")
+
+   .. note::
+      The launcher automatically loads rig configuration from the default location.
+      For testing or special setups, you can specify a custom rig config path:
+      
+      .. code-block:: python
+      
+         # Only for testing/special cases!
+         launcher.initialize_launcher(param_file="test.json", rig_config_path="/custom/path")
 
    **For MATLAB Scripts:**
 
@@ -52,10 +93,9 @@ Basic Experiment Setup
       # Create launcher instance  
       launcher = MatlabLauncher()
 
-      # Run the experiment
-      success = launcher.run("matlab_params.json")
-
-   **For Python Scripts:**
+      # Initialize and run the experiment
+      launcher.initialize_launcher(param_file="matlab_params.json")
+      success = launcher.run("matlab_params.json")   **For Python Scripts:**
 
    .. code-block:: python
 
@@ -64,7 +104,8 @@ Basic Experiment Setup
       # Create launcher instance
       launcher = PythonLauncher()
 
-      # Run the experiment
+      # Initialize and run the experiment
+      launcher.initialize_launcher(param_file="python_params.json")
       success = launcher.run("python_params.json")
 
 3. **Using Project Scripts**

@@ -37,7 +37,7 @@ except ImportError:
     AIND_DATA_SCHEMA_AVAILABLE = False
     logging.warning("aind-data-schema-models not available. Using fallback folder naming.")
 
-from ..utils import config_loader
+from ..utils import rig_config
 from ..utils import git_manager
 
 
@@ -88,8 +88,7 @@ class BaseLauncher:
         
         # Register exit handlers only once per process, not per instance
         if not BaseLauncher._cleanup_registered:
-            BaseLauncher._cleanup_registered = True
-            # Use a class-level cleanup instead of instance cleanup
+            BaseLauncher._cleanup_registered = True            # Use a class-level cleanup instead of instance cleanup
             def global_cleanup():
                 # This will be called once at exit, not per instance
                 pass
@@ -103,8 +102,8 @@ class BaseLauncher:
         return {
             "python": sys.version.split()[0],
             "os": (platform.system(), platform.release(), platform.version()),
-            "hardware": (platform.processor(), platform.machine()),            "computer_name": platform.node(),
-            "rig_id": os.environ.get('RIG_ID', socket.gethostname()),
+            "hardware": (platform.processor(), platform.machine()),
+            "computer_name": platform.node(),
         }
     
     def collect_runtime_information(self) -> Dict[str, str]:
@@ -182,18 +181,48 @@ class BaseLauncher:
         
         logging.info(f"Collected end-of-experiment info - {end_info}")
         return end_info
-
-    def load_parameters(self, param_file: Optional[str]):
+    
+    def initialize_launcher(self, param_file: Optional[str] = None, rig_config_path: Optional[str] = None):
         """
-        Load parameters from a JSON file.
+        Initialize the launcher by loading all required configuration and data.
+        
+        This method performs three key initialization steps:
+        1. Loads experiment parameters from JSON file (if provided)
+        2. Loads rig-specific configuration from TOML file  
+        3. Collects any missing runtime information from user prompts
+        
+        Configuration System Overview:
+        =============================
+        The OpenScope launcher uses a three-tier configuration system:
+        
+        1. **Rig Config (TOML file)**: Hardware and setup-specific settings that remain
+           constant for a physical rig setup (rig_id, data paths, hardware configs).
+           Default location: C:/RigConfig/rig_config.toml (Windows) or /opt/rigconfig/rig_config.toml (Linux)
+           
+        2. **Experiment Parameters (JSON file)**: Experiment-specific settings that change
+           per experiment (subject_id, protocols, stimulus parameters, session parameters).
+           These files are typically created per experiment or shared across similar experiments.
+           
+        3. **Runtime Information**: Any missing required values are collected interactively
+           from the user at runtime (e.g., if subject_id is not in the JSON file).
+        
+        Configuration Hierarchy & Priority:
+        - Runtime prompts override everything (highest priority)
+        - JSON parameters override rig config for overlapping keys
+        - Rig config provides the base defaults (lowest priority)
         
         Args:
-            param_file: Path to the JSON parameter file
+            param_file: Path to JSON file containing experiment-specific parameters.
+                       If None, only rig config and runtime prompts will be used.
+            rig_config_path: Optional override path to rig config file. 
+                           **ONLY use this for special cases like testing or non-standard setups.**
+                           In normal operation, leave this as None to use the default rig config location.
         """
+        # Step 1: Load experiment parameters from JSON file
         if param_file:
             with open(param_file, 'r') as f:
                 self.params = json.load(f)
-                logging.info(f"Loaded parameters from {param_file}")
+                logging.info(f"Loaded experiment parameters from {param_file}")
                 
             # Generate parameter checksum for provenance tracking
             with open(param_file, 'rb') as f:
@@ -201,30 +230,24 @@ class BaseLauncher:
             logging.info(f"Parameter file checksum: {self.params_checksum}")
         else:
             logging.warning("No parameter file provided, using default parameters")
-            self.params = {}        # Collect runtime information (only for missing values)
+            self.params = {}
+        
+        # Step 2: Collect runtime information (only for missing values)
         runtime_info = self.collect_runtime_information()
-        # Update parameters with runtime information
         self.params.update(runtime_info)
         
-        # Load hardware configuration
-        self.config = config_loader.load_config(self.params)
-          # Extract subject_id and user_id (using runtime info and config as fallbacks)
-        self.subject_id = (
-            self.params.get("subject_id") or 
-            (self.config.get("Behavior", {}).get("subject_id") if self.config else "") or
-            ""
-        )
-        self.user_id = (
-            self.params.get("user_id") or
-            (self.config.get("Behavior", {}).get("user_id") if self.config else "") or
-            ""
-        )
+        # Step 3: Load rig configuration  
+        self.rig_config = rig_config.get_rig_config(rig_config_path)
+        
+        # Extract subject_id and user_id from params
+        self.subject_id = self.params.get("subject_id", "")
+        self.user_id = self.params.get("user_id", "")
         
         logging.info(f"Using subject_id: {self.subject_id}, user_id: {self.user_id}")
+        logging.info(f"Using rig: {self.rig_config['rig_id']}")
         
         # Initialize script checksum (if not already set by subclass)
         if not hasattr(self, 'script_checksum') or self.script_checksum is None:
-            # Generate a default checksum based on launcher type and params
             script_content = f"{self.__class__.__name__}_{str(self.params)}"
             self.script_checksum = hashlib.md5(script_content.encode()).hexdigest()
     
@@ -506,9 +529,11 @@ class BaseLauncher:
             if not AIND_DATA_SCHEMA_AVAILABLE:
                 logging.warning("aind-data-schema not available, skipping session.json creation")
                 return False
-              # Get rig name from platform info (rig_id identifies the machine)
-            rig_name = self.platform_info.get('rig_id', 'unknown_rig')
-              # --- Protocol and platform confirmation ---
+            
+            # Get rig_id from rig config (guaranteed to be available)
+            rig_id = self.rig_config['rig_id']
+            
+            # --- Protocol and platform confirmation ---
             protocol_id = self.params.get("protocol_id")
             if protocol_id is not None:
                 protocol_id = self._confirm_param("protocol_id", protocol_id)
@@ -548,7 +573,7 @@ class BaseLauncher:
                 session_start_time=self.start_time,
                 session_end_time=self.stop_time,
                 session_type=self.params.get("session_type", "OpenScope experiment"),
-                rig_id=rig_name,
+                rig_id=rig_id,
                 subject_id=self.subject_id,
                 protocol_id=protocol_id,
                 iacuc_protocol=iacuc_protocol,
@@ -688,10 +713,8 @@ class BaseLauncher:
         
         try:
             # Set start time
-            self.start_time = datetime.datetime.now()
-            
-            # Load parameters
-            self.load_parameters(param_file)
+            self.start_time = datetime.datetime.now()            # Initialize launcher
+            self.initialize_launcher(param_file)
             
             # Collect animal weight prior at start if enabled
             self.animal_weight_prior = None
