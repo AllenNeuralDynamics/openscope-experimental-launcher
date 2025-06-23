@@ -96,12 +96,13 @@ markers = [
 ]
 
 [tool.coverage.run]
-omit = ["*__init__*", "tests/*"]
+omit = ["*__init__*", "tests/*", "*/post_processing/*"]
 source = ["openscope_experimental_launcher"]
 branch = true
-# Focus coverage on base classes only
+# Focus coverage on core launcher functionality
 include = [
-    "*/base/*",
+    "*/launchers/*",
+    "*/interfaces/*",
     "*/utils/*"
 ]
 
@@ -116,10 +117,9 @@ exclude_lines = [
     "raise NotImplementedError"
 ]
 fail_under = 50
-# Exclude launcher implementations from coverage requirements
+# Exclude post-processing tools from coverage requirements
 omit = [
-    "*/slap2/launcher.py",
-    "*/slap2/session_builder.py"
+    "*/post_processing/*"
 ]
 
 [tool.isort]
