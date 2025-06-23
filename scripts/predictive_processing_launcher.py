@@ -8,19 +8,10 @@ project experiments using the new experimental launcher architecture.
 Usage:
     python predictive_processing_launcher.py [path_to_parameters.json]
 """
-
-import os
 import sys
 import logging
-from typing import Dict, Optional
-
-# Add the src directory to the path for imports
-current_dir = os.path.dirname(os.path.abspath(__file__))
-src_dir = os.path.join(current_dir, '..', 'src')
-sys.path.insert(0, src_dir)
-
 from openscope_experimental_launcher.launchers import BonsaiLauncher
-
+from openscope_experimental_launcher.post_processing import pp_stimulus_converter
 
 class PredictiveProcessingLauncher(BonsaiLauncher):
     """
@@ -30,118 +21,45 @@ class PredictiveProcessingLauncher(BonsaiLauncher):
     Predictive Processing project experiments.
     """
     
-    def __init__(self):
-        """Initialize the predictive processing experiment."""
-        super().__init__()
+    def __init__(self, param_file=None, rig_config_path=None):
+        """Initialize the predictive processing experiment launcher."""
+        super().__init__(param_file, rig_config_path)
         logging.info("Predictive Processing experiment launcher initialized")
     
     def _get_launcher_type_name(self) -> str:
         """Get the name of the experiment type for logging."""
         return "PredictiveProcessing"
     
-    def collect_runtime_information(self) -> Dict[str, str]:
+    @staticmethod
+    def post_experiment_processing(session_directory: str) -> bool:
         """
-        Collect Predictive Processing-specific runtime information.
+        Run post-processing for Predictive Processing experiments.
+        Calls the parent BonsaiLauncher post-processing, then runs the
+        dedicated stimulus table converter tool.
         
-        Extends the base collection with project-specific parameters.
-        
-        Returns:
-            Dictionary containing collected runtime information
-        """
-        # Start with base runtime info
-        runtime_info = super().collect_runtime_information()
-        
-        logging.info(f"Collected Predictive Processing runtime info - {runtime_info}")
-        return runtime_info
-    
-    def post_experiment_processing(self) -> bool:
-        """
-        Perform Predictive Processing-specific post-experiment processing.
-        
-        This includes:
-        - Data validation and organization
-        - Stimulus timing verification
-        - Quality control checks
-        
+        Args:
+            session_directory: Path to the session directory containing experiment data
+            
         Returns:
             True if successful, False otherwise
         """
         logging.info("Starting Predictive Processing post-experiment processing...")
-        
-        try:
-            # Verify stimulus timing
-            if not self._verify_stimulus_timing():
-                logging.warning("Stimulus timing verification failed")
-                # Don't fail the entire post-processing for timing issues
-            
-            # Perform quality control checks
-            if not self._quality_control_checks():
-                logging.warning("Quality control checks failed")
-                # Don't fail the entire post-processing for QC issues
-            
+        # Call parent post-processing (BonsaiLauncher)
+        parent_success = BonsaiLauncher.post_experiment_processing(session_directory)
+        if not parent_success:
+            logging.warning("Parent post-processing failed")        # Call the focused stimulus table converter
+        logging.info("Running stimulus table converter...")
+        stimulus_success = pp_stimulus_converter.convert_orientation_to_stimulus_table(session_directory)
+        if not stimulus_success:
+            logging.error("Stimulus table conversion failed")
+        success = parent_success and stimulus_success
+        if success:
             logging.info("Predictive Processing post-experiment processing completed successfully")
-            return True
-            
-        except Exception as e:
-            logging.error(f"Predictive Processing post-experiment processing failed: {e}")
-            return False
-    
-    def _verify_stimulus_timing(self) -> bool:
-        """
-        Verify stimulus timing consistency.
-        
-        Returns:
-            True if verification successful, False otherwise
-        """
-        try:
-            logging.info("Verifying stimulus timing...")
-            
-            # This is a placeholder for actual timing verification
-            # In a real implementation, you would:
-            # 1. Load stimulus log files
-            # 2. Check frame timing consistency
-            # 3. Verify sync signals
-            # 4. Compare expected vs actual timing
-            
-            logging.info("Stimulus timing verification completed")
-            return True
-            
-        except Exception as e:
-            logging.error(f"Stimulus timing verification failed: {e}")
-            return False
-    
-    def _quality_control_checks(self) -> bool:
-        """
-        Perform quality control checks on collected data.
-        
-        Returns:
-            True if QC checks successful, False otherwise
-        """
-        try:
-            logging.info("Performing quality control checks...")
-            
-            # This is a placeholder for actual QC checks
-            # In a real implementation, you would:
-            # 1. Check data integrity
-            # 2. Verify recording quality metrics
-            # 3. Check for data corruption
-            # 4. Validate stimulus presentation
-            
-            logging.info("Quality control checks completed")
-            return True
-            
-        except Exception as e:
-            logging.error(f"Quality control checks failed: {e}")
-            return False
-
-
-def main():
-    """Main entry point for Predictive Processing launcher."""
-    if __name__ == "__main__":
-        return PredictiveProcessingLauncher.main(
-            description="Launch OpenScope Predictive Processing experiment"
-        )
+        else:            logging.error("Predictive Processing post-experiment processing failed")
+        return success
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(PredictiveProcessingLauncher.main(
+        description="Launch OpenScope Predictive Processing experiment"
+    ))

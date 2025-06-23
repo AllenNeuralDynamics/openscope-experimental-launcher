@@ -79,7 +79,7 @@ Quick Start
    
       # Use project-specific launcher scripts
       python scripts/minimalist_launcher.py scripts/example_minimalist_params.json
-      python scripts/slap2_launcher.py path/to/slap2_params.json
+      python scripts/predictive_processing_launcher.py experiment_params.json
 
 3. **Parameter File Example**:
 
@@ -140,6 +140,7 @@ Contents
    rig_config
    parameter_files
    rig_launchers
+   post_processing
 
 Indices and Tables
 ==================

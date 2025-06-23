@@ -26,13 +26,15 @@ Basic Experiment Setup
 1. **Create a Parameter File**   Create a JSON file with your experiment parameters:
 
    .. code-block:: json
-      :caption: example_params.json      {
+      :caption: example_params.json
+
+      {
           "subject_id": "test_mouse_001",
           "user_id": "researcher_name",
           "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
           "repository_commit_hash": "main",
           "local_repository_path": "C:/BonsaiExperiments",
-          "script_path": "code/stimulus-control/src/Standard_oddball_slap2.bonsai",
+          "script_path": "code/stimulus-control/src/predictive_processing_workflow.bonsai",
           "bonsai_exe_path": "code/stimulus-control/bonsai/Bonsai.exe",
           "output_root_folder": "C:/experiment_data",
           "collect_mouse_runtime_data": true,
@@ -90,17 +92,12 @@ Basic Experiment Setup
       launcher.initialize_launcher(param_file="python_params.json")
       success = launcher.run("python_params.json")
 
-3. **Using Project Scripts**
-
-   For project-specific experiments, use the launcher scripts:
+3. **Using Project Scripts**   For project-specific experiments, use the launcher scripts:
 
    .. code-block:: bash
 
       # Test BaseLauncher functionality
       python scripts/minimalist_launcher.py scripts/example_minimalist_params.json
-
-      # SLAP2 imaging experiments
-      python scripts/slap2_launcher.py path/to/slap2_params.json
 
       # Predictive processing experiments  
       python scripts/predictive_processing_launcher.py path/to/pp_params.json
@@ -110,11 +107,13 @@ Command Line Usage
 
 You can also run experiments directly from the command line:
 
-.. code-block:: bash   # Run with parameter file
+.. code-block:: bash
+
+   # Run with parameter file
    python -m openscope_experimental_launcher.base.experiment example_params.json
 
-   # Run SLAP2 experiment
-   python -m openscope_experimental_launcher.slap2.launcher slap2_params.json
+   # Run Predictive Processing experiment
+   python scripts/predictive_processing_launcher.py pp_params.json
 
 Runtime Data Collection (Optional)
 ----------------------------------
@@ -127,23 +126,29 @@ The launcher supports interactive data collection at runtime. When ``collect_mou
 
 All runtime data is automatically included in the generated ``session.json`` file. This feature is completely optional and experiments will run normally without it.
 
-Rig-Specific Launchers
-----------------------
+Predictive Processing Experiments
+----------------------------------
 
-SLAP2 Imaging Experiments
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+The launcher includes specialized support for Predictive Processing experiments with automatic post-processing:
 
 .. code-block:: python
 
-   from openscope_experimental_launcher.slap2.launcher import SLAP2Experiment
+   from openscope_experimental_launcher.launchers import PredictiveProcessingLauncher
 
-   # Create SLAP2 experiment with enhanced metadata generation
-   experiment = SLAP2Experiment()
-   success = experiment.run("slap2_params.json")   # Check generated outputs
+   # Create experiment with automatic post-processing
+   launcher = PredictiveProcessingLauncher(param_file="pp_params.json")
+   success = launcher.run()
+   
+   # Check generated outputs
    if success:
-       print(f"Experiment data: {experiment.output_session_folder}")
-       print(f"Stimulus table: {experiment.stimulus_table_path}")
-       print(f"Session metadata: {experiment.session_json_path}")
+       print(f"Experiment data: {launcher.output_session_folder}")
+       print(f"Stimulus table: {launcher.output_session_folder}/stimulus_table_output/")
+       
+**Post-Processing Features:**
+   - Automatic conversion of orientation data to stimulus tables
+   - Integration with Harp timing data for precise synchronization
+   - Comprehensive validation and error reporting
+   - Detailed conversion statistics
 
 Next Steps
 ----------

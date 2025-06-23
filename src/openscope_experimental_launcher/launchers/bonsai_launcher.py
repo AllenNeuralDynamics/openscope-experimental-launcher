@@ -9,7 +9,7 @@ import os
 import logging
 import subprocess
 import datetime
-from typing import Dict
+from typing import Dict, Optional
 
 # Import Windows-specific modules for process management
 try:
@@ -31,13 +31,18 @@ class BonsaiLauncher(BaseLauncher):
     Launcher for Bonsai-based OpenScope experiments.
     
     Extends BaseLauncher with Bonsai-specific process creation and
-    Windows job object handling for enhanced process management.
-    """
+    Windows job object handling for enhanced process management.    """
     
-    def __init__(self):
-        """Initialize the Bonsai launcher."""
-        super().__init__()
-          # Windows job object for process management
+    def __init__(self, param_file: Optional[str] = None, rig_config_path: Optional[str] = None):
+        """Initialize the Bonsai launcher.
+        
+        Args:
+            param_file: Path to JSON file containing experiment-specific parameters.
+            rig_config_path: Optional override path to rig config file.
+        """
+        super().__init__(param_file, rig_config_path)
+        
+        # Windows job object for process management
         self.hJob = None
         if WINDOWS_MODULES_AVAILABLE:
             self._setup_windows_job()

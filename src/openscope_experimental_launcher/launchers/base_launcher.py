@@ -16,9 +16,7 @@ import platform
 import socket
 import uuid
 import hashlib
-import atexit
 import psutil
-import shutil
 import json
 import argparse
 import subprocess
@@ -52,22 +50,28 @@ class BaseLauncher:
     - Output directory management
     - Logging setup and finalization
     - Process monitoring coordination
-    
-    Interface-specific functionality (Bonsai, MATLAB, Python) is handled
+      Interface-specific functionality (Bonsai, MATLAB, Python) is handled
     by separate interface modules and launcher classes.
     """
     
-    # Class variable to track cleanup registration
-    _cleanup_registered = False
-    
-    def __init__(self):
-        """Initialize the base launcher with core functionality."""
+    def __init__(self, param_file: Optional[str] = None, rig_config_path: Optional[str] = None):
+        """
+        Initialize the base launcher with core functionality.
+        
+        Args:
+            param_file: Path to JSON file containing experiment-specific parameters.
+                       If None, only rig config and runtime prompts will be used.
+            rig_config_path: Optional override path to rig config file. 
+                           **ONLY use this for special cases like testing or non-standard setups.**
+                           In normal operation, leave this as None to use the default rig config location.
+        """
         self.platform_info = self._get_platform_info()
         self.params = {}
         self.start_time = None
         self.stop_time = None
         self.config = {}
-          # Session tracking variables
+        
+        # Session tracking variables
         self.subject_id = ""
         self.user_id = ""
         self.session_uuid = ""
@@ -80,19 +84,46 @@ class BaseLauncher:
         self.stdout_data = []
         self.stderr_data = []
         self._output_threads = []
-        self._percent_used = None
-        
-        # Logging state
+        self._percent_used = None        # Logging state
         self._logging_finalized = False  # Flag to prevent duplicate logging
         
-        # Register exit handlers only once per process, not per instance
-        if not BaseLauncher._cleanup_registered:
-            BaseLauncher._cleanup_registered = True            # Use a class-level cleanup instead of instance cleanup
-            def global_cleanup():
-                # This will be called once at exit, not per instance
-                pass
-            atexit.register(global_cleanup)
-            signal.signal(signal.SIGTERM, lambda sig, frame: sys.exit(0))
+        # Initialize launcher by loading all required configuration and data
+        # This performs three key initialization steps:
+        # 1. Loads experiment parameters from JSON file (if provided)
+        # 2. Loads rig-specific configuration from TOML file  
+        # 3. Collects any missing runtime information from user prompts
+          # Step 1: Load experiment parameters from JSON file
+        # Store original input parameters for metadata saving
+        self.original_param_file = param_file
+        self.original_input_params = {}
+        
+        if param_file:
+            with open(param_file, 'r') as f:
+                self.params = json.load(f)
+                self.original_input_params = self.params.copy()  # Store original before merging
+                logging.info(f"Loaded experiment parameters from {param_file}")
+        else:
+            logging.warning("No parameter file provided, using default parameters")
+            self.params = {}
+        
+        # Step 2: Load rig configuration  
+        self.rig_config = rig_config.get_rig_config(rig_config_path)
+        
+        # Step 3: Merge rig_config into params with proper priority
+        # rig_config provides defaults, params (from JSON) override rig_config
+        merged_params = dict(self.rig_config)  # Start with rig_config as base
+        merged_params.update(self.params)      # Override with experiment-specific params
+        self.params = merged_params
+        
+        # Step 4: Collect runtime information (only for missing values)
+        runtime_info = self.collect_runtime_information()
+        self.params.update(runtime_info)       # Runtime info has highest priority
+        
+        # Extract subject_id and user_id from params
+        self.subject_id = self.params.get("subject_id", "")
+        self.user_id = self.params.get("user_id", "")
+        logging.info(f"Using subject_id: {self.subject_id}, user_id: {self.user_id}")
+        logging.info(f"Using rig: {self.rig_config['rig_id']}")
         
         logging.info("BaseLauncher initialized")
     
@@ -181,69 +212,6 @@ class BaseLauncher:
         logging.info(f"Collected end-of-experiment info - {end_info}")
         return end_info
     
-    def initialize_launcher(self, param_file: Optional[str] = None, rig_config_path: Optional[str] = None):
-        """
-        Initialize the launcher by loading all required configuration and data.
-        
-        This method performs three key initialization steps:
-        1. Loads experiment parameters from JSON file (if provided)
-        2. Loads rig-specific configuration from TOML file  
-        3. Collects any missing runtime information from user prompts
-        
-        Configuration System Overview:
-        =============================
-        The OpenScope launcher uses a three-tier configuration system:
-        
-        1. **Rig Config (TOML file)**: Hardware and setup-specific settings that remain
-           constant for a physical rig setup (rig_id, data paths, hardware configs).
-           Default location: C:/RigConfig/rig_config.toml (Windows) or /opt/rigconfig/rig_config.toml (Linux)
-           
-        2. **Experiment Parameters (JSON file)**: Experiment-specific settings that change
-           per experiment (subject_id, protocols, stimulus parameters, session parameters).
-           These files are typically created per experiment or shared across similar experiments.
-           
-        3. **Runtime Information**: Any missing required values are collected interactively
-           from the user at runtime (e.g., if subject_id is not in the JSON file).
-          Configuration Hierarchy & Priority:
-        - Runtime prompts override everything (highest priority)
-        - JSON parameters override rig config for overlapping keys
-        - Rig config provides the base defaults (lowest priority)
-        - All rig_config fields are now available in self.params for easy access
-        
-        Args:
-            param_file: Path to JSON file containing experiment-specific parameters.
-                       If None, only rig config and runtime prompts will be used.
-            rig_config_path: Optional override path to rig config file. 
-                           **ONLY use this for special cases like testing or non-standard setups.**
-                           In normal operation, leave this as None to use the default rig config location.
-        """
-        # Step 1: Load experiment parameters from JSON file
-        if param_file:
-            with open(param_file, 'r') as f:
-                self.params = json.load(f)
-                logging.info(f"Loaded experiment parameters from {param_file}")
-        else:
-            logging.warning("No parameter file provided, using default parameters")
-            self.params = {}
-          # Step 2: Load rig configuration  
-        self.rig_config = rig_config.get_rig_config(rig_config_path)
-        
-        # Step 3: Merge rig_config into params with proper priority
-        # rig_config provides defaults, params (from JSON) override rig_config
-        merged_params = dict(self.rig_config)  # Start with rig_config as base
-        merged_params.update(self.params)      # Override with experiment-specific params
-        self.params = merged_params
-        
-        # Step 4: Collect runtime information (only for missing values)
-        runtime_info = self.collect_runtime_information()
-        self.params.update(runtime_info)       # Runtime info has highest priority
-        
-        # Extract subject_id and user_id from params
-        self.subject_id = self.params.get("subject_id", "")
-        self.user_id = self.params.get("user_id", "")
-        logging.info(f"Using subject_id: {self.subject_id}, user_id: {self.user_id}")
-        logging.info(f"Using rig: {self.rig_config['rig_id']}")
-
     def determine_output_session_folder(self) -> Optional[str]:
         """
         Determine the session output directory.
@@ -297,39 +265,39 @@ class BaseLauncher:
             else:
                 logging.info(f"output_session_folder already exists: {output_session_folder}")
                 
-            return output_session_folder
-            
+            return output_session_folder            
         except Exception as e:
             logging.error(f"Failed to determine output_session_folder: {e}")
             return None
-    
-    def save_experiment_metadata(self, output_directory: str, param_file: Optional[str] = None):
+
+    def save_launcher_metadata(self, output_directory: str):
         """
-        Save experiment metadata to the output directory.
+        Save launcher metadata to the output directory for experiment replication.
         
         This includes:
-        - Original parameter JSON file
+        - Original input parameters from the JSON file (input_parameters.json)
+        - Fully processed parameters after merging rig config and runtime info (processed_parameters.json)
         - Command line arguments used to run the experiment
         - Runtime information and system details
-        - Experiment logs (if available)
         
-        Args:
+        The processed_parameters.json file contains everything needed to replicate the experiment
+        and can be used as input to a new launcher instance.
+          Args:
             output_directory: Directory where metadata should be saved
-            param_file: Path to the original parameter file (if available)
         """
         try:
             # Create metadata directory if it doesn't exist
-            metadata_dir = os.path.join(output_directory, "experiment_metadata")
+            metadata_dir = os.path.join(output_directory, "launcher_metadata")
             os.makedirs(metadata_dir, exist_ok=True)
             
-            # 1. Save original parameter file if provided
-            if param_file and os.path.exists(param_file):
-                param_filename = os.path.basename(param_file)
-                param_dest = os.path.join(metadata_dir, f"original_{param_filename}")
-                shutil.copy2(param_file, param_dest)
-                logging.info(f"Saved original parameter file to: {param_dest}")
+            # 1. Save original input parameters from JSON file
+            input_params_file = os.path.join(metadata_dir, "input_parameters.json")
+            with open(input_params_file, 'w') as f:
+                json.dump(self.original_input_params, f, indent=2, default=str)
+            logging.info(f"Saved original input parameters to: {input_params_file}")
             
-            # 2. Save processed parameters (with resolved paths, etc.)
+            # 2. Save processed parameters (merged rig config + input params + runtime info)
+            # This is what you should use to replicate the experiment exactly
             processed_params_file = os.path.join(metadata_dir, "processed_parameters.json")
             with open(processed_params_file, 'w') as f:
                 json.dump(self.params, f, indent=2, default=str)
@@ -342,13 +310,14 @@ class BaseLauncher:
                 "arguments": sys.argv,
                 "working_directory": os.getcwd(),
                 "python_executable": sys.executable,
+                "original_param_file": self.original_param_file,
                 "timestamp": datetime.datetime.now().isoformat()
             }
             with open(cmdline_file, 'w') as f:
                 json.dump(cmdline_info, f, indent=2)
             logging.info(f"Saved command line info to: {cmdline_file}")
 
-              # 4. Save runtime and system information
+            # 4. Save runtime and system information
             runtime_file = os.path.join(metadata_dir, "runtime_information.json")
             
             runtime_info = {
@@ -362,7 +331,7 @@ class BaseLauncher:
                 json.dump(runtime_info, f, indent=2, default=str)
             logging.info(f"Saved runtime information to: {runtime_file}")
 
-            logging.info(f"Experiment metadata saved to: {metadata_dir}")
+            logging.info(f"Launcher metadata saved to: {metadata_dir}")
             
         except Exception as e:
             logging.error(f"Failed to save experiment metadata: {e}")
@@ -466,7 +435,8 @@ class BaseLauncher:
                 logging.info(f"Duration: {duration}")
             logging.info(f"Final Memory Usage: {psutil.virtual_memory().percent}%")
             logging.info("="*60)
-              # Close and remove file handlers to ensure logs are flushed
+            
+            # Close and remove file handlers to ensure logs are flushed
             root_logger = logging.getLogger()
             handlers_to_remove = []
             
@@ -481,17 +451,41 @@ class BaseLauncher:
         except Exception as e:
             print(f"Error finalizing logging: {e}")
     
-    def post_experiment_processing(self) -> bool:
+    @staticmethod
+    def run_post_processing(session_directory: str) -> bool:
         """
-        Perform post-experiment processing specific to each rig type.
-        This method should be overridden in each rig-specific launcher.
+        Pure post-processing method that works independently of launcher state.
         
-        Default implementation does nothing - each rig should implement
-        its own data reformatting logic here.
+        This static method performs post-processing based only on the session directory
+        contents, without access to internal launcher state. This ensures that 
+        post-processing can be run independently and enables experiment replication.
         
+        Subclasses should override this method to implement rig-specific processing.
+        
+        Args:
+            session_directory: Path to the session directory containing experiment data
+            
         Returns:
-            True if successful, False otherwise        """
-        logging.info("No post-experiment processing defined for this launcher type")
+            True if successful, False otherwise
+        """
+        logging.info(f"Running default post-processing for: {session_directory}")
+        
+        # Basic validation - check if directory exists
+        if not os.path.exists(session_directory):
+            logging.error(f"Session directory does not exist: {session_directory}")
+            return False
+            
+        if not os.path.isdir(session_directory):
+            logging.error(f"Path is not a directory: {session_directory}")
+            return False
+        
+        # List contents for basic validation
+        contents = os.listdir(session_directory)
+        logging.info(f"Session directory contains {len(contents)} items")
+        for item in contents:
+            logging.debug(f"  - {item}")
+        
+        logging.info("Default post-processing completed successfully")
         return True
     
     def create_session_file(self, output_directory: str) -> bool:
@@ -541,9 +535,8 @@ class BaseLauncher:
             collect_mouse_runtime_data = self.params.get("collect_mouse_runtime_data", False)
             animal_weight_prior = getattr(self, 'animal_weight_prior', None)
             animal_weight_post = None
-            
-            # Get stimulus epochs and data streams directly
-            stimulus_epochs = self.get_stimulus_epochs(self.start_time, self.stop_time)
+              # Get stimulus epochs and data streams directly
+            stimulus_epochs = self.get_stimulus_epochs()
             data_streams = self.get_data_streams(self.start_time, self.stop_time)
 
             # Prompt for animal_weight_post at end if enabled
@@ -674,20 +667,18 @@ class BaseLauncher:
             logging.error(f"Error during cleanup: {e}")
         return None
     
-    def run(self, param_file: Optional[str] = None) -> bool:
+    def run(self) -> bool:
         """
-        Run the experiment with the given parameters.
+        Run the experiment.
         
         This is the main orchestration method that should be called by
         interface-specific launchers. It handles the common workflow:
-        1. Set up parameters and session
-        2. Set up repository and output directories
-        3. Set up logging
-        4. Call start_experiment() (implemented by subclasses)
-        5. Handle post-processing and cleanup
+        1. Set up repository and output directories
+        2. Set up logging
+        3. Call start_experiment() (implemented by subclasses)
+        4. Handle post-processing and cleanup
         
-        Args:
-            param_file: Path to the JSON parameter file
+        Note: The launcher should already be initialized via __init__ before calling this method.
             
         Returns:
             True if successful, False otherwise
@@ -696,8 +687,9 @@ class BaseLauncher:
         
         try:
             # Set start time
-            self.start_time = datetime.datetime.now()            # Initialize launcher
-            self.initialize_launcher(param_file)
+            self.start_time = datetime.datetime.now()
+            
+            # Note: initialization now happens in __init__, not here
             
             # Collect animal weight prior at start if enabled
             self.animal_weight_prior = None
@@ -715,10 +707,8 @@ class BaseLauncher:
             # Set up continuous logging to output_session_folder
             if output_session_folder:
                 centralized_log_dir = self.params.get("centralized_log_directory")
-                self.setup_continuous_logging(output_session_folder, centralized_log_dir)
-                
-                # Save experiment metadata after logging is set up
-                self.save_experiment_metadata(output_session_folder, param_file)
+                self.setup_continuous_logging(output_session_folder, centralized_log_dir)                  # Save launcher metadata after logging is set up
+                self.save_launcher_metadata(output_session_folder)
             
             # Start the experiment (implemented by interface-specific launchers)
             if not self.start_experiment():
@@ -730,15 +720,16 @@ class BaseLauncher:
                 logging.error(f"{self._get_launcher_type_name()} experiment failed")
                 return False
             
-            # Perform rig-specific post-processing
-            if not self.post_experiment_processing():
-                logging.warning("Post-experiment processing failed, but experiment data was collected")
-            
             # Collect end-of-experiment information (notes, outcome, etc.)
-            self.collect_end_experiment_information()            # Create session.json file with experiment metadata
-            if output_session_folder:
-                self.create_session_file(output_session_folder)
+            self.collect_end_experiment_information()               
             
+             # Perform rig-specific post-processing
+            if not self.run_post_processing(self.output_session_folder):
+                logging.warning("Post-experiment processing failed, but experiment data was collected")
+                   
+            if output_session_folder:
+                self.create_session_file(output_session_folder)            
+
             return True
             
         except Exception as e:
@@ -998,7 +989,7 @@ class BaseLauncher:
             return f"No errors reported by {self._get_launcher_type_name()}."
         return "\n".join(self.stderr_data)
 
-    def get_stimulus_epochs(self, start_time: datetime.datetime, end_time: datetime.datetime) -> list:
+    def get_stimulus_epochs(self) -> list:
         """
         Get stimulus epochs for session creation.
         
@@ -1006,8 +997,7 @@ class BaseLauncher:
         launchers based on the experimental protocol and Bonsai scripts used.
         
         Args:
-            start_time: Session start time
-            end_time: Session end time
+            None
             
         Returns:
             Empty list (stimulus epochs should be defined in derived classes)

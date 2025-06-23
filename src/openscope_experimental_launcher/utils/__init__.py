@@ -2,7 +2,7 @@
 Utility modules for OpenScope experimental launchers.
 
 Contains helper functions for rig configuration, Git management,
-and process monitoring.
+process monitoring, and post-experiment processing.
 """
 
 # Import functions from modules

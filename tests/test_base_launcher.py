@@ -15,31 +15,33 @@ class TestBaseLauncher:
     
     def test_init(self):
         """Test BaseLauncher initialization."""
-        experiment = BaseLauncher()        
+        with patch('openscope_experimental_launcher.utils.rig_config.get_rig_config', return_value={'rig_id': 'test_rig'}):
+            experiment = BaseLauncher()        
         assert experiment.platform_info is not None
         assert experiment.output_session_folder == ""
-        assert experiment.params == {}
+        assert 'rig_id' in experiment.params  # rig_config gets merged into params
         assert experiment.process is None
         assert experiment.session_uuid is not None
 
     def test_collect_runtime_information(self):
         """Test runtime information collection."""
-        experiment = BaseLauncher()
+        with patch('openscope_experimental_launcher.utils.rig_config.get_rig_config', return_value={'rig_id': 'test_rig'}):
+            experiment = BaseLauncher()
+        # Clear the rig config from params to test collection
+        experiment.params = {}
         runtime_info = experiment.collect_runtime_information()
         assert isinstance(runtime_info, dict)        # The current implementation only collects subject_id and user_id if not already in params
         assert "subject_id" in runtime_info or "user_id" in runtime_info
 
     def test_initialize_launcher_with_file(self, param_file, sample_params):
         """Test launcher initialization from file."""
-        experiment = BaseLauncher()        
         with patch('openscope_experimental_launcher.utils.rig_config.get_rig_config', return_value={'rig_id': 'test_rig', 'output_root_folder': '/tmp'}):
-            experiment.initialize_launcher(param_file)
+            experiment = BaseLauncher(param_file=param_file)
         
         # Check that all original params are present
         for key, value in sample_params.items():
             assert experiment.params[key] == value
-        
-        # Check that rig_config fields are also merged into params
+          # Check that rig_config fields are also merged into params
         assert experiment.params["output_root_folder"] == "/tmp"
         
         assert experiment.subject_id == sample_params["subject_id"]
@@ -47,10 +49,9 @@ class TestBaseLauncher:
 
     def test_initialize_launcher_without_file(self):
         """Test launcher initialization without file."""
-        experiment = BaseLauncher()
-        
         with patch('openscope_experimental_launcher.utils.rig_config.get_rig_config', return_value={'rig_id': 'test_rig', 'output_root_folder': '/tmp'}):
-            experiment.initialize_launcher(None)
+            experiment = BaseLauncher(param_file=None)
+        
         # The experiment may load default parameters, so we check if params is a dict
         assert isinstance(experiment.params, dict)
 
@@ -100,7 +101,9 @@ class TestBaseLauncher:
         with patch.object(experiment, 'stop_process'):
             result = experiment.stop()
             
-            assert result is None  # Method returns None    def test_get_process_errors(self):
+            assert result is None  # Method returns None
+            
+    def test_get_process_errors(self):
         """Test getting process errors."""
         experiment = BaseLauncher()
         errors = experiment.get_process_errors()
@@ -149,17 +152,19 @@ class TestBaseLauncher:
         assert isinstance(errors, str)
 
     def test_post_experiment_processing(self):
-        """Test post-experiment processing."""
+        """Test post-experiment processing functionality."""
         experiment = BaseLauncher()
-        
-        with patch.object(experiment, 'get_process_errors', return_value=""):
-            result = experiment.post_experiment_processing()
+        # Test the run_post_processing static method instead
+        with patch('os.path.exists', return_value=True):
+            result = BaseLauncher.run_post_processing("/tmp/test_session")
             
             assert isinstance(result, bool)
     
     def test_run_success(self, temp_dir, param_file):
         """Test successful experiment run with mocked create_process."""
-        experiment = BaseLauncher()
+        # Initialize with the parameter file
+        with patch('openscope_experimental_launcher.utils.rig_config.get_rig_config', return_value={'rig_id': 'test_rig', 'output_root_folder': temp_dir}):
+            experiment = BaseLauncher(param_file=param_file)
         
         # Create a mock process object
         mock_process = Mock()
@@ -167,23 +172,27 @@ class TestBaseLauncher:
         mock_process.wait.return_value = 0
         mock_process.returncode = 0
         
+        def mock_start_experiment():
+            experiment.process = mock_process  # Set the process attribute
+            return True
+        
         with patch('openscope_experimental_launcher.utils.git_manager.setup_repository', return_value=True), \
-             patch.object(experiment, 'create_process', return_value=mock_process), \
+             patch.object(experiment, 'start_experiment', side_effect=mock_start_experiment), \
              patch.object(experiment, 'determine_output_session_folder', return_value=temp_dir), \
-             patch.object(experiment, 'save_experiment_metadata'), \
-             patch.object(experiment, 'post_experiment_processing', return_value=True):
+             patch.object(experiment, 'save_launcher_metadata'), \
+             patch.object(BaseLauncher, 'run_post_processing', return_value=True):
             
-            result = experiment.run(param_file)
+            result = experiment.run()
             
             assert result is True
 
     def test_run_repository_setup_failure(self, param_file):
         """Test experiment run with repository setup failure."""
-        experiment = BaseLauncher()
-        
         with patch('openscope_experimental_launcher.utils.git_manager.setup_repository', return_value=False), \
-             patch.object(experiment, 'initialize_launcher'):            
-            result = experiment.run(param_file)
+             patch('openscope_experimental_launcher.utils.rig_config.get_rig_config', return_value={'rig_id': 'test_rig'}):
+            experiment = BaseLauncher(param_file=param_file)
+            
+            result = experiment.run()
             
             assert result is False
 
@@ -223,16 +232,17 @@ class TestBaseLauncher:
         # Should return None when no subject_id is specified
         assert result is None
 
-    def test_save_experiment_metadata(self, temp_dir):
-        """Test saving experiment metadata."""
+    def test_save_launcher_metadata(self, temp_dir):
+        """Test saving launcher metadata."""
         experiment = BaseLauncher()
         experiment.params = {"subject_id": "test_mouse"}
+        experiment.original_input_params = {"subject_id": "test_mouse"}
+        experiment.original_param_file = None
         
         # This should not raise an exception
-        experiment.save_experiment_metadata(temp_dir)
-        
-        # Check if metadata directory was created with expected files
-        metadata_dir = os.path.join(temp_dir, "experiment_metadata")
+        experiment.save_launcher_metadata(temp_dir)
+          # Check if metadata directory was created with expected files
+        metadata_dir = os.path.join(temp_dir, "launcher_metadata")
         assert os.path.exists(metadata_dir)
         
         # Check for expected metadata files
@@ -346,3 +356,33 @@ class TestBaseLauncher:
         assert "session_start_time" in session_data
         assert "session_end_time" in session_data
         assert "data_streams" in session_data
+
+    def test_mode_initialization(self):
+        """Test initialization with different parameter configurations."""
+        # Test initialization with param_file
+        with patch('openscope_experimental_launcher.utils.rig_config.get_rig_config', return_value={'rig_id': 'test_rig'}):
+            experiment_with_file = BaseLauncher(param_file=None)
+            assert hasattr(experiment_with_file, 'params')
+            assert isinstance(experiment_with_file.params, dict)
+        
+        # Test initialization with rig_config_path override
+        with patch('openscope_experimental_launcher.utils.rig_config.get_rig_config', return_value={'rig_id': 'test_rig'}):
+            experiment_with_rig_config = BaseLauncher(param_file=None, rig_config_path="/custom/path")
+            assert hasattr(experiment_with_rig_config, 'params')
+            assert isinstance(experiment_with_rig_config.params, dict)
+
+    def test_argument_parser_modes(self):
+        """Test argument parser with current implementation."""
+        parser = BaseLauncher.create_argument_parser()
+        
+        # Test with param file
+        args = parser.parse_args(['params.json'])
+        assert args.param_file == 'params.json'
+        
+        # Test without param file (optional)
+        args = parser.parse_args([])
+        assert args.param_file is None
+        
+        # Test with description
+        parser_with_desc = BaseLauncher.create_argument_parser("Custom description")
+        assert parser_with_desc.description == "Custom description"

@@ -1,8 +1,9 @@
 # openscope-experimental-launcher
 
 [![License](https://img.shields.io/badge/license-MIT-brightgreen)](LICENSE)
-![Interrogate](https://img.shields.io/badge/interrogate-100.0%25-brightgreen)
-![Coverage](https://img.shields.io/badge/coverage-60%25-orange?logo=codecov)
+![Interrogate](https://img.shields.io/badge/interrogate-96.6%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-47%25-orange?logo=codecov)
+![Tests](https://img.shields.io/badge/tests-140%20passed-brightgreen)
 ![Python](https://img.shields.io/badge/python->=3.8-blue?logo=python)
 ![Platform](https://img.shields.io/badge/platform-Windows-blue?logo=windows)
 [![Documentation](https://img.shields.io/badge/docs-latest-blue?logo=gitbook)](https://allenneuraldynamics.github.io/openscope-experimental-launcher/)
@@ -17,6 +18,7 @@ This package provides a modular, extensible launcher for neuroscience experiment
 
 - **Multi-Interface Support**: Bonsai, MATLAB, and Python experiment execution
 - **Modular Architecture**: Clean separation between common logic and interface-specific process creation
+- **Post-Processing Pipeline**: Automated data transformation with standalone, reusable tools
 - **Process Management**: Comprehensive process monitoring, memory tracking, and cleanup
 - **Session Tracking**: Generate unique session IDs and comprehensive experiment metadata
 - **Automated Session Files**: Creates standardized `session.json` files using AIND data schema
@@ -31,7 +33,8 @@ The launcher uses a modular architecture with clean separation of concerns:
 ```
 src/openscope_experimental_launcher/
 ├── launchers/               # Interface-specific launchers
-├── interfaces/              # Stateless interface functions  
+├── interfaces/              # Stateless interface functions
+├── post_processing/         # Standalone post-processing tools
 └── utils/                   # Shared utilities
 scripts/                     # Project-specific launcher scripts
 ```
@@ -39,6 +42,7 @@ scripts/                     # Project-specific launcher scripts
 **Design Principles:**
 - **Interface Separation**: Clean separation between launchers and interfaces
 - **Stateless Functions**: Interface modules provide pure functions with no global state
+- **Modular Post-Processing**: Standalone tools for data transformation
 - **Project Flexibility**: Custom launchers via scripts without modifying core code
 
 ## Quick Start
@@ -54,24 +58,24 @@ pip install -e .
 ```python
 from openscope_experimental_launcher.launchers import BonsaiLauncher
 
-launcher = BonsaiLauncher()
-success = launcher.run("path/to/parameters.json")
+launcher = BonsaiLauncher(param_file="path/to/parameters.json")
+success = launcher.run()
 ```
 
 **MATLAB Experiments:**
 ```python
 from openscope_experimental_launcher.launchers import MatlabLauncher
 
-launcher = MatlabLauncher()
-success = launcher.run("path/to/parameters.json")
+launcher = MatlabLauncher(param_file="path/to/parameters.json")
+success = launcher.run()
 ```
 
 **Python Experiments:**
 ```python
 from openscope_experimental_launcher.launchers import PythonLauncher
 
-launcher = PythonLauncher()
-success = launcher.run("path/to/parameters.json")
+launcher = PythonLauncher(param_file="path/to/parameters.json")
+success = launcher.run()
 ```
 
 ## Configuration System
@@ -84,8 +88,8 @@ The launcher uses a **three-tier configuration system** that cleanly separates r
 
 ```python
 # Normal usage - clean and simple
-launcher = BonsaiLauncher()
-launcher.initialize_launcher(param_file="experiment.json")  # Uses default rig config
+launcher = BonsaiLauncher(param_file="experiment.json")  # Uses default rig config
+success = launcher.run()
 ```
 
 **[📖 Complete Configuration Guide →](docs/configuration-guide.md)**
@@ -104,8 +108,8 @@ launcher.initialize_launcher(param_file="experiment.json")  # Uses default rig c
 
 **Using Project Scripts:**
 ```bash
-python scripts/slap2_launcher.py path/to/slap2_parameters.json
 python scripts/minimalist_launcher.py scripts/example_minimalist_params.json
+python scripts/predictive_processing_launcher.py experiment_params.json
 ```
 
 ## Documentation
@@ -119,6 +123,7 @@ For complete documentation, tutorials, and examples:
 - **[Quick Start Tutorial](docs/source/quickstart.rst)** - Step-by-step first experiment walkthrough  
 - **[Parameter Reference](docs/source/parameter_files.rst)** - Complete parameter documentation and examples
 - **[Launcher Guide](docs/source/rig_launchers.rst)** - Architecture details and launcher customization
+- **[Post-Processing Guide](docs/source/post_processing.rst)** - Data transformation tools and workflows
 
 ## License
 
