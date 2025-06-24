@@ -39,6 +39,12 @@ from ..utils import rig_config
 from ..utils import git_manager
 
 
+try:
+    from .. import __version__
+except ImportError:
+    __version__ = "unknown"
+
+
 class BaseLauncher:
     """
     Base class for OpenScope experimental launchers.
@@ -78,6 +84,9 @@ class BaseLauncher:
         self.output_session_folder = ""  # Store the session output directory      
         self.experiment_notes = ""  # Store experiment notes collected at the end
         self.animal_weight_prior = None  # Store animal weight prior collected at start
+        
+        # Version tracking
+        self._version = __version__
         
         # Process management (common to all interfaces)
         self.process = None
@@ -276,13 +285,15 @@ class BaseLauncher:
         
         This includes:
         - Original input parameters from the JSON file (input_parameters.json)
-        - Fully processed parameters after merging rig config and runtime info (processed_parameters.json)
+        - Processed parameters after merging rig config (processed_parameters.json)
         - Command line arguments used to run the experiment
-        - Runtime information and system details
         
-        The processed_parameters.json file contains everything needed to replicate the experiment
-        and can be used as input to a new launcher instance.
-          Args:
+        The processed_parameters.json file contains only the input parameters 
+        (after merging with rig config) and can be used as input to replicate 
+        the experiment. Runtime information and launcher details are saved 
+        in end_state.json instead.
+        
+        Args:
             output_directory: Directory where metadata should be saved
         """
         try:
@@ -296,11 +307,18 @@ class BaseLauncher:
                 json.dump(self.original_input_params, f, indent=2, default=str)
             logging.info(f"Saved original input parameters to: {input_params_file}")
             
-            # 2. Save processed parameters (merged rig config + input params + runtime info)
-            # This is what you should use to replicate the experiment exactly
+            # 2. Save processed input parameters (original params + rig config, but no runtime info)
+            # This contains only what's needed to replicate the experiment configuration
+            processed_params = {}
+            for key, value in self.params.items():
+                # Exclude runtime/launcher-specific metadata that belongs in end_state.json
+                if key not in ['session_uuid', 'start_time', 'stop_time', 'output_session_folder',
+                              'launcher_class', 'launcher_version', 'platform_info']:
+                    processed_params[key] = value
+            
             processed_params_file = os.path.join(metadata_dir, "processed_parameters.json")
             with open(processed_params_file, 'w') as f:
-                json.dump(self.params, f, indent=2, default=str)
+                json.dump(processed_params, f, indent=2, default=str)
             logging.info(f"Saved processed parameters to: {processed_params_file}")
             
             # 3. Save command line arguments
@@ -317,20 +335,6 @@ class BaseLauncher:
                 json.dump(cmdline_info, f, indent=2)
             logging.info(f"Saved command line info to: {cmdline_file}")
 
-            # 4. Save runtime and system information
-            runtime_file = os.path.join(metadata_dir, "runtime_information.json")
-            
-            runtime_info = {
-                "session_uuid": getattr(self, 'session_uuid', ''),
-                "subject_id": getattr(self, 'subject_id', ''),
-                "user_id": getattr(self, 'user_id', ''),
-                "start_time": self.start_time.isoformat() if getattr(self, 'start_time', None) else None,
-                "platform_info": getattr(self, 'platform_info', {})
-            }
-            with open(runtime_file, 'w') as f:
-                json.dump(runtime_info, f, indent=2, default=str)
-            logging.info(f"Saved runtime information to: {runtime_file}")
-
             logging.info(f"Launcher metadata saved to: {metadata_dir}")
             
         except Exception as e:
@@ -345,9 +349,9 @@ class BaseLauncher:
             centralized_log_dir: Optional centralized logging directory
         """
         try:
-            # Create log filename with session info
+            # Create log filename in launcher_metadata directory
             subject_id = self.params.get('subject_id')
-            log_filename = f"experiment_{self.session_uuid}.log"
+            log_filename = "launcher.log"
             
             # Set up logging format
             log_format = logging.Formatter(
@@ -358,9 +362,10 @@ class BaseLauncher:
             # Get root logger
             root_logger = logging.getLogger()
             
-            # 1. Set up file handler for output directory
-            output_log_path = os.path.join(output_directory, log_filename)
-            os.makedirs(os.path.dirname(output_log_path), exist_ok=True)
+            # 1. Set up file handler for launcher_metadata directory
+            launcher_metadata_dir = os.path.join(output_directory, "launcher_metadata")
+            os.makedirs(launcher_metadata_dir, exist_ok=True)
+            output_log_path = os.path.join(launcher_metadata_dir, log_filename)
             
             output_handler = logging.FileHandler(output_log_path)
             output_handler.setLevel(logging.DEBUG)
@@ -460,124 +465,40 @@ class BaseLauncher:
         contents, without access to internal launcher state. This ensures that 
         post-processing can be run independently and enables experiment replication.
         
-        Subclasses should override this method to implement rig-specific processing.
-        
-        Args:
+        Subclasses should override this method to implement rig-specific processing.        Args:
             session_directory: Path to the session directory containing experiment data
             
         Returns:
             True if successful, False otherwise
         """
         logging.info(f"Running default post-processing for: {session_directory}")
-        
-        # Basic validation - check if directory exists
-        if not os.path.exists(session_directory):
-            logging.error(f"Session directory does not exist: {session_directory}")
-            return False
+
+        try:
+            # Import and use the session creator
+            from openscope_experimental_launcher.post_processing.session_creator import SessionCreator
             
-        if not os.path.isdir(session_directory):
-            logging.error(f"Path is not a directory: {session_directory}")
+            creator = SessionCreator(session_directory)
+            
+            if not creator.load_experiment_data():
+                logging.error("Failed to load experiment data for session creation")
+                return False
+            
+            if not creator.create_session_file(force=False):
+                logging.error("Failed to create session file")
+                return False
+            
+            logging.info("Session file created successfully via post-processing")
+            
+        except ImportError as e:
+            logging.warning(f"Session creator not available: {e}")
             return False
-        
-        # List contents for basic validation
-        contents = os.listdir(session_directory)
-        logging.info(f"Session directory contains {len(contents)} items")
-        for item in contents:
-            logging.debug(f"  - {item}")
+        except Exception as e:
+            logging.error(f"Session creation failed: {e}")
+            return False
         
         logging.info("Default post-processing completed successfully")
         return True
-    
-    def create_session_file(self, output_directory: str) -> bool:
-        """
-        Create session.json file with experiment metadata using aind-data-schema.
-        
-        This method creates a standardized session.json file in the output directory
-        containing basic experiment metadata. Derived classes can override this method
-        to add rig-specific metadata or use custom stimulus epoch and data stream builders.
-        
-        Args:
-            output_directory: Directory where session.json should be created
-              Returns:
-            True if session.json was created successfully, False otherwise
-        """
-        try:
-            # Check if aind-data-schema is available
-            if not AIND_DATA_SCHEMA_AVAILABLE:
-                logging.warning("aind-data-schema not available, skipping session.json creation")
-                return False
-            
-            # Get rig_id from rig config (guaranteed to be available)
-            rig_id = self.rig_config['rig_id']
-            
-            # --- Protocol and platform confirmation ---
-            protocol_id = self.params.get("protocol_id")
-            if protocol_id is not None:
-                protocol_id = self._confirm_param("protocol_id", protocol_id)
-            else:
-                protocol_id = ["default_protocol"]  # Default value for tests
-                
-            iacuc_protocol = self.params.get("iacuc_protocol")
-            if iacuc_protocol is not None:
-                iacuc_protocol = self._confirm_param("iacuc_protocol", iacuc_protocol)
-                
-            mouse_platform_name = self.params.get("mouse_platform_name")
-            if mouse_platform_name is not None:
-                mouse_platform_name = self._confirm_param("mouse_platform_name", mouse_platform_name)
-            else:
-                mouse_platform_name = "default_platform"  # Default value for tests
-                
-            active_mouse_platform = self.params.get("active_mouse_platform")
-            if active_mouse_platform is not None:
-                active_mouse_platform = self._confirm_param("active_mouse_platform", active_mouse_platform)
-            else:
-                active_mouse_platform = True  # Default value for tests# --- Mouse runtime data collection ---
-            collect_mouse_runtime_data = self.params.get("collect_mouse_runtime_data", False)
-            animal_weight_prior = getattr(self, 'animal_weight_prior', None)
-            animal_weight_post = None
-              # Get stimulus epochs and data streams directly
-            stimulus_epochs = self.get_stimulus_epochs()
-            data_streams = self.get_data_streams(self.start_time, self.stop_time)
-
-            # Prompt for animal_weight_post at end if enabled
-            if collect_mouse_runtime_data:
-                animal_weight_post = self._collect_mouse_runtime_data(at_start=False)
-
-            # Create session object directly
-            session = Session(
-                experimenter_full_name=[self.user_id] if self.user_id else [],
-                session_start_time=self.start_time,
-                session_end_time=self.stop_time,
-                session_type=self.params.get("session_type", "OpenScope experiment"),
-                rig_id=rig_id,
-                subject_id=self.subject_id,
-                protocol_id=protocol_id,
-                iacuc_protocol=iacuc_protocol,
-                mouse_platform_name=mouse_platform_name,
-                active_mouse_platform=active_mouse_platform,
-                animal_weight_prior=animal_weight_prior,
-                animal_weight_post=animal_weight_post,
-                data_streams=data_streams,
-                stimulus_epochs=stimulus_epochs,
-                notes=self.experiment_notes
-            )
-            
-            if session is None:
-                logging.error("Failed to build session object")
-                return False
-            
-            # Save session.json file
-            session_file_path = os.path.join(output_directory, "session.json")
-            with open(session_file_path, 'w') as f:
-                json.dump(session.model_dump(), f, indent=2, default=str)
-            
-            logging.info(f"Session file created successfully: {session_file_path}")
-            return True
-            
-        except Exception as e:
-            logging.error(f"Failed to create session.json file: {e}")
-            return False
-
+       
     
     def _get_launcher_type_name(self) -> str:
         """
@@ -723,16 +644,22 @@ class BaseLauncher:
             # Collect end-of-experiment information (notes, outcome, etc.)
             self.collect_end_experiment_information()               
             
-             # Perform rig-specific post-processing
+            # Save end state for post-processing tools (e.g., session creation)
+            if output_session_folder:
+                self.save_end_state(output_session_folder)
+            
+            # Perform rig-specific post-processing
             if not self.run_post_processing(self.output_session_folder):
                 logging.warning("Post-experiment processing failed, but experiment data was collected")
                    
-            if output_session_folder:
-                self.create_session_file(output_session_folder)            
+
 
             return True
             
         except Exception as e:
+            # Save debug state for crash analysis
+            if hasattr(self, 'output_session_folder') and self.output_session_folder:
+                self.save_debug_state(self.output_session_folder, e)
             logging.exception(f"{self._get_launcher_type_name()} experiment failed: {e}")
             return False
         finally:
@@ -846,15 +773,14 @@ class BaseLauncher:
             if args.param_file and not os.path.exists(args.param_file):
                 logging.error(f"Parameter file not found: {args.param_file}")
                 return 1
-            
-            # Create experiment instance
-            experiment = cls()
+              # Create experiment instance with parameter file
+            experiment = cls(param_file=args.param_file)
             
             # Run the experiment
             experiment_name = cls.__name__.replace('Experiment', '').replace('Launcher', '')
             logging.info(f"Starting {experiment_name} with parameters: {args.param_file}")
             
-            success = experiment.run(args.param_file)
+            success = experiment.run()
             
             if success:
                 logging.info(f"===== {experiment_name.upper()} COMPLETED SUCCESSFULLY =====")               
@@ -989,54 +915,6 @@ class BaseLauncher:
             return f"No errors reported by {self._get_launcher_type_name()}."
         return "\n".join(self.stderr_data)
 
-    def get_stimulus_epochs(self) -> list:
-        """
-        Get stimulus epochs for session creation.
-        
-        Base launcher has no stimulus epochs - these should be implemented in project-specific
-        launchers based on the experimental protocol and Bonsai scripts used.
-        
-        Args:
-            None
-            
-        Returns:
-            Empty list (stimulus epochs should be defined in derived classes)
-        """
-        return []
-
-    def get_data_streams(self, start_time: datetime.datetime, end_time: datetime.datetime) -> list:
-        """
-        Get data streams for session creation.
-        
-        Base launcher creates a data stream that refers to itself (the launcher).
-        Subclasses can call super().get_data_streams() and extend the returned list
-        with additional streams (e.g., Bonsai, Python scripts, MATLAB, etc.).
-        
-        Args:
-            start_time: Session start time
-            end_time: Session end time
-              Returns:
-            List containing launcher data stream
-        """
-        if not AIND_DATA_SCHEMA_AVAILABLE:
-            return []
-        
-        # Create data stream for this launcher instance
-        from openscope_experimental_launcher import __version__
-
-        launcher_stream = Stream(
-            stream_start_time=start_time,
-            stream_end_time=end_time,
-            stream_modalities=[StreamModality.BEHAVIOR],  # Launcher is behavioral control
-            software=[Software(
-                name=self.__class__.__name__,  # Use actual class name
-                version=__version__,  # Package version
-                url="https://github.com/AllenInstitute/openscope-experimental-launcher",  # GitHub repo
-                parameters=self.params
-            )]
-        )
-        return [launcher_stream]
-    
     def _confirm_param(self, param_name, param_value):
         """Prompt user to confirm or edit a parameter value."""
         new_value = input(f"{param_name}: '{param_value}' (press Enter to keep, or type new value): ").strip()
@@ -1061,6 +939,148 @@ class BaseLauncher:
             except Exception:
                 print("Invalid input. Please enter a number or leave blank.")
 
+    def _collect_mouse_runtime_data(self, at_start=True):
+        """Prompt for animal weight at start or end if enabled."""
+        if at_start:
+            return self._get_valid_float("Enter animal weight PRIOR to experiment")
+        else:
+            return self._get_valid_float("Enter animal weight POST experiment")
+    
+    def save_end_state(self, output_directory: str) -> bool:
+        """
+        Save end-of-experiment state for post-processing tools.
+        
+        This saves essential runtime information that post-processing tools need,
+        such as session creation. The data is saved in a simple JSON format that
+        can be easily read by post-processing scripts.
+          Args:
+            output_directory: Directory where end_state.json should be created
+            
+        Returns:
+            True if end state was saved successfully, False otherwise
+        """
+        try:
+            # Create metadata directory if it doesn't exist
+            metadata_dir = os.path.join(output_directory, "launcher_metadata")
+            os.makedirs(metadata_dir, exist_ok=True)
+            
+            end_state_file = os.path.join(metadata_dir, "end_state.json")
+            
+            # Collect end state data
+            end_state = {
+                "launcher_info": {
+                    "class_name": self.__class__.__name__,
+                    "module": self.__class__.__module__,
+                    "version": getattr(self, '_version', 'unknown')
+                },
+                "session_info": {
+                    "subject_id": getattr(self, 'subject_id', None),
+                    "user_id": getattr(self, 'user_id', None),
+                    "session_uuid": getattr(self, 'session_uuid', None),
+                    "start_time": self.start_time.isoformat() if hasattr(self, 'start_time') and self.start_time else None,
+                    "stop_time": self.stop_time.isoformat() if hasattr(self, 'stop_time') and self.stop_time else None,
+                },
+                "experiment_data": {
+                    "experiment_notes": getattr(self, 'experiment_notes', None),
+                    "animal_weight_prior": getattr(self, 'animal_weight_prior', None),
+                    "animal_weight_post": getattr(self, 'animal_weight_post', None),
+                    "output_session_folder": getattr(self, 'output_session_folder', None),
+                },
+                "parameters": getattr(self, 'params', {}),
+                "rig_config": getattr(self, 'rig_config', {}),
+                "saved_at": datetime.datetime.now().isoformat()
+            }
+            
+            # Allow subclasses to add custom end state data
+            custom_end_state = self.get_custom_end_state()
+            if custom_end_state:
+                end_state["custom_data"] = custom_end_state
+            
+            # Write end state file
+            with open(end_state_file, 'w') as f:
+                json.dump(end_state, f, indent=2, default=str)
+                
+            logging.info(f"End state saved to: {end_state_file}")
+            return True
+            
+        except Exception as e:
+            logging.error(f"Failed to save end state: {e}")
+            return False
+    
+    def get_custom_end_state(self) -> Dict[str, Any]:
+        """
+        Get custom end state data from subclasses.
+        
+        Subclasses can override this method to add their own data to the end state file.
+        This data will be available to post-processing tools.
+        
+        Returns:
+            Dictionary of custom data to include in end state, or None if no custom data
+        """
+        return None
+    
+    def save_debug_state(self, output_directory: str, exception: Exception) -> bool:
+        """
+        Save debug state when an experiment crashes.
+        
+        This saves the complete launcher state at the time of crash for debugging purposes.
+        Unlike end state, this includes all internal variables and is only created on errors.
+        
+        Args:
+            output_directory: Directory where debug_state.json should be created
+            exception: The exception that caused the crash
+            
+        Returns:
+            True if debug state was saved successfully, False otherwise
+        """
+        try:
+            # Create metadata directory if it doesn't exist
+            metadata_dir = os.path.join(output_directory, "launcher_metadata")
+            os.makedirs(metadata_dir, exist_ok=True)
+            
+            debug_state_file = os.path.join(metadata_dir, "debug_state.json")
+            
+            # Collect all accessible attributes for debugging
+            debug_state = {
+                "crash_info": {
+                    "exception_type": type(exception).__name__,
+                    "exception_message": str(exception),
+                    "crash_time": datetime.datetime.now().isoformat()
+                },
+                "launcher_state": {},
+                "system_info": {
+                    "python_version": sys.version,
+                    "platform": sys.platform,
+                    "cwd": os.getcwd()
+                }
+            }
+            
+            # Collect all launcher attributes (for debugging)
+            for attr_name in dir(self):
+                if not attr_name.startswith('_') and not callable(getattr(self, attr_name)):
+                    try:
+                        value = getattr(self, attr_name)
+                        # Try to serialize the value
+                        json.dumps(value, default=str)  # Test serialization
+                        debug_state["launcher_state"][attr_name] = value
+                    except (TypeError, ValueError):
+                        # If serialization fails, store type info instead
+                        debug_state["launcher_state"][attr_name] = f"<non-serializable: {type(value).__name__}>"
+                    except Exception:
+                        # Skip attributes that cause other errors
+                        debug_state["launcher_state"][attr_name] = "<error accessing attribute>"
+            
+            # Write debug state file
+            with open(debug_state_file, 'w') as f:
+                json.dump(debug_state, f, indent=2, default=str)
+                
+            logging.error(f"Debug state saved to: {debug_state_file}")
+            return True
+            
+        except Exception as debug_e:
+            logging.error(f"Failed to save debug state: {debug_e}")
+            return False
+    
     def _collect_mouse_runtime_data(self, at_start=True):
         """Prompt for animal weight at start or end if enabled."""
         if at_start:

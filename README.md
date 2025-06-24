@@ -2,8 +2,8 @@
 
 [![License](https://img.shields.io/badge/license-MIT-brightgreen)](LICENSE)
 ![Interrogate](https://img.shields.io/badge/interrogate-96.6%25-brightgreen)
-![Coverage](https://img.shields.io/badge/coverage-47%25-orange?logo=codecov)
-![Tests](https://img.shields.io/badge/tests-140%20passed-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-56%25-orange?logo=codecov)
+![Tests](https://img.shields.io/badge/tests-158%20passed-brightgreen)
 ![Python](https://img.shields.io/badge/python->=3.8-blue?logo=python)
 ![Platform](https://img.shields.io/badge/platform-Windows-blue?logo=windows)
 [![Documentation](https://img.shields.io/badge/docs-latest-blue?logo=gitbook)](https://allenneuraldynamics.github.io/openscope-experimental-launcher/)
@@ -19,9 +19,11 @@ This package provides a modular, extensible launcher for neuroscience experiment
 - **Multi-Interface Support**: Bonsai, MATLAB, and Python experiment execution
 - **Modular Architecture**: Clean separation between common logic and interface-specific process creation
 - **Post-Processing Pipeline**: Automated data transformation with standalone, reusable tools
+- **Session Creation**: Modular session.json generation moved to post-processing for better extensibility
 - **Process Management**: Comprehensive process monitoring, memory tracking, and cleanup
 - **Session Tracking**: Generate unique session IDs and comprehensive experiment metadata
 - **Automated Session Files**: Creates standardized `session.json` files using AIND data schema
+- **Metadata Management**: Runtime state files organized in launcher_metadata/ directory
 - **Git Repository Management**: Automatic cloning and version tracking for reproducibility
 - **Runtime Data Collection**: Interactive prompts for protocol confirmation and animal weight collection
 - **Project Flexibility**: Custom launchers via scripts without modifying core code

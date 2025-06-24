@@ -151,46 +151,52 @@ class BonsaiLauncher(BaseLauncher):
             self._assign_to_job_object()
         
         return process
-    
-    def get_data_streams(self, start_time: datetime.datetime, end_time: datetime.datetime) -> list:
+
+    @staticmethod
+    def run_post_processing(session_directory: str) -> bool:
         """
-        Get data streams for Bonsai experiments.
+        Bonsai-specific post-processing including session enhancement.
         
-        Extends base launcher stream with Bonsai-specific stream.
+        First creates a base session.json using the standard SessionCreator,
+        then enhances it with Bonsai-specific workflow and script information.
         
         Args:
-            start_time: Session start time
-            end_time: Session end time
+            session_directory: Path to the session directory containing experiment data
             
         Returns:
-            List containing launcher stream + Bonsai stream
+            True if successful, False otherwise
         """
-        import datetime
-        from aind_data_schema.core.session import Stream
-        from aind_data_schema.components.devices import Software
-        from aind_data_schema_models.modalities import Modality
+        logging.info(f"Running Bonsai post-processing for: {session_directory}")
         
-        # Get base launcher stream
-        streams = super().get_data_streams(start_time, end_time)
-          # Add Bonsai script stream
         try:
-            script_path = self.params.get('script_path', 'Unknown')
-            script_name = os.path.basename(script_path) if script_path != 'Unknown' else 'Unknown'
-            script_parameters = self.params.get("script_parameters", {})
-
-            bonsai_script_stream = Stream(
-                stream_start_time=start_time,
-                stream_end_time=end_time,
-                stream_modalities=[Modality.BEHAVIOR],
-                software=[Software(
-                    name=f"Bonsai Script: {script_name}",
-                    version=self.params.get("script_version", "Unknown"),
-                    url=script_path,
-                    parameters=script_parameters
-                )]
-            )
-            streams.append(bonsai_script_stream)
+            # Step 1: Create base session.json using standard SessionCreator
+            from ..post_processing.session_creator import SessionCreator
+            
+            creator = SessionCreator(session_directory)
+            
+            if not creator.load_experiment_data():
+                logging.error("Failed to load experiment data for session creation")
+                return False
+            
+            if not creator.create_session_file(force=False):
+                logging.error("Failed to create session file")
+                return False
+            
+            logging.info("Base session file created successfully")
+              # Step 2: Enhance session.json with Bonsai-specific information
+            from ..post_processing.session_enhancer_bonsai import enhance_existing_session
+            
+            if not enhance_existing_session(session_directory):
+                logging.warning("Bonsai session enhancement failed, but base session exists")
+            else:
+                logging.info("Bonsai session enhancement completed successfully")
+            
+        except ImportError as e:
+            logging.error(f"Required post-processing modules not available: {e}")
+            return False
         except Exception as e:
-            logging.warning(f"Could not create Bonsai script stream: {e}")
+            logging.error(f"Post-processing failed: {e}")
+            return False
         
-        return streams
+        logging.info("Bonsai post-processing completed successfully")
+        return True

@@ -31,7 +31,7 @@ class PredictiveProcessingLauncher(BonsaiLauncher):
         return "PredictiveProcessing"
     
     @staticmethod
-    def post_experiment_processing(session_directory: str) -> bool:
+    def run_post_processing(session_directory: str) -> bool:
         """
         Run post-processing for Predictive Processing experiments.
         Calls the parent BonsaiLauncher post-processing, then runs the
@@ -43,19 +43,25 @@ class PredictiveProcessingLauncher(BonsaiLauncher):
         Returns:
             True if successful, False otherwise
         """
-        logging.info("Starting Predictive Processing post-experiment processing...")
+        logging.info("Starting Predictive Processing post-processing...")
+        
         # Call parent post-processing (BonsaiLauncher)
-        parent_success = BonsaiLauncher.post_experiment_processing(session_directory)
+        parent_success = BonsaiLauncher.run_post_processing(session_directory)
         if not parent_success:
-            logging.warning("Parent post-processing failed")        # Call the focused stimulus table converter
+            logging.warning("Parent post-processing failed")
+        
+        # Call the focused stimulus table converter
         logging.info("Running stimulus table converter...")
         stimulus_success = pp_stimulus_converter.convert_orientation_to_stimulus_table(session_directory)
         if not stimulus_success:
             logging.error("Stimulus table conversion failed")
+        
         success = parent_success and stimulus_success
         if success:
-            logging.info("Predictive Processing post-experiment processing completed successfully")
-        else:            logging.error("Predictive Processing post-experiment processing failed")
+            logging.info("Predictive Processing post-processing completed successfully")
+        else:
+            logging.error("Predictive Processing post-processing failed")
+        
         return success
 
 

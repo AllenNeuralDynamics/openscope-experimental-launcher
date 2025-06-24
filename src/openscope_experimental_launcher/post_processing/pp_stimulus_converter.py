@@ -189,7 +189,7 @@ def convert_orientation_to_stimulus_table(session_folder: str, output_folder: Op
     
     # Create output folder
     if output_folder is None:
-        output_folder = session_path / "stimulus_table_output"
+        output_folder = session_path 
     output_path = Path(output_folder)
     output_path.mkdir(exist_ok=True)
     
@@ -213,7 +213,7 @@ def convert_orientation_to_stimulus_table(session_folder: str, output_folder: Op
             logging.warning(f"Failed to load HARP timing data: {e}")
             timing_data = None
     else:
-        logging.info("No HARP data directory found - using fallback timing")
+        logging.info("No HARP data directory found")
     
     # Process orientation files
     stimulus_table = None

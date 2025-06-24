@@ -244,16 +244,15 @@ class TestBaseLauncher:
           # Check if metadata directory was created with expected files
         metadata_dir = os.path.join(temp_dir, "launcher_metadata")
         assert os.path.exists(metadata_dir)
-        
-        # Check for expected metadata files
+          # Check for expected metadata files
         processed_params_file = os.path.join(metadata_dir, "processed_parameters.json")
         assert os.path.exists(processed_params_file)
         
         cmdline_file = os.path.join(metadata_dir, "command_line_arguments.json")
         assert os.path.exists(cmdline_file)
         
-        runtime_file = os.path.join(metadata_dir, "runtime_information.json")
-        assert os.path.exists(runtime_file)
+        input_params_file = os.path.join(metadata_dir, "input_parameters.json")
+        assert os.path.exists(input_params_file)
 
     def test_setup_continuous_logging(self, temp_dir):
         """Test setting up continuous logging."""
@@ -292,70 +291,14 @@ class TestBaseLauncher:
 
     def test_repr_representation(self):
         """Test repr representation of experiment."""
-        experiment = BaseLauncher()
+        experiment = BaseLauncher()        
         experiment.params = {"subject_id": "test_mouse"}
         
         result = repr(experiment)
         
         assert "BaseLauncher" in result
 
-    def test_create_session_file_without_schema(self, tmp_path):
-        """Test session file creation when aind-data-schema is not available."""
-        experiment = BaseLauncher()
-        experiment.start_time = datetime.datetime.now()
-        experiment.stop_time = datetime.datetime.now()
-        experiment.params = {"subject_id": "test_mouse"}
-        experiment.subject_id = "test_mouse"
-        experiment.user_id = "test_user" 
-        experiment.session_uuid = "test_session"
-        
-        output_dir = str(tmp_path)
-        
-        # Mock the AIND_DATA_SCHEMA_AVAILABLE constant to simulate it not being available
-        with patch('openscope_experimental_launcher.launchers.base_launcher.AIND_DATA_SCHEMA_AVAILABLE', False):
-            result = experiment.create_session_file(output_dir)
-        
-        # Should return False when schema is not available
-        assert result is False        # session.json should not be created
-        session_file = tmp_path / "session.json"
-        assert not session_file.exists()
-    
-    def test_create_session_file_with_schema(self, tmp_path):
-        """Test session file creation with aind-data-schema available."""
-        
-        experiment = BaseLauncher()
-        experiment.start_time = datetime.datetime.now()
-        experiment.stop_time = datetime.datetime.now()
-        experiment.params = {"subject_id": "test_mouse"}
-        experiment.subject_id = "test_mouse"
-        experiment.user_id = "test_user"
-        experiment.session_uuid = "test_session"
-        
-        # Initialize rig_config for session creation
-        experiment.rig_config = {"rig_id": "test_rig", "output_root_folder": "/tmp"}
-        
-        output_dir = str(tmp_path)
-        
-        # Test the actual session creation (aind-data-schema should be available)
-        result = experiment.create_session_file(output_dir)
-        
-        # Should return True when session is created successfully
-        assert result is True
-        
-        # session.json should be created
-        session_file = tmp_path / "session.json"
-        assert session_file.exists()
-        
-        # Verify the contents - the new system creates a proper aind-data-schema Session object
-        import json
-        with open(session_file, 'r') as f:
-            session_data = json.load(f)
-        
-        # Check for key fields that should be present in the aind-data-schema Session
-        assert session_data["subject_id"] == "test_mouse"
-        assert "session_start_time" in session_data
-        assert "session_end_time" in session_data
-        assert "data_streams" in session_data
+ 
 
     def test_mode_initialization(self):
         """Test initialization with different parameter configurations."""
