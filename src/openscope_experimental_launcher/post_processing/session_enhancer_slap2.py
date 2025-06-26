@@ -114,7 +114,7 @@ def read_raster_size_and_z(meta_path):
                     zs = arr
     return raster_size, zs
 
-def create_slap2_stream(plane: str, meta_path: str, summary_path: str, session_start_time=None, harp_folder=None) -> dict:
+def create_slap2_stream(plane: str, meta_path: str, summary_path: str, session_start_time=None, harp_folder=None, targeted_structure=None, fov_coordinate_ml=None, fov_coordinate_ap=None, fov_coordinate_unit=None, fov_reference=None, magnification=None, fov_scale_factor=None) -> dict:
     """Create a SLAP2 Stream for a given plane using aind-data-schema objects (only required fields)."""
     if not AIND_AVAILABLE:
         raise ImportError("aind-data-schema is not available")
@@ -183,14 +183,21 @@ def create_slap2_stream(plane: str, meta_path: str, summary_path: str, session_s
     slap_fov_kwargs['power_unit'] = "percent"
     slap_fov_kwargs['scanfield_z_unit'] = "micrometer"
 
-    # Only set static fields if schema requires (otherwise skip)
-    slap_fov_kwargs['targeted_structure'] = "VISp"
-    slap_fov_kwargs['fov_coordinate_ml'] = 0.0
-    slap_fov_kwargs['fov_coordinate_ap'] = 0.0
-    slap_fov_kwargs['fov_coordinate_unit'] = "micrometer"
-    slap_fov_kwargs['fov_reference'] = "bregma"
-    slap_fov_kwargs['magnification'] = "20x"
-    slap_fov_kwargs['fov_scale_factor'] = 1.0
+    # Remove hardcoded values, use passed-in arguments
+    if targeted_structure is not None:
+        slap_fov_kwargs['targeted_structure'] = targeted_structure
+    if fov_coordinate_ml is not None:
+        slap_fov_kwargs['fov_coordinate_ml'] = fov_coordinate_ml
+    if fov_coordinate_ap is not None:
+        slap_fov_kwargs['fov_coordinate_ap'] = fov_coordinate_ap
+    if fov_coordinate_unit is not None:
+        slap_fov_kwargs['fov_coordinate_unit'] = fov_coordinate_unit
+    if fov_reference is not None:
+        slap_fov_kwargs['fov_reference'] = fov_reference
+    if magnification is not None:
+        slap_fov_kwargs['magnification'] = magnification
+    if fov_scale_factor is not None:
+        slap_fov_kwargs['fov_scale_factor'] = fov_scale_factor
 
     # Add required fields for SlapFieldOfView if not present, but only if not misleading
     # session_type and path_to_array_of_frame_rates are required by schema
@@ -239,11 +246,12 @@ def find_session_json(root_dir: str) -> Optional[str]:
     return None
 
 
-def enhance_existing_slap2_session(session_folder: str) -> bool:
+def enhance_existing_slap2_session(session_folder: str, targeted_structure=None, fov_coordinate_ml=None, fov_coordinate_ap=None, fov_coordinate_unit=None, fov_reference=None, magnification=None, fov_scale_factor=None) -> bool:
     """
     Enhance an existing session.json with SLAP2 streams.
     Args:
         session_folder: Path to session folder containing experiment data
+        targeted_structure, fov_coordinate_ml, fov_coordinate_ap, fov_coordinate_unit, fov_reference: CLI or prompt values
     Returns:
         True if enhancement successful, False otherwise
     """
@@ -267,8 +275,33 @@ def enhance_existing_slap2_session(session_folder: str) -> bool:
     session = load_session(session_json_path)
     session_start_time = session.get('session_start_time')
 
-    stream_dmd1 = create_slap2_stream('DMD1', dmd1_meta, summary_mat, session_start_time=session_start_time, harp_folder=harp_folder)
-    stream_dmd2 = create_slap2_stream('DMD2', dmd2_meta, summary_mat, session_start_time=session_start_time, harp_folder=harp_folder)
+    def prompt_with_default(prompt, default, cast_func=str):
+        val = input(f"{prompt} [{default}]: ")
+        if val.strip() == "":
+            return cast_func(default)
+        return cast_func(val)
+
+    # Prompt for missing CLI values, offering defaults
+    if targeted_structure is None:
+        targeted_structure = prompt_with_default("Enter targeted_structure", "VISp", str)
+    if fov_coordinate_ml is None:
+        fov_coordinate_ml = prompt_with_default("Enter fov_coordinate_ml (float)", 0.0, float)
+    if fov_coordinate_ap is None:
+        fov_coordinate_ap = prompt_with_default("Enter fov_coordinate_ap (float)", 0.0, float)
+    if fov_coordinate_unit is None:
+        fov_coordinate_unit = prompt_with_default("Enter fov_coordinate_unit", "micrometer", str)
+    if fov_reference is None:
+        fov_reference = prompt_with_default("Enter fov_reference", "bregma", str)
+    if magnification is None:
+        magnification = prompt_with_default("Enter magnification", "20x", str)
+    if fov_scale_factor is None:
+        fov_scale_factor = prompt_with_default("Enter fov_scale_factor (float)", 1.0, float)
+
+    # Pass these to create_slap2_stream
+    stream_dmd1 = create_slap2_stream('DMD1', dmd1_meta, summary_mat, session_start_time=session_start_time, harp_folder=harp_folder,
+        targeted_structure=targeted_structure, fov_coordinate_ml=fov_coordinate_ml, fov_coordinate_ap=fov_coordinate_ap, fov_coordinate_unit=fov_coordinate_unit, fov_reference=fov_reference, magnification=magnification, fov_scale_factor=fov_scale_factor)
+    stream_dmd2 = create_slap2_stream('DMD2', dmd2_meta, summary_mat, session_start_time=session_start_time, harp_folder=harp_folder,
+        targeted_structure=targeted_structure, fov_coordinate_ml=fov_coordinate_ml, fov_coordinate_ap=fov_coordinate_ap, fov_coordinate_unit=fov_coordinate_unit, fov_reference=fov_reference, magnification=magnification, fov_scale_factor=fov_scale_factor)
 
     if 'streams' not in session:
         session['streams'] = []
@@ -322,17 +355,18 @@ def main():
 Examples:
   python session_enhancer_slap2.py /path/to/session_folder
   python session_enhancer_slap2.py /path/to/session_folder --verbose
+  python session_enhancer_slap2.py /path/to/session_folder --targeted_structure VISp --fov_coordinate_ml 0.0 --fov_coordinate_ap 0.0 --fov_coordinate_unit micrometer --fov_reference bregma
         """
     )
-    parser.add_argument(
-        "session_folder",
-        help="Path to session folder containing experiment data and session.json"
-    )
-    parser.add_argument(
-        '--verbose',
-        action='store_true',
-        help='Enable verbose logging'
-    )
+    parser.add_argument("session_folder", help="Path to session folder containing experiment data and session.json")
+    parser.add_argument('--targeted_structure', type=str, help='Targeted structure (e.g. VISp)')
+    parser.add_argument('--fov_coordinate_ml', type=float, help='FOV coordinate ML (float, e.g. 0.0)')
+    parser.add_argument('--fov_coordinate_ap', type=float, help='FOV coordinate AP (float, e.g. 0.0)')
+    parser.add_argument('--fov_coordinate_unit', type=str, help='FOV coordinate unit (e.g. micrometer)')
+    parser.add_argument('--fov_reference', type=str, help='FOV reference (e.g. bregma)')
+    parser.add_argument('--magnification', type=str, help='Magnification (e.g. 20x)')
+    parser.add_argument('--fov_scale_factor', type=float, help='FOV scale factor (float, e.g. 1.0)')
+    parser.add_argument('--verbose', action='store_true', help='Enable verbose logging')
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -344,10 +378,23 @@ Examples:
         logger.error(f"Session folder does not exist: {args.session_folder}")
         return 1
 
-    if not enhance_existing_slap2_session(args.session_folder):
+    try:
+        ok = enhance_existing_slap2_session(
+            args.session_folder,
+            targeted_structure=args.targeted_structure,
+            fov_coordinate_ml=args.fov_coordinate_ml,
+            fov_coordinate_ap=args.fov_coordinate_ap,
+            fov_coordinate_unit=args.fov_coordinate_unit,
+            fov_reference=args.fov_reference,
+            magnification=args.magnification,
+            fov_scale_factor=args.fov_scale_factor,
+        )
+    except Exception as e:
+        logger.error(f"Validation or runtime error: {e}")
+        return 1
+    if not ok:
         logger.error("Failed to enhance session with SLAP2 streams")
         return 1
-
     logger.info("SLAP2 session enhancement completed successfully")
     return 0
 if __name__ == "__main__":
