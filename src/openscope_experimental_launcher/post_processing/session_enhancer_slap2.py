@@ -239,36 +239,37 @@ def find_session_json(root_dir: str) -> Optional[str]:
     return None
 
 
-def enhance_session_with_slap2_streams(root_dir: str, session_path: str = None):
-    logger.info("Starting SLAP2 session enhancement for root_dir=%s, session_path=%s", root_dir, session_path)
-    logger.info(f"Finding most recent DMD1.meta, DMD2.meta, Summary-*.mat, .harp folder, and session.json in {root_dir}")
-    # Find most recent files
-    dmd1_meta = find_most_recent('acquisition_*_DMD1.meta', root_dir)
-    dmd2_meta = find_most_recent('acquisition_*_DMD2.meta', root_dir)
-    summary_mat = find_most_recent('Summary-*.mat', root_dir)
-    harp_folder = find_harp_folder(root_dir)
-    session_json_path = session_path or find_session_json(root_dir)
+def enhance_existing_slap2_session(session_folder: str) -> bool:
+    """
+    Enhance an existing session.json with SLAP2 streams.
+    Args:
+        session_folder: Path to session folder containing experiment data
+    Returns:
+        True if enhancement successful, False otherwise
+    """
+    logger.info("Starting SLAP2 session enhancement for session_folder=%s", session_folder)
+    session_json_path = os.path.join(session_folder, "session.json")
+    dmd1_meta = find_most_recent('acquisition_*_DMD1.meta', session_folder)
+    dmd2_meta = find_most_recent('acquisition_*_DMD2.meta', session_folder)
+    summary_mat = find_most_recent('Summary-*.mat', session_folder)
+    harp_folder = find_harp_folder(session_folder)
 
     if not (dmd1_meta and dmd2_meta and summary_mat):
         logger.error("Could not find all required SLAP2 files.")
-        return
+        return False
     if not harp_folder:
         logger.error("Could not find .harp folder.")
-        return
-    if not session_json_path:
-        logger.error("Could not find session.json file.")
-        return
+        return False
+    if not os.path.exists(session_json_path):
+        logger.error("Could not find session.json file at %s", session_json_path)
+        return False
 
-    # Load session
-    logger.info(f"Loading session from {session_json_path}")
     session = load_session(session_json_path)
     session_start_time = session.get('session_start_time')
 
-    # Create streams with HARP timing
     stream_dmd1 = create_slap2_stream('DMD1', dmd1_meta, summary_mat, session_start_time=session_start_time, harp_folder=harp_folder)
     stream_dmd2 = create_slap2_stream('DMD2', dmd2_meta, summary_mat, session_start_time=session_start_time, harp_folder=harp_folder)
 
-    # Append to session (update this logic to match your session schema)
     if 'streams' not in session:
         session['streams'] = []
     if stream_dmd1:
@@ -276,9 +277,9 @@ def enhance_session_with_slap2_streams(root_dir: str, session_path: str = None):
     if stream_dmd2:
         session['streams'].append(stream_dmd2)
 
-    # Save session
     save_session(session, session_json_path)
     logger.info("Added SLAP2 streams to %s", session_json_path)
+    return True
 
 
 def read_summary_mat_fields(summary_path):
@@ -312,10 +313,43 @@ def read_summary_mat_fields(summary_path):
     return Z, analyzeHz
 
 
-if __name__ == "__main__":
+def main():
     import argparse
-    parser = argparse.ArgumentParser(description="Enhance session.json with SLAP2 streams.")
-    parser.add_argument("root_dir", help="Root directory to search for SLAP2 files")
-    parser.add_argument("session_path", help="Path to session.json file")
+    parser = argparse.ArgumentParser(
+        description="Enhance existing session.json files with SLAP2 streams",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python session_enhancer_slap2.py /path/to/session_folder
+  python session_enhancer_slap2.py /path/to/session_folder --verbose
+        """
+    )
+    parser.add_argument(
+        "session_folder",
+        help="Path to session folder containing experiment data and session.json"
+    )
+    parser.add_argument(
+        '--verbose',
+        action='store_true',
+        help='Enable verbose logging'
+    )
     args = parser.parse_args()
-    enhance_session_with_slap2_streams(args.root_dir, args.session_path)
+
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+
+    if not Path(args.session_folder).exists():
+        logger.error(f"Session folder does not exist: {args.session_folder}")
+        return 1
+
+    if not enhance_existing_slap2_session(args.session_folder):
+        logger.error("Failed to enhance session with SLAP2 streams")
+        return 1
+
+    logger.info("SLAP2 session enhancement completed successfully")
+    return 0
+if __name__ == "__main__":
+    import sys
+    sys.exit(main())
