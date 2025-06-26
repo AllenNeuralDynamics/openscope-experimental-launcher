@@ -115,41 +115,6 @@ You can also run experiments directly from the command line:
    # Run Predictive Processing experiment
    python scripts/predictive_processing_launcher.py pp_params.json
 
-Runtime Data Collection (Optional)
-----------------------------------
-
-The launcher supports interactive data collection at runtime. When ``collect_mouse_runtime_data: true`` is set in your parameter file:
-
-- **Protocol Confirmation**: Confirms protocol and platform settings before starting
-- **Animal Weight Collection**: Prompts for pre- and post-experiment animal weights
-- **Simple Interface**: Press Enter to keep existing values, or type new values to change them
-
-All runtime data is automatically included in the generated ``session.json`` file. This feature is completely optional and experiments will run normally without it.
-
-Predictive Processing Experiments
-----------------------------------
-
-The launcher includes specialized support for Predictive Processing experiments with automatic post-processing:
-
-.. code-block:: python
-
-   from openscope_experimental_launcher.launchers import PredictiveProcessingLauncher
-
-   # Create experiment with automatic post-processing
-   launcher = PredictiveProcessingLauncher(param_file="pp_params.json")
-   success = launcher.run()
-   
-   # Check generated outputs
-   if success:
-       print(f"Experiment data: {launcher.output_session_folder}")
-       print(f"Stimulus table: {launcher.output_session_folder}/stimulus_table_output/")
-       
-**Post-Processing Features:**
-   - Automatic conversion of orientation data to stimulus tables
-   - Integration with Harp timing data for precise synchronization
-   - Comprehensive validation and error reporting
-   - Detailed conversion statistics
-
 Next Steps
 ----------
 

@@ -132,22 +132,6 @@ You can also access rig config programmatically:
    print(f"Current rig: {config['rig_id']}")
    print(f"Data directory: {config['output_root_folder']}")
 
-Testing with Custom Configs
-----------------------------
-
-For testing, you can use a custom rig config file:
-
-.. code-block:: python
-
-   # Only for testing!
-   launcher.initialize_launcher(
-       param_file="experiment.json",
-       rig_config_path="/path/to/test_rig_config.toml"
-   )
-
-.. warning::
-   Custom rig config paths should only be used for testing or special setups.
-   Normal operation should always use the default location.
 
 Related Documentation
 ---------------------
