@@ -141,6 +141,8 @@ Contents
    parameter_files
    rig_launchers
    post_processing
+   logging
+   launcher_metadata
 
 Indices and Tables
 ==================
