@@ -8,7 +8,6 @@ Windows-specific optimizations.
 import os
 import logging
 import subprocess
-import datetime
 from typing import Dict, Optional
 
 # Import Windows-specific modules for process management
@@ -155,48 +154,23 @@ class BonsaiLauncher(BaseLauncher):
     @staticmethod
     def run_post_processing(session_directory: str) -> bool:
         """
-        Bonsai-specific post-processing including session enhancement.
-        
-        First creates a base session.json using the standard SessionCreator,
-        then enhances it with Bonsai-specific workflow and script information.
-        
-        Args:
-            session_directory: Path to the session directory containing experiment data
-            
-        Returns:
-            True if successful, False otherwise
+        Bonsai-specific post-processing using unified param_file workflow.
+        Calls session_creator and session_enhancer_bonsai run_postprocessing APIs.
+        Returns True if both steps succeed, False otherwise.
         """
         logging.info(f"Running Bonsai post-processing for: {session_directory}")
-        
-        try:
-            # Step 1: Create base session.json using standard SessionCreator
-            from ..post_processing.session_creator import SessionCreator
-            
-            creator = SessionCreator(session_directory)
-            
-            if not creator.load_experiment_data():
-                logging.error("Failed to load experiment data for session creation")
-                return False
-            
-            if not creator.create_session_file(force=False):
-                logging.error("Failed to create session file")
-                return False
-            
-            logging.info("Base session file created successfully")
-              # Step 2: Enhance session.json with Bonsai-specific information
-            from ..post_processing.session_enhancer_bonsai import enhance_existing_session
-            
-            if not enhance_existing_session(session_directory):
-                logging.warning("Bonsai session enhancement failed, but base session exists")
-            else:
-                logging.info("Bonsai session enhancement completed successfully")
-            
-        except ImportError as e:
-            logging.error(f"Required post-processing modules not available: {e}")
+        metadata_dir = os.path.join(session_directory, "launcher_metadata")
+        param_file = os.path.join(metadata_dir, "processed_parameters.json")
+        from openscope_experimental_launcher.post_processing import session_creator
+        from openscope_experimental_launcher.post_processing import session_enhancer_bonsai
+        result1 = session_creator.run_postprocessing(param_file=param_file)
+        if result1 != 0:
+            logging.error(f"Session creation post-processing failed (exit code {result1})")
             return False
-        except Exception as e:
-            logging.error(f"Post-processing failed: {e}")
-            return False
-        
+        result2 = session_enhancer_bonsai.run_postprocessing(param_file=param_file)
+        if result2 != 0:
+            logging.warning(f"Bonsai session enhancement failed (exit code {result2}), but base session exists")
+        else:
+            logging.info("Bonsai session enhancement completed successfully")
         logging.info("Bonsai post-processing completed successfully")
         return True
