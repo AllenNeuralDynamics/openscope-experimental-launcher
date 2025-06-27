@@ -143,6 +143,7 @@ Contents
    post_processing
    logging
    launcher_metadata
+   architecture
 
 Indices and Tables
 ==================
