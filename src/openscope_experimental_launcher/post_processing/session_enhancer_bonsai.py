@@ -173,53 +173,51 @@ def enhance_existing_session(session_folder: str) -> bool:
     return enhancer.enhance_session()
 
 
-def main():
-    """Command-line interface."""
+def run_postprocessing(param_file: str = None, overrides: dict = None) -> int:
+    """
+    Main entry point for Bonsai session enhancement post-processing.
+    Loads parameters, prompts for missing fields, and runs enhancement.
+    Returns 0 on success, nonzero on error.
+    """
+    import logging
+    from pathlib import Path
+    from openscope_experimental_launcher.utils import param_utils
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+    required_fields = ["output_session_folder"]
+    defaults = {}
+    help_texts = {"output_session_folder": "Session output folder (from launcher)"}
+    params = param_utils.load_parameters(
+        param_file=param_file,
+        overrides=overrides,
+        required_fields=required_fields,
+        defaults=defaults,
+        help_texts=help_texts
+    )
+    session_folder = params["output_session_folder"]
+    if not Path(session_folder).exists():
+        logging.error(f"Session folder does not exist: {session_folder}")
+        return 1
+    enhancer = BonsaiSessionEnhancer(session_folder)
+    if not enhancer.enhance_session():
+        logging.error("Failed to enhance session with Bonsai information")
+        return 1
+    logging.info("Bonsai session enhancement completed successfully")
+    return 0
+
+if __name__ == "__main__":
     import argparse
     import sys
-    
     parser = argparse.ArgumentParser(
         description="Enhance existing session.json files with Bonsai-specific information",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python session_enhancer_bonsai.py /path/to/session_folder
-  python session_enhancer_bonsai.py /path/to/session_folder --verbose        """
+  python session_enhancer_bonsai.py processed_parameters.json
+        """
     )
-    
-    parser.add_argument(
-        "session_folder",
-        help="Path to session folder containing experiment data and session.json"
-    )
-    
-    parser.add_argument(
-        '--verbose',
-        action='store_true',
-        help='Enable verbose logging'
-    )
-    
+    parser.add_argument("param_file", help="Path to processed_parameters.json from the launcher")
     args = parser.parse_args()
-    
-    # Set up logging
-    logging.basicConfig(
-        level=logging.DEBUG if args.verbose else logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s'
-    )
-    
-    # Check if session folder exists
-    if not Path(args.session_folder).exists():
-        logging.error(f"Session folder does not exist: {args.session_folder}")
-        return 1
-    
-    # Enhance the session
-    if not enhance_existing_session(args.session_folder):
-        logging.error("Failed to enhance session with Bonsai information")
-        return 1
-    
-    logging.info("Bonsai session enhancement completed successfully")
-    return 0
-
-
-if __name__ == "__main__":
-    import sys
-    sys.exit(main())
+    sys.exit(run_postprocessing(param_file=args.param_file))

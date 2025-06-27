@@ -397,44 +397,20 @@ class BaseLauncher:
     @staticmethod
     def run_post_processing(session_directory: str) -> bool:
         """
-        Pure post-processing method that works independently of launcher state.
-        
-        This static method performs post-processing based only on the session directory
-        contents, without access to internal launcher state. This ensures that 
-        post-processing can be run independently and enables experiment replication.
-        
-        Subclasses should override this method to implement rig-specific processing.        Args:
-            session_directory: Path to the session directory containing experiment data
-            
-        Returns:
-            True if successful, False otherwise
+        Run only the session_creator post-processing module using its Python API entry point.
+        Returns True if the post-processing step succeeds, False otherwise.
         """
-        logging.info(f"Running default post-processing for: {session_directory}")
-
-        try:
-            # Import and use the session creator
-            from openscope_experimental_launcher.post_processing.session_creator import SessionCreator
-            
-            creator = SessionCreator(session_directory)
-            
-            if not creator.load_experiment_data():
-                logging.error("Failed to load experiment data for session creation")
-                return False
-            
-            if not creator.create_session_file(force=False):
-                logging.error("Failed to create session file")
-                return False
-            
-            logging.info("Session file created successfully via post-processing")
-            
-        except ImportError as e:
-            logging.warning(f"Session creator not available: {e}")
+        import os
+        import logging
+        logging.info(f"Running post-processing for: {session_directory}")
+        metadata_dir = os.path.join(session_directory, "launcher_metadata")
+        param_file = os.path.join(metadata_dir, "processed_parameters.json")
+        from openscope_experimental_launcher.post_processing import session_creator
+        result = session_creator.run_postprocessing(param_file=param_file)
+        if result != 0:
+            logging.error(f"Post-processing step failed: session_creator (exit code {result})")
             return False
-        except Exception as e:
-            logging.error(f"Session creation failed: {e}")
-            return False
-        
-        logging.info("Default post-processing completed successfully")
+        logging.info("Session creation post-processing completed successfully.")
         return True
        
     

@@ -38,12 +38,14 @@ Design Philosophy
 **Self-Contained**
    No dependencies on launcher classes or complex state management
 
-**Command-Line Interface**
-   Simple, scriptable interfaces for automation and batch processing
+**Unified Parameter File**
+   All tools accept a param_file (JSON) as input, and prompt for missing fields interactively
 
+**Python API and CLI**
+   Tools expose a `run_postprocessing(param_file)` function for both CLI and Python use
 
 Integration with Launchers
----------------------------
+--------------------------
 
 Post-processing tools are automatically called by specific launchers after experiment completion:
 
@@ -52,20 +54,20 @@ Post-processing tools are automatically called by specific launchers after exper
 .. code-block:: python
 
    from openscope_experimental_launcher.launchers import PredictiveProcessingLauncher
-   
-   launcher = PredictiveProcessingLauncher()
-   success = launcher.run("experiment_params.json")
+   launcher = PredictiveProcessingLauncher(param_file="experiment_params.json")
+   success = launcher.run()
    # Post-processing automatically runs after successful experiment
 
 **Manual Execution:**
 
 .. code-block:: python
 
-   # Run post-processing independently
-   from openscope_experimental_launcher.post_processing.pp_stimulus_converter import process_session
-   
-   success = process_session("/path/to/session/folder")
+   from openscope_experimental_launcher.post_processing import session_creator
+   result = session_creator.run_postprocessing(param_file="path/to/processed_parameters.json")
 
+.. code-block:: bash
+
+   python -m openscope_experimental_launcher.post_processing.session_creator path/to/processed_parameters.json
 
 Adding New Tools
 ----------------
@@ -76,40 +78,28 @@ When creating new post-processing tools, follow this template structure:
 
 .. code-block:: python
 
-   def process_session(session_folder: str, output_folder: str = None) -> bool:
+   def run_postprocessing(param_file: str = None, overrides: dict = None) -> int:
        """
        Main processing function.
-       
-       Args:
-           session_folder: Path to session data folder
-           output_folder: Optional output folder (defaults to session folder)
-           
-       Returns:
-           True if successful, False otherwise
+       Loads parameters, prompts for missing fields, and runs processing.
+       Returns 0 on success, nonzero on error.
        """
        # Implementation here
        pass
 
-   def main():
-       """Command-line interface."""
-       parser = argparse.ArgumentParser(description="Tool description")
-       parser.add_argument("session_folder", help="Path to session folder")
-       parser.add_argument("output_folder", nargs='?', help="Output folder (optional)")
-       
-       args = parser.parse_args()
-       success = process_session(args.session_folder, args.output_folder)
-       sys.exit(0 if success else 1)
-
    if __name__ == "__main__":
-       main()
-
+       import argparse
+       import sys
+       parser = argparse.ArgumentParser(description="Tool description")
+       parser.add_argument("param_file", help="Path to processed_parameters.json")
+       args = parser.parse_args()
+       sys.exit(run_postprocessing(param_file=args.param_file))
 
 **Integration Steps:**
 
 1. Create the tool in ``src/openscope_experimental_launcher/post_processing/``
-2. Add command-line interface following the template
+2. Add the unified CLI and Python API entry point as above
 3. Update launcher's ``run_post_processing()`` method if automatic integration is needed
-
 
 Available Tools
 ---------------
@@ -125,11 +115,9 @@ Session Creator
 
 .. code-block:: bash
 
-   # Create session file from experiment output
-   python -m openscope_experimental_launcher.post_processing.session_creator /path/to/output
-   
+   python -m openscope_experimental_launcher.post_processing.session_creator path/to/processed_parameters.json
    # Force overwrite existing session.json
-   python -m openscope_experimental_launcher.post_processing.session_creator /path/to/output --force
+   python -m openscope_experimental_launcher.post_processing.session_creator path/to/processed_parameters.json --force
 
 **Input Files**:
 - ``end_state.json``: Runtime information from experiment completion
@@ -155,8 +143,7 @@ Predictive Processing Stimulus Converter
 
 .. code-block:: bash
 
-   # Convert stimulus table
-   python -m openscope_experimental_launcher.post_processing.pp_stimulus_converter /path/to/session
+   python -m openscope_experimental_launcher.post_processing.pp_stimulus_converter path/to/processed_parameters.json
 
 **Input**: Raw stimulus table files from Predictive Processing experiments
 

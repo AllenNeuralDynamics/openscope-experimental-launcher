@@ -8,6 +8,9 @@ Parameter files are JSON configuration files that define experiment-specific set
    like rig_id belong in the rig configuration file. See :doc:`rig_config` for rig 
    configuration details and :doc:`configuration` for the complete system overview.
 
+.. important::
+   All post-processing tools now expect a **param_file (JSON)** as input, not a session folder. This enables unified parameter prompting and future GUI integration.
+
 Core Parameters
 ---------------
 

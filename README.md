@@ -1,9 +1,9 @@
 # openscope-experimental-launcher
 
 [![License](https://img.shields.io/badge/license-MIT-brightgreen)](LICENSE)
-![Interrogate](https://img.shields.io/badge/interrogate-96.6%25-brightgreen)
-![Coverage](https://img.shields.io/badge/coverage-56%25-orange?logo=codecov)
-![Tests](https://img.shields.io/badge/tests-158%20passed-brightgreen)
+![Interrogate](https://img.shields.io/badge/interrogate-91.6%25-yellowgreen)
+![Coverage](https://img.shields.io/badge/coverage-58%25-yellow?logo=codecov)
+![Tests](https://img.shields.io/badge/tests-161%20passed-brightgreen)
 ![Python](https://img.shields.io/badge/python->=3.8-blue?logo=python)
 ![Platform](https://img.shields.io/badge/platform-Windows-blue?logo=windows)
 [![Documentation](https://img.shields.io/badge/docs-latest-blue?logo=gitbook)](https://allenneuraldynamics.github.io/openscope-experimental-launcher/)
@@ -46,6 +46,22 @@ scripts/                     # Project-specific launcher scripts
 - **Stateless Functions**: Interface modules provide pure functions with no global state
 - **Modular Post-Processing**: Standalone tools for data transformation
 - **Project Flexibility**: Custom launchers via scripts without modifying core code
+
+## Post-Processing Workflow
+
+All post-processing modules now use a unified parameter file workflow and expose a Python API entry point:
+
+- **Python API:**
+  ```python
+  from openscope_experimental_launcher.post_processing import session_creator
+  result = session_creator.run_postprocessing(param_file="path/to/processed_parameters.json")
+  ```
+- **CLI:**
+  ```bash
+  python -m openscope_experimental_launcher.post_processing.session_creator path/to/processed_parameters.json
+  ```
+
+Launchers call these post-processing modules directly via their Python API, not via subprocess. This ensures robust integration and interactive parameter prompting in all modes.
 
 ## Quick Start
 

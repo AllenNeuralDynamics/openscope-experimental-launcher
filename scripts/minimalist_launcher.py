@@ -35,9 +35,9 @@ class MinimalistLauncher(BaseLauncher):
     - Demonstrates all base launcher features without external dependencies
     """
     
-    def __init__(self):
+    def __init__(self, param_file=None, rig_config_path=None):
         """Initialize the test experiment."""
-        super().__init__()
+        super().__init__(param_file=param_file, rig_config_path=rig_config_path)
         logging.info("Minimalist test experiment initialized")
     
     def _get_launcher_type_name(self) -> str:

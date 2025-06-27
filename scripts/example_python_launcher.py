@@ -28,9 +28,9 @@ class ExamplePythonLauncher(PythonLauncher):
     This demonstrates how to extend PythonLauncher for specific experiments.
     """
     
-    def __init__(self):
+    def __init__(self, param_file=None, rig_config_path=None):
         """Initialize the example Python experiment."""
-        super().__init__()
+        super().__init__(param_file=param_file, rig_config_path=rig_config_path)
         logging.info("Example Python experiment launcher initialized")
     
     def _get_launcher_type_name(self) -> str:

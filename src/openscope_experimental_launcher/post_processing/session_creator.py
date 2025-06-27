@@ -16,13 +16,12 @@ Usage:
     python session_creator.py <output_folder> --force  # Overwrite existing session.json
 """
 
-import argparse
 import json
 import logging
-import os
+from pathlib import Path
+from openscope_experimental_launcher.utils import param_utils
 import sys
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 # Add the parent directory to sys.path to import openscope_experimental_launcher modules
@@ -217,53 +216,61 @@ class SessionCreator:
         return streams
 
 
-def main():
-    """Command-line interface."""
-    parser = argparse.ArgumentParser(
-        description="Create session.json files from experiment output folders",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  python session_creator.py /path/to/session_folder
-  python session_creator.py /path/to/session_folder --force
-        """
-    )
-    parser.add_argument(
-        'session_folder',
-        help='Path to session folder containing experiment data'
-    )
-    parser.add_argument(
-        '--force',
-        action='store_true',
-        help='Overwrite existing session.json file'    )
-
-    args = parser.parse_args()
-    
-    # Set up logging
+def run_postprocessing(param_file: str = None, overrides: dict = None) -> int:
+    """
+    Main entry point for session creation post-processing.
+    Loads parameters, prompts for missing fields, and runs session creation.
+    Returns 0 on success, nonzero on error.
+    """
+    import logging
+    from pathlib import Path
+    from openscope_experimental_launcher.utils import param_utils
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s'
     )
-    
-    # Check if session folder exists
-    if not os.path.exists(args.session_folder):
-        logging.error(f"Session folder does not exist: {args.session_folder}")
+    required_fields = ["output_session_folder"]
+    defaults = {}
+    help_texts = {"output_session_folder": "Session output folder (from launcher)"}
+    params = param_utils.load_parameters(
+        param_file=param_file,
+        overrides=overrides,
+        required_fields=required_fields,
+        defaults=defaults,
+        help_texts=help_texts
+    )
+    session_folder = params["output_session_folder"]
+    if not Path(session_folder).exists():
+        logging.error(f"Session folder does not exist: {session_folder}")
         return 1
-    
-    # Create session creator and run
-    creator = SessionCreator(args.session_folder)
-    
+    creator = SessionCreator(session_folder)
     if not creator.load_experiment_data():
         logging.error("Failed to load experiment data")
         return 1
-    
-    if not creator.create_session_file(force=args.force):
-        logging.error("Failed to create session file")
+    # Support force from overrides or param_file
+    force = False
+    if overrides and "force" in overrides:
+        force = overrides["force"]
+    if not creator.create_session_file(force=force):
+        logging.error("Failed to create session.json file")
         return 1
-    
-    logging.info("Session creation completed successfully")
+    logging.info("Session file created successfully")
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    import argparse
+    import sys
+    parser = argparse.ArgumentParser(
+        description="Create session.json files from experiment output folders",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Usage:
+    python session_creator.py processed_parameters.json
+    python session_creator.py processed_parameters.json --force  # Overwrite existing session.json
+        """
+    )
+    parser.add_argument("param_file", help="Path to processed_parameters.json from the launcher")
+    parser.add_argument('--force', action='store_true', help='Overwrite existing session.json')
+    args = parser.parse_args()
+    sys.exit(run_postprocessing(param_file=args.param_file, overrides={"force": args.force}))

@@ -144,10 +144,14 @@ class TestBaseLauncher:
     def test_post_experiment_processing(self):
         """Test post-experiment processing functionality."""
         experiment = BaseLauncher()
-        # Test the run_post_processing static method instead
-        with patch('os.path.exists', return_value=True):
+        # Prepare a fake processed_parameters.json content
+        fake_json = '{"output_session_folder": "/tmp/test_session"}'
+        # Patch open to return the fake JSON when the param file is read
+        from unittest.mock import mock_open
+        m = mock_open(read_data=fake_json)
+        with patch('os.path.exists', return_value=True), \
+             patch('builtins.open', m):
             result = BaseLauncher.run_post_processing("/tmp/test_session")
-            
             assert isinstance(result, bool)
     
     def test_run_success(self, temp_dir, param_file):

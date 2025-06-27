@@ -18,7 +18,6 @@ Usage:
 import os
 import sys
 import logging
-import argparse
 from typing import Dict, Optional
 from pathlib import Path
 import pandas as pd
@@ -27,6 +26,7 @@ import harp
 import requests
 import yaml
 import io
+from openscope_experimental_launcher.utils import param_utils
 
 # HARP utility functions for timing alignment
 def _get_who_am_i_list(url: str = "https://raw.githubusercontent.com/harp-tech/protocol/main/whoami.yml"):
@@ -292,42 +292,51 @@ def convert_orientation_to_stimulus_table(session_folder: str, output_folder: Op
     return True
 
 
-def main():
-    """Main entry point."""
+def run_postprocessing(param_file: str = None, overrides: dict = None) -> int:
+    """
+    Main entry point for stimulus table conversion post-processing.
+    Loads parameters, prompts for missing fields, and runs conversion.
+    Returns 0 on success, nonzero on error.
+    """
+    import logging
+    from pathlib import Path
+    from openscope_experimental_launcher.utils import param_utils
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+    required_fields = ["output_session_folder"]
+    defaults = {}
+    help_texts = {"output_session_folder": "Session output folder (from launcher)"}
+    params = param_utils.load_parameters(
+        param_file=param_file,
+        overrides=overrides,
+        required_fields=required_fields,
+        defaults=defaults,
+        help_texts=help_texts
+    )
+    session_folder = params["output_session_folder"]
+    if not Path(session_folder).exists():
+        logging.error(f"Session folder does not exist: {session_folder}")
+        return 1
+    # Call the main conversion logic
+    if not convert_orientation_to_stimulus_table(session_folder):
+        logging.error("Failed to convert orientation data to stimulus table")
+        return 1
+    logging.info("Stimulus table conversion completed successfully for session: %s", session_folder)
+    return 0
+
+if __name__ == "__main__":
+    import argparse
+    import sys
     parser = argparse.ArgumentParser(
-        description="Convert orientation data to stimulus tables for Predictive Processing analysis",
+        description="Convert orientation data from SLAP2 experiments into standardized stimulus tables for OpenScope Predictive Processing.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python pp_stimulus_converter.py /path/to/session_folder
-  python pp_stimulus_converter.py /path/to/session_folder /path/to/output
+  python pp_stimulus_converter.py processed_parameters.json
         """
     )
-    parser.add_argument(
-        "session_folder",
-        help="Path to session folder containing orientation data"
-    )
-    parser.add_argument(
-        "output_folder",
-        nargs='?',
-        help="Optional output folder (default: session_folder/stimulus_table_output)"
-    )
-    
+    parser.add_argument("param_file", help="Path to processed_parameters.json from the launcher")
     args = parser.parse_args()
-    
-    # Set up logging
-    logging.basicConfig(
-        level= logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s'
-    )
-    
-    # Convert orientation data
-    success = convert_orientation_to_stimulus_table(args.session_folder, args.output_folder)
-    
-    if success:
-        logging.info("STimulus table conversion completed successfully for session: %s", args.session_folder)
-    return 0 if success else 1
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run_postprocessing(param_file=args.param_file))
