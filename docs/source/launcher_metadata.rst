@@ -10,6 +10,7 @@ Purpose
 -------
 
 The `launcher_metadata` folder provides a complete record of:
+
 - The parameters and configuration used for the experiment
 - The runtime environment and software versions
 - Any user prompts or overrides entered during the session
@@ -49,6 +50,7 @@ How It Is Created
 
 - The folder is created automatically by the launcher at the start of each experiment session.
 - Files are written as the experiment progresses:
+
   - Parameters and launcher metadata are saved at initialization.
   - End state and debug files are saved at experiment completion or on error.
 
