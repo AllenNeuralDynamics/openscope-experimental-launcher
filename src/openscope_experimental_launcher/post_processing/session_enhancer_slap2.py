@@ -7,6 +7,7 @@ import h5py
 import pandas as pd
 from pathlib import Path
 import logging
+from openscope_experimental_launcher.utils import param_utils
 
 try:
     from aind_data_schema.core.session import Stream, SlapFieldOfView
@@ -20,11 +21,6 @@ try:
 except ImportError:
     get_timing_data = None
 
-# Configure logging at the top of the file
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s %(levelname)s %(message)s',
-)
 logger = logging.getLogger(__name__)
 
 def find_most_recent(pattern: str, root: str) -> Optional[str]:
@@ -114,7 +110,7 @@ def read_raster_size_and_z(meta_path):
                     zs = arr
     return raster_size, zs
 
-def create_slap2_stream(plane: str, meta_path: str, summary_path: str, session_start_time=None, harp_folder=None, targeted_structure=None, fov_coordinate_ml=None, fov_coordinate_ap=None, fov_coordinate_unit=None, fov_reference=None, magnification=None, fov_scale_factor=None) -> dict:
+def create_slap2_stream(plane: str, meta_path: str, session_start_time=None, harp_folder=None, targeted_structure=None, fov_coordinate_ml=None, fov_coordinate_ap=None, fov_coordinate_unit=None, fov_reference=None, magnification=None, fov_scale_factor=None, session_type=None) -> dict:
     """Create a SLAP2 Stream for a given plane using aind-data-schema objects (only required fields)."""
     if not AIND_AVAILABLE:
         raise ImportError("aind-data-schema is not available")
@@ -128,10 +124,6 @@ def create_slap2_stream(plane: str, meta_path: str, summary_path: str, session_s
     # Use _extract_scalar to ensure raster_size values are scalars
     fov_width = int(_extract_scalar(raster_size[0])) if raster_size and len(raster_size) > 0 and _extract_scalar(raster_size[0]) is not None else None
     fov_height = int(_extract_scalar(raster_size[1])) if raster_size and len(raster_size) > 1 and _extract_scalar(raster_size[1]) is not None else None
-    logger.info(f"Reading summary mat fields from: {summary_path}")
-    Z, analyzeHz = read_summary_mat_fields(summary_path)
-    analyzeHz = _extract_scalar(analyzeHz) if analyzeHz is not None else None
-    frame_rate = float(analyzeHz) if analyzeHz is not None else None
     imaging_depth = int(_extract_scalar(zs[0])) if zs and len(zs) > 0 and _extract_scalar(zs[0]) is not None else None
 
     if session_start_time is not None and harp_folder is not None and get_timing_data is not None:
@@ -172,15 +164,11 @@ def create_slap2_stream(plane: str, meta_path: str, summary_path: str, session_s
         slap_fov_kwargs['fov_width'] = fov_width
     if fov_height is not None:
         slap_fov_kwargs['fov_height'] = fov_height
-    if frame_rate is not None:
-        slap_fov_kwargs['frame_rate'] = frame_rate
     # Always set required units and static fields if schema requires
     slap_fov_kwargs['dilation_unit'] = "pixel"
     slap_fov_kwargs['imaging_depth_unit'] = "micrometer"
     slap_fov_kwargs['fov_size_unit'] = "pixel"
     slap_fov_kwargs['fov_scale_factor_unit'] = "micrometer/pixel"
-    slap_fov_kwargs['frame_rate_unit'] = "hertz"
-    slap_fov_kwargs['power_unit'] = "percent"
     slap_fov_kwargs['scanfield_z_unit'] = "micrometer"
 
     # Remove hardcoded values, use passed-in arguments
@@ -199,10 +187,11 @@ def create_slap2_stream(plane: str, meta_path: str, summary_path: str, session_s
     if fov_scale_factor is not None:
         slap_fov_kwargs['fov_scale_factor'] = fov_scale_factor
 
+    slap_fov_kwargs['session_type'] = session_type
+
     # Add required fields for SlapFieldOfView if not present, but only if not misleading
     # session_type and path_to_array_of_frame_rates are required by schema
-    slap_fov_kwargs['session_type'] = "Parent" if plane == "DMD1" else "Branch"
-    slap_fov_kwargs['path_to_array_of_frame_rates'] = ""  # Only if you do not have real data, else skip FOV
+    slap_fov_kwargs['path_to_array_of_frame_rates'] = "unavailable"  # Only if you do not have real data, else skip FOV
     if 'index' not in slap_fov_kwargs:
         logger.warning("Required field 'index' missing, skipping SlapFieldOfView for %s.", plane)
         return None
@@ -246,7 +235,7 @@ def find_session_json(root_dir: str) -> Optional[str]:
     return None
 
 
-def enhance_existing_slap2_session(session_folder: str, targeted_structure=None, fov_coordinate_ml=None, fov_coordinate_ap=None, fov_coordinate_unit=None, fov_reference=None, magnification=None, fov_scale_factor=None) -> bool:
+def enhance_existing_slap2_session(session_folder: str, targeted_structure=None, fov_coordinate_ml=None, fov_coordinate_ap=None, fov_coordinate_unit=None, fov_reference=None, magnification=None, fov_scale_factor=None, session_type=None) -> bool:
     """
     Enhance an existing session.json with SLAP2 streams.
     Args:
@@ -275,33 +264,14 @@ def enhance_existing_slap2_session(session_folder: str, targeted_structure=None,
     session = load_session(session_json_path)
     session_start_time = session.get('session_start_time')
 
-    def prompt_with_default(prompt, default, cast_func=str):
-        val = input(f"{prompt} [{default}]: ")
-        if val.strip() == "":
-            return cast_func(default)
-        return cast_func(val)
-
-    # Prompt for missing CLI values, offering defaults
-    if targeted_structure is None:
-        targeted_structure = prompt_with_default("Enter targeted_structure", "VISp", str)
-    if fov_coordinate_ml is None:
-        fov_coordinate_ml = prompt_with_default("Enter fov_coordinate_ml (float)", 0.0, float)
-    if fov_coordinate_ap is None:
-        fov_coordinate_ap = prompt_with_default("Enter fov_coordinate_ap (float)", 0.0, float)
-    if fov_coordinate_unit is None:
-        fov_coordinate_unit = prompt_with_default("Enter fov_coordinate_unit", "micrometer", str)
-    if fov_reference is None:
-        fov_reference = prompt_with_default("Enter fov_reference", "bregma", str)
-    if magnification is None:
-        magnification = prompt_with_default("Enter magnification", "20x", str)
-    if fov_scale_factor is None:
-        fov_scale_factor = prompt_with_default("Enter fov_scale_factor (float)", 1.0, float)
+    # All required parameters are now loaded and prompted via param_utils.load_parameters
+    # Use params['targeted_structure'], params['fov_coordinate_ml'], etc. directly
 
     # Pass these to create_slap2_stream
-    stream_dmd1 = create_slap2_stream('DMD1', dmd1_meta, summary_mat, session_start_time=session_start_time, harp_folder=harp_folder,
-        targeted_structure=targeted_structure, fov_coordinate_ml=fov_coordinate_ml, fov_coordinate_ap=fov_coordinate_ap, fov_coordinate_unit=fov_coordinate_unit, fov_reference=fov_reference, magnification=magnification, fov_scale_factor=fov_scale_factor)
-    stream_dmd2 = create_slap2_stream('DMD2', dmd2_meta, summary_mat, session_start_time=session_start_time, harp_folder=harp_folder,
-        targeted_structure=targeted_structure, fov_coordinate_ml=fov_coordinate_ml, fov_coordinate_ap=fov_coordinate_ap, fov_coordinate_unit=fov_coordinate_unit, fov_reference=fov_reference, magnification=magnification, fov_scale_factor=fov_scale_factor)
+    stream_dmd1 = create_slap2_stream('DMD1', dmd1_meta, session_start_time=session_start_time, harp_folder=harp_folder,
+        targeted_structure=targeted_structure, fov_coordinate_ml=fov_coordinate_ml, fov_coordinate_ap=fov_coordinate_ap, fov_coordinate_unit=fov_coordinate_unit, fov_reference=fov_reference, magnification=magnification, fov_scale_factor=fov_scale_factor, session_type=session_type)
+    stream_dmd2 = create_slap2_stream('DMD2', dmd2_meta, session_start_time=session_start_time, harp_folder=harp_folder,
+        targeted_structure=targeted_structure, fov_coordinate_ml=fov_coordinate_ml, fov_coordinate_ap=fov_coordinate_ap, fov_coordinate_unit=fov_coordinate_unit, fov_reference=fov_reference, magnification=magnification, fov_scale_factor=fov_scale_factor, session_type=session_type)
 
     if 'streams' not in session:
         session['streams'] = []
@@ -315,79 +285,79 @@ def enhance_existing_slap2_session(session_folder: str, targeted_structure=None,
     return True
 
 
-def read_summary_mat_fields(summary_path):
-    """Read Z and analyzeHz from a v7.3 .mat file using h5py."""
-    Z = None
-    analyzeHz = None
-    with h5py.File(summary_path, 'r') as f:
-        # Try to read Z and analyzeHz at the root or in subgroups
-        if 'Z' in f:
-            Z = f['Z'][()]
-        if 'analyzeHz' in f:
-            analyzeHz = f['analyzeHz'][()]
-        # If not found at root, search recursively
-        if Z is None or analyzeHz is None:
-            def recursive_search(group):
-                nonlocal Z, analyzeHz
-                for k, v in group.items():
-                    if isinstance(v, h5py.Dataset):
-                        if k == 'Z' and Z is None:
-                            Z = v[()]
-                        if k == 'analyzeHz' and analyzeHz is None:
-                            analyzeHz = v[()]
-                    elif isinstance(v, h5py.Group):
-                        recursive_search(v)
-            recursive_search(f)
-    # Convert to Python scalars if possible
-    if hasattr(Z, 'tolist'):
-        Z = Z.tolist()
-    if hasattr(analyzeHz, 'tolist'):
-        analyzeHz = analyzeHz.tolist()
-    return Z, analyzeHz
-
-
 def main():
     import argparse
     parser = argparse.ArgumentParser(
-        description="Enhance existing session.json files with SLAP2 streams",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  python session_enhancer_slap2.py /path/to/session_folder
-  python session_enhancer_slap2.py /path/to/session_folder --verbose
-  python session_enhancer_slap2.py /path/to/session_folder --targeted_structure VISp --fov_coordinate_ml 0.0 --fov_coordinate_ap 0.0 --fov_coordinate_unit micrometer --fov_reference bregma
-        """
-    )
-    parser.add_argument("session_folder", help="Path to session folder containing experiment data and session.json")
-    parser.add_argument('--targeted_structure', type=str, help='Targeted structure (e.g. VISp)')
-    parser.add_argument('--fov_coordinate_ml', type=float, help='FOV coordinate ML (float, e.g. 0.0)')
-    parser.add_argument('--fov_coordinate_ap', type=float, help='FOV coordinate AP (float, e.g. 0.0)')
-    parser.add_argument('--fov_coordinate_unit', type=str, help='FOV coordinate unit (e.g. micrometer)')
-    parser.add_argument('--fov_reference', type=str, help='FOV reference (e.g. bregma)')
-    parser.add_argument('--magnification', type=str, help='Magnification (e.g. 20x)')
-    parser.add_argument('--fov_scale_factor', type=float, help='FOV scale factor (float, e.g. 1.0)')
-    parser.add_argument('--verbose', action='store_true', help='Enable verbose logging')
+        description="Enhance existing session.json files with SLAP2 streams")
+    parser.add_argument("param_file", help="Path to processed_parameters.json from the launcher")
     args = parser.parse_args()
 
     logging.basicConfig(
-        level=logging.DEBUG if args.verbose else logging.INFO,
+        level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s'
     )
 
-    if not Path(args.session_folder).exists():
-        logger.error(f"Session folder does not exist: {args.session_folder}")
+    # Load parameters from processed_param_file and prompt for missing ones
+    required_fields = [
+        "output_session_folder", "session_type", "targeted_structure", "fov_coordinate_ml", "fov_coordinate_ap", "fov_coordinate_unit", "fov_reference", "magnification", "fov_scale_factor"
+    ]
+    defaults = {
+        "session_type": "Branch",
+        "targeted_structure": "VISp",
+        "fov_coordinate_ml": 0.0,
+        "fov_coordinate_ap": 0.0,
+        "fov_coordinate_unit": "micrometer",
+        "fov_reference": "bregma",
+        "magnification": "20x",
+        "fov_scale_factor": 1.0
+    }
+    help_texts = {
+        "output_session_folder": "Session output folder",
+        "session_type": "Session type ('Parent' or 'Branch')",
+        "targeted_structure": "Targeted structure (e.g. VISp)",
+        "fov_coordinate_ml": "FOV coordinate ML (float, e.g. 0.0)",
+        "fov_coordinate_ap": "FOV coordinate AP (float, e.g. 0.0)",
+        "fov_coordinate_unit": "FOV coordinate unit (e.g. micrometer)",
+        "fov_reference": "FOV reference (e.g. bregma)",
+        "magnification": "Magnification (e.g. 20x)",
+        "fov_scale_factor": "FOV scale factor (float, e.g. 1.0)"
+    }
+    def _validate_session_type(val):
+        val = str(val).strip().capitalize()
+        if val not in ("Parent", "Branch"):
+            raise ValueError("Session type must be 'Parent' or 'Branch'")
+        return val
+    
+    def _prompt_func(prompt, default):
+        if 'session type' in prompt.lower():
+            return param_utils.get_user_input(prompt, default, cast_func=_validate_session_type)
+        return param_utils.get_user_input(prompt, default)
+    
+    params = param_utils.load_parameters(
+        param_file=args.param_file,
+        required_fields=required_fields,
+        defaults=defaults,
+        help_texts=help_texts,
+        prompt_func=_prompt_func
+    )
+    session_folder = params["output_session_folder"]
+    session_type = params["session_type"]
+
+    if not Path(session_folder).exists():
+        logger.error(f"Session folder does not exist: {session_folder}")
         return 1
 
     try:
         ok = enhance_existing_slap2_session(
-            args.session_folder,
-            targeted_structure=args.targeted_structure,
-            fov_coordinate_ml=args.fov_coordinate_ml,
-            fov_coordinate_ap=args.fov_coordinate_ap,
-            fov_coordinate_unit=args.fov_coordinate_unit,
-            fov_reference=args.fov_reference,
-            magnification=args.magnification,
-            fov_scale_factor=args.fov_scale_factor,
+            session_folder,
+            targeted_structure=params.get('targeted_structure'),
+            fov_coordinate_ml=params.get('fov_coordinate_ml'),
+            fov_coordinate_ap=params.get('fov_coordinate_ap'),
+            fov_coordinate_unit=params.get('fov_coordinate_unit'),
+            fov_reference=params.get('fov_reference'),
+            magnification=params.get('magnification'),
+            fov_scale_factor=params.get('fov_scale_factor'),
+            session_type=session_type
         )
     except Exception as e:
         logger.error(f"Validation or runtime error: {e}")

@@ -177,7 +177,6 @@ def _update_repository(repo_path: str, commit_hash: str) -> bool:
         else:
             subprocess.check_call(['git', 'checkout', commit_hash], stderr=subprocess.STDOUT)
         
-        logging.info("Repository updated successfully")
         return True
         
     except subprocess.CalledProcessError as e:

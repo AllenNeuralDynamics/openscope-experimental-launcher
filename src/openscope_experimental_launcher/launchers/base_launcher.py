@@ -13,23 +13,16 @@ import signal
 import logging
 import datetime
 import platform
-import socket
-import uuid
-import hashlib
 import psutil
 import json
 import argparse
 import subprocess
 import threading
 from typing import Dict, List, Optional, Any
-from decimal import Decimal
 
 # Import AIND data schema utilities for standardized folder naming
 try:
     from aind_data_schema_models.data_name_patterns import build_data_name
-    from aind_data_schema.core.session import Session, Stream, StimulusModality, Modality
-    from aind_data_schema.components.devices import Software
-    from aind_data_schema_models.modalities import Modality as StreamModality
     AIND_DATA_SCHEMA_AVAILABLE = True
 except ImportError:
     AIND_DATA_SCHEMA_AVAILABLE = False
@@ -37,12 +30,9 @@ except ImportError:
 
 from ..utils import rig_config
 from ..utils import git_manager
+from ..utils import param_utils 
+from .. import __version__
 
-
-try:
-    from .. import __version__
-except ImportError:
-    __version__ = "unknown"
 
 
 class BaseLauncher:
@@ -101,39 +91,43 @@ class BaseLauncher:
         # 1. Loads experiment parameters from JSON file (if provided)
         # 2. Loads rig-specific configuration from TOML file  
         # 3. Collects any missing runtime information from user prompts
-          # Step 1: Load experiment parameters from JSON file
+        # Step 1: Load experiment parameters from JSON file
         # Store original input parameters for metadata saving
         self.original_param_file = param_file
         self.original_input_params = {}
-        
-        if param_file:
-            with open(param_file, 'r') as f:
-                self.params = json.load(f)
-                self.original_input_params = self.params.copy()  # Store original before merging
-                logging.info(f"Loaded experiment parameters from {param_file}")
-        else:
-            logging.warning("No parameter file provided, using default parameters")
-            self.params = {}
-        
-        # Step 2: Load rig configuration  
+
+        # Step 1: Load rig configuration (provides defaults)
         self.rig_config = rig_config.get_rig_config(rig_config_path)
-        
-        # Step 3: Merge rig_config into params with proper priority
-        # rig_config provides defaults, params (from JSON) override rig_config
-        merged_params = dict(self.rig_config)  # Start with rig_config as base
-        merged_params.update(self.params)      # Override with experiment-specific params
-        self.params = merged_params
-        
-        # Step 4: Collect runtime information (only for missing values)
-        runtime_info = self.collect_runtime_information()
-        self.params.update(runtime_info)       # Runtime info has highest priority
-        
-        # Extract subject_id and user_id from params
-        self.subject_id = self.params.get("subject_id", "")
-        self.user_id = self.params.get("user_id", "")
+
+        # Step 2: Use param_utils to load parameters from file, merge with rig_config, and prompt for missing
+        # Define required fields and defaults as needed for your workflow
+        required_fields = ["subject_id", "user_id"]  # Add more as needed
+        # Merge rig_config with explicit subject_id/user_id defaults
+        defaults = dict(self.rig_config)
+        defaults.setdefault("subject_id", "test_subject")
+        defaults.setdefault("user_id", "test_user")
+        help_texts = {"subject_id": "Animal or experiment subject ID", "user_id": "Experimenter user ID"}
+        # Load parameters (file, overrides=None, required_fields, defaults, help_texts)
+        self.params = param_utils.load_parameters(
+            param_file=param_file,
+            overrides=None,
+            required_fields=required_fields,
+            defaults=defaults,
+            help_texts=help_texts
+        )
+
+        # Propagate any missing rig_config fields into params
+        for k, v in self.rig_config.items():
+            if k not in self.params:
+                self.params[k] = v
+
+        self.original_input_params = dict(self.params)  # Store for metadata
+
+        # Extract subject_id and user_id from params (no fallback default needed)
+        self.subject_id = self.params["subject_id"]
+        self.user_id = self.params["user_id"]
         logging.info(f"Using subject_id: {self.subject_id}, user_id: {self.user_id}")
         logging.info(f"Using rig: {self.rig_config['rig_id']}")
-        
         logging.info("BaseLauncher initialized")
     
     def _get_platform_info(self) -> Dict[str, Any]:
@@ -145,48 +139,6 @@ class BaseLauncher:
             "computer_name": platform.node(),
         }
     
-    def collect_runtime_information(self) -> Dict[str, str]:
-        """
-        Collect key information from user at runtime (beginning of experiment).
-        
-        This method collects essential experiment information at the start:
-        - Subject ID
-        - User ID  
-        
-        This method can be extended in derived classes to collect 
-        rig-specific information.
-        
-        Returns:
-            Dictionary containing collected runtime information
-        """
-        runtime_info = {}
-        
-        # Only collect subject_id if not already provided in params
-        if not self.params.get("subject_id"):
-            try:
-                subject_id = input("Enter subject ID (default: test_subject): ").strip()
-                if not subject_id:
-                    subject_id = "test_subject"
-            except (EOFError, OSError):
-                # Handle cases where input is not available (e.g., during testing)
-                subject_id = "test_subject"
-            runtime_info["subject_id"] = subject_id
-            
-        # Only collect user_id if not already provided in params
-        if not self.params.get("user_id"):
-            try:
-                user_id = input("Enter user ID (default: test_user): ").strip()
-                if not user_id:
-                    user_id = "test_user"
-            except (EOFError, OSError):
-                # Handle cases where input is not available (e.g., during testing)
-                user_id = "test_user"
-            runtime_info["user_id"] = user_id
-        
-        logging.info(f"Collected runtime info - {runtime_info}")
-
-        return runtime_info
-
     def collect_end_experiment_information(self) -> Dict[str, str]:
         """
         Collect information from user at the end of the experiment.
@@ -202,21 +154,16 @@ class BaseLauncher:
         """
         end_info = {}
         
-        try:
-            print("\n" + "="*60)
-            print("EXPERIMENT COMPLETED - Please provide final information")
-            print("="*60)
-            
-            # Collect final experiment notes
-            final_notes = input("Enter final experiment notes/observations (optional): ").strip()
-            if final_notes:
-                end_info["final_notes"] = final_notes
-                self.experiment_notes = final_notes  # Store for session.json
-            
-        except (EOFError, OSError):
-            # Handle cases where input is not available (e.g., during testing)
-            logging.info("End-of-experiment information collection skipped (no interactive input available)")
-            pass
+        print("\n" + "="*60)
+        print("EXPERIMENT COMPLETED - Please provide final information")
+        print("="*60)
+        
+        # Collect final experiment notes
+        final_notes = param_utils.get_user_input(
+            "Enter final experiment notes/observations (optional)", default="", cast_func=str)
+        if final_notes:
+            end_info["final_notes"] = final_notes
+            self.experiment_notes = final_notes  # Store for session.json
         
         logging.info(f"Collected end-of-experiment info - {end_info}")
         return end_info
@@ -307,18 +254,10 @@ class BaseLauncher:
                 json.dump(self.original_input_params, f, indent=2, default=str)
             logging.info(f"Saved original input parameters to: {input_params_file}")
             
-            # 2. Save processed input parameters (original params + rig config, but no runtime info)
-            # This contains only what's needed to replicate the experiment configuration
-            processed_params = {}
-            for key, value in self.params.items():
-                # Exclude runtime/launcher-specific metadata that belongs in end_state.json
-                if key not in ['session_uuid', 'start_time', 'stop_time', 'output_session_folder',
-                              'launcher_class', 'launcher_version', 'platform_info']:
-                    processed_params[key] = value
-            
+            # 2. Save processed input parameters (original params + rig config)           
             processed_params_file = os.path.join(metadata_dir, "processed_parameters.json")
             with open(processed_params_file, 'w') as f:
-                json.dump(processed_params, f, indent=2, default=str)
+                json.dump(self.params, f, indent=2, default=str)
             logging.info(f"Saved processed parameters to: {processed_params_file}")
             
             # 3. Save command line arguments
@@ -334,7 +273,6 @@ class BaseLauncher:
             with open(cmdline_file, 'w') as f:
                 json.dump(cmdline_info, f, indent=2)
             logging.info(f"Saved command line info to: {cmdline_file}")
-
             logging.info(f"Launcher metadata saved to: {metadata_dir}")
             
         except Exception as e:
@@ -625,6 +563,9 @@ class BaseLauncher:
             output_session_folder = self.determine_output_session_folder()
             self.output_session_folder = output_session_folder  # Store for post-processing and interface use
             
+            # we save this here for any post-processing tools that need it
+            self.params["output_session_folder"] = output_session_folder
+
             # Set up continuous logging to output_session_folder
             if output_session_folder:
                 centralized_log_dir = self.params.get("centralized_log_directory")
@@ -773,25 +714,24 @@ class BaseLauncher:
             if args.param_file and not os.path.exists(args.param_file):
                 logging.error(f"Parameter file not found: {args.param_file}")
                 return 1
-              # Create experiment instance with parameter file
-            experiment = cls(param_file=args.param_file)
+              # Create launcher instance with parameter file
+            launcher = cls(param_file=args.param_file)
             
-            # Run the experiment
-            experiment_name = cls.__name__.replace('Experiment', '').replace('Launcher', '')
-            logging.info(f"Starting {experiment_name} with parameters: {args.param_file}")
+            # Run the launcher
+            logging.info(f"Starting {cls.__name__} with parameters: {args.param_file}")
             
-            success = experiment.run()
+            success = launcher.run()
             
             if success:
-                logging.info(f"===== {experiment_name.upper()} COMPLETED SUCCESSFULLY =====")               
+                logging.info(f"===== {cls.__name__.upper()} COMPLETED SUCCESSFULLY =====")               
                 return 0
             else:
-                logging.error(f"===== {experiment_name.upper()} FAILED =====")
+                logging.error(f"===== {cls.__name__.upper()} FAILED =====")
                 logging.error("Check the logs above for error details.")
                 return 1
                 
         except KeyboardInterrupt:
-            logging.info("Experiment interrupted by user")
+            logging.info("Launcher interrupted by user")
             return 1
         except Exception as e:
             logging.error(f"Unexpected error: {e}")
@@ -917,15 +857,15 @@ class BaseLauncher:
 
     def _confirm_param(self, param_name, param_value):
         """Prompt user to confirm or edit a parameter value."""
-        new_value = input(f"{param_name}: '{param_value}' (press Enter to keep, or type new value): ").strip()
-        if not new_value:
-            return param_value  # Keep the original value
-        return new_value  # Use the new value
+        new_value = param_utils.get_user_input(
+            f"{param_name}: '{param_value}' (press Enter to keep, or type new value)",
+            default=param_value, cast_func=str)
+        return new_value
 
     def _get_valid_float(self, prompt, default=None):
         """Prompt user for a float value, with validation."""
         while True:
-            val = input(f"{prompt} (grams, or leave blank for None): ").strip()
+            val = param_utils.get_user_input(f"{prompt} (grams, or leave blank for None)", default=default, cast_func=str)
             if not val and default is not None:
                 return default
             if not val:
@@ -941,11 +881,9 @@ class BaseLauncher:
 
     def _collect_mouse_runtime_data(self, at_start=True):
         """Prompt for animal weight at start or end if enabled."""
-        if at_start:
-            return self._get_valid_float("Enter animal weight PRIOR to experiment")
-        else:
-            return self._get_valid_float("Enter animal weight POST experiment")
-    
+        prompt = "Enter animal weight PRIOR to experiment" if at_start else "Enter animal weight POST experiment"
+        return param_utils.get_user_input(prompt, default=None, cast_func=float)
+
     def save_end_state(self, output_directory: str) -> bool:
         """
         Save end-of-experiment state for post-processing tools.
@@ -1080,10 +1018,3 @@ class BaseLauncher:
         except Exception as debug_e:
             logging.error(f"Failed to save debug state: {debug_e}")
             return False
-    
-    def _collect_mouse_runtime_data(self, at_start=True):
-        """Prompt for animal weight at start or end if enabled."""
-        if at_start:
-            return self._get_valid_float("Enter animal weight PRIOR to experiment")
-        else:
-            return self._get_valid_float("Enter animal weight POST experiment")

@@ -23,16 +23,6 @@ class TestBaseLauncher:
         assert experiment.process is None
         assert experiment.session_uuid is not None
 
-    def test_collect_runtime_information(self):
-        """Test runtime information collection."""
-        with patch('openscope_experimental_launcher.utils.rig_config.get_rig_config', return_value={'rig_id': 'test_rig'}):
-            experiment = BaseLauncher()
-        # Clear the rig config from params to test collection
-        experiment.params = {}
-        runtime_info = experiment.collect_runtime_information()
-        assert isinstance(runtime_info, dict)        # The current implementation only collects subject_id and user_id if not already in params
-        assert "subject_id" in runtime_info or "user_id" in runtime_info
-
     def test_initialize_launcher_with_file(self, param_file, sample_params):
         """Test launcher initialization from file."""
         with patch('openscope_experimental_launcher.utils.rig_config.get_rig_config', return_value={'rig_id': 'test_rig', 'output_root_folder': '/tmp'}):
