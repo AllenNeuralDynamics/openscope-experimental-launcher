@@ -4,6 +4,7 @@ Base launcher class for OpenScope experiments.
 This module contains the core functionality for launching experiments
 with parameter management, session tracking, metadata collection, and logging.
 Interface-specific functionality is delegated to separate interface modules.
+
 """
 
 import os
@@ -15,9 +16,9 @@ import datetime
 import platform
 import psutil
 import json
-import argparse
 import subprocess
 import threading
+import importlib
 from typing import Dict, List, Optional, Any
 
 # Import AIND data schema utilities for standardized folder naming
@@ -61,6 +62,7 @@ class BaseLauncher:
                            **ONLY use this for special cases like testing or non-standard setups.**
                            In normal operation, leave this as None to use the default rig config location.
         """
+        self.param_file = param_file
         self.platform_info = self._get_platform_info()
         self.params = {}
         self.start_time = None
@@ -72,8 +74,6 @@ class BaseLauncher:
         self.user_id = ""
         self.session_uuid = ""
         self.output_session_folder = ""  # Store the session output directory      
-        self.experiment_notes = ""  # Store experiment notes collected at the end
-        self.animal_weight_prior = None  # Store animal weight prior collected at start
         
         # Version tracking
         self._version = __version__
@@ -138,35 +138,6 @@ class BaseLauncher:
             "hardware": (platform.processor(), platform.machine()),
             "computer_name": platform.node(),
         }
-    
-    def collect_end_experiment_information(self) -> Dict[str, str]:
-        """
-        Collect information from user at the end of the experiment.
-        
-        This method collects experiment wrap-up information:
-        - Final experiment notes
-        
-        This method can be extended in derived classes to collect 
-        rig-specific post-experiment information.
-        
-        Returns:
-            Dictionary containing collected end-of-experiment information
-        """
-        end_info = {}
-        
-        print("\n" + "="*60)
-        print("EXPERIMENT COMPLETED - Please provide final information")
-        print("="*60)
-        
-        # Collect final experiment notes
-        final_notes = param_utils.get_user_input(
-            "Enter final experiment notes/observations (optional)", default="", cast_func=str)
-        if final_notes:
-            end_info["final_notes"] = final_notes
-            self.experiment_notes = final_notes  # Store for session.json
-        
-        logging.info(f"Collected end-of-experiment info - {end_info}")
-        return end_info
     
     def determine_output_session_folder(self) -> Optional[str]:
         """
@@ -394,24 +365,40 @@ class BaseLauncher:
         except Exception as e:
             print(f"Error finalizing logging: {e}")
     
-    @staticmethod
-    def run_post_processing(session_directory: str) -> bool:
+    def run_post_acquisition(self, param_file=None) -> bool:
         """
-        Run only the session_creator post-processing module using its Python API entry point.
-        Returns True if the post-processing step succeeds, False otherwise.
+        Run a configurable, stackable post-acquisition pipeline using unified parameter workflow.
+        Args:
+            param_file (str, optional): Path to parameter JSON file. If None, uses self.param_file.
+        Returns:
+            True if all steps succeed, False otherwise.
         """
-        import os
-        import logging
-        logging.info(f"Running post-processing for: {session_directory}")
-        metadata_dir = os.path.join(session_directory, "launcher_metadata")
-        param_file = os.path.join(metadata_dir, "processed_parameters.json")
-        from openscope_experimental_launcher.post_processing import session_creator
-        result = session_creator.run_postprocessing(param_file=param_file)
-        if result != 0:
-            logging.error(f"Post-processing step failed: session_creator (exit code {result})")
-            return False
-        logging.info("Session creation post-processing completed successfully.")
-        return True
+        if param_file is None:
+            param_file = self.param_file
+        params = param_utils.load_parameters(param_file=param_file)
+        pipeline = params.get("post_acquisition_pipeline", [])
+        all_success = True
+        for module_name in pipeline:
+            try:
+                logging.info(f"Running post-acquisition step: {module_name}")
+                mod = importlib.import_module(f"openscope_experimental_launcher.post_acquisition.{module_name}")
+                if hasattr(mod, "run_post_acquisition"):
+                    result = mod.run_post_acquisition(param_file)
+                    if result not in (None, 0):
+                        logging.error(f"Post-acquisition step failed: {module_name} (exit code {result})")
+                        all_success = False
+                    else:
+                        logging.info(f"Post-acquisition step completed: {module_name}")
+                else:
+                    logging.warning(f"Module {module_name} does not have run_post_acquisition()")
+            except Exception as e:
+                logging.error(f"Error running post-acquisition module {module_name}: {e}")
+                all_success = False
+        if all_success:
+            logging.info("All post-acquisition steps completed successfully.")
+        else:
+            logging.warning("Some post-acquisition steps failed. Check logs for details.")
+        return all_success
        
     
     def _get_launcher_type_name(self) -> str:
@@ -511,7 +498,7 @@ class BaseLauncher:
         1. Set up repository and output directories
         2. Set up logging
         3. Call start_experiment() (implemented by subclasses)
-        4. Handle post-processing and cleanup
+        4. Handle post-acquisition and cleanup
         
         Note: The launcher should already be initialized via __init__ before calling this method.
             
@@ -526,20 +513,15 @@ class BaseLauncher:
             
             # Note: initialization now happens in __init__, not here
             
-            # Collect animal weight prior at start if enabled
-            self.animal_weight_prior = None
-            if self.params.get("collect_mouse_runtime_data", False):
-                self.animal_weight_prior = self._collect_mouse_runtime_data(at_start=True)
-            
             # Set up repository
             if not git_manager.setup_repository(self.params):
                 logging.error("Repository setup failed")
                 return False            
             # Determine output_session_folder (specific directory where experiment data will be saved)
             output_session_folder = self.determine_output_session_folder()
-            self.output_session_folder = output_session_folder  # Store for post-processing and interface use
+            self.output_session_folder = output_session_folder  # Store for post-acquisition and interface use
             
-            # we save this here for any post-processing tools that need it
+            # we save this here for any post-acquisition tools that need it
             self.params["output_session_folder"] = output_session_folder
 
             # Set up continuous logging to output_session_folder
@@ -547,6 +529,10 @@ class BaseLauncher:
                 centralized_log_dir = self.params.get("centralized_log_directory")
                 self.setup_continuous_logging(output_session_folder, centralized_log_dir)                  # Save launcher metadata after logging is set up
                 self.save_launcher_metadata(output_session_folder)
+            
+            # Run pre-acquisition steps
+            if not self.run_pre_acquisition():
+                logging.warning("Pre-acquisition processing failed, but continuing with experiment.")
             
             # Start the experiment (implemented by interface-specific launchers)
             if not self.start_experiment():
@@ -558,16 +544,12 @@ class BaseLauncher:
                 logging.error(f"{self._get_launcher_type_name()} experiment failed")
                 return False
             
-            # Collect end-of-experiment information (notes, outcome, etc.)
-            self.collect_end_experiment_information()               
+            # Save end state for post-acquisition tools (e.g., session creation)
+            self.save_end_state(self.output_session_folder)
             
-            # Save end state for post-processing tools (e.g., session creation)
-            if output_session_folder:
-                self.save_end_state(output_session_folder)
-            
-            # Perform rig-specific post-processing
-            if not self.run_post_processing(self.output_session_folder):
-                logging.warning("Post-experiment processing failed, but experiment data was collected")
+            # Perform rig-specific post-acquisition
+            if not self.run_post_acquisition():
+                logging.warning("Post-acquisition processing failed, but experiment data was collected")
                    
 
 
@@ -623,15 +605,22 @@ class BaseLauncher:
     
     def create_process(self) -> subprocess.Popen:
         """
-        Create the subprocess for the experiment.
-        
-        This method must be implemented by interface-specific launchers
-        to create the appropriate subprocess (Bonsai, MATLAB, Python, etc.)
-        
+        Create a dummy subprocess for testing: runs a brief 'hello world' command.
         Returns:
-            subprocess.Popen object for the running process
+            subprocess.Popen object for the running process, or None if not implemented.
         """
-        raise NotImplementedError("create_process() must be implemented by interface-specific launchers")
+        import subprocess
+        import sys
+        # Use a cross-platform hello world command
+        if sys.platform.startswith('win'):
+            cmd = [sys.executable, '-c', 'print("Hello from BaseLauncher!")']
+        else:
+            cmd = [sys.executable, '-c', 'print(\"Hello from BaseLauncher!\")']
+        try:
+            return subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except Exception as e:
+            logging.error(f"Failed to start dummy hello world process: {e}")
+            return None
     
     def check_experiment_success(self) -> bool:
         """
@@ -646,38 +635,15 @@ class BaseLauncher:
         return False
     
     @classmethod
-    def create_argument_parser(cls, description: str = None) -> argparse.ArgumentParser:
+    def run_from_params(cls, param_file):
         """
-        Create a standard argument parser for experiment launchers.
+        Run the experiment with the specified parameters.
         
         Args:
-            description: Description for the argument parser
+            param_file: Path to the JSON parameter file
             
         Returns:
-            Configured ArgumentParser instance
-        """
-        if description is None:
-            description = f"Launch {cls.__name__} experiment"
-            
-        parser = argparse.ArgumentParser(description=description)
-        parser.add_argument(
-            'param_file',
-            nargs='?',
-            help='Path to the JSON parameter file. If not provided, will look for default parameter files.'
-        )
-
-        return parser
-    
-    @classmethod
-    def run_from_args(cls, args: argparse.Namespace) -> int:
-        """
-        Run the experiment from parsed command line arguments.
-        
-        Args:
-            args: Parsed command line arguments
-            
-        Returns:
-            Exit code (0 for success, 1 for failure)
+            True if successful, False otherwise
         """
         # Set up basic logging
         logging.basicConfig(
@@ -686,48 +652,33 @@ class BaseLauncher:
         )
         
         try:
-            # Validate parameter file if provided
-            if args.param_file and not os.path.exists(args.param_file):
-                logging.error(f"Parameter file not found: {args.param_file}")
-                return 1
-              # Create launcher instance with parameter file
-            launcher = cls(param_file=args.param_file)
+            # Validate parameter file
+            if param_file and not os.path.exists(param_file):
+                logging.error(f"Parameter file not found: {param_file}")
+                return False
+            
+            # Create launcher instance with parameter file
+            launcher = cls(param_file=param_file)
             
             # Run the launcher
-            logging.info(f"Starting {cls.__name__} with parameters: {args.param_file}")
+            logging.info(f"Starting {cls.__name__} with parameters: {param_file}")
             
             success = launcher.run()
             
             if success:
                 logging.info(f"===== {cls.__name__.upper()} COMPLETED SUCCESSFULLY =====")               
-                return 0
+                return True
             else:
                 logging.error(f"===== {cls.__name__.upper()} FAILED =====")
                 logging.error("Check the logs above for error details.")
-                return 1
+                return False
                 
         except KeyboardInterrupt:
             logging.info("Launcher interrupted by user")
-            return 1
+            return False
         except Exception as e:
             logging.error(f"Unexpected error: {e}")
-            return 1
-    
-    @classmethod
-    def main(cls, description: str = None, args: List[str] = None) -> int:
-        """
-        Main entry point for experiment launchers.
-        
-        Args:
-            description: Description for the argument parser
-            args: Command line arguments (defaults to sys.argv)
-            
-        Returns:
-            Exit code (0 for success, 1 for failure)
-        """
-        parser = cls.create_argument_parser(description)
-        parsed_args = parser.parse_args(args)
-        return cls.run_from_args(parsed_args)
+            return False
     
     def _start_output_readers(self):
         """Start threads to read stdout and stderr in real-time."""
@@ -831,42 +782,13 @@ class BaseLauncher:
             return f"No errors reported by {self._get_launcher_type_name()}."
         return "\n".join(self.stderr_data)
 
-    def _confirm_param(self, param_name, param_value):
-        """Prompt user to confirm or edit a parameter value."""
-        new_value = param_utils.get_user_input(
-            f"{param_name}: '{param_value}' (press Enter to keep, or type new value)",
-            default=param_value, cast_func=str)
-        return new_value
-
-    def _get_valid_float(self, prompt, default=None):
-        """Prompt user for a float value, with validation."""
-        while True:
-            val = param_utils.get_user_input(f"{prompt} (grams, or leave blank for None)", default=default, cast_func=str)
-            if not val and default is not None:
-                return default
-            if not val:
-                return None
-            try:
-                fval = float(val)
-                if fval > 0:
-                    return fval
-                else:
-                    print("Please enter a positive number.")
-            except Exception:
-                print("Invalid input. Please enter a number or leave blank.")
-
-    def _collect_mouse_runtime_data(self, at_start=True):
-        """Prompt for animal weight at start or end if enabled."""
-        prompt = "Enter animal weight PRIOR to experiment" if at_start else "Enter animal weight POST experiment"
-        return param_utils.get_user_input(prompt, default=None, cast_func=float)
-
     def save_end_state(self, output_directory: str) -> bool:
         """
-        Save end-of-experiment state for post-processing tools.
+        Save end-of-experiment state for post-acquisition tools.
         
-        This saves essential runtime information that post-processing tools need,
+        This saves essential runtime information that post-acquisition tools need,
         such as session creation. The data is saved in a simple JSON format that
-        can be easily read by post-processing scripts.
+        can be easily read by post-acquisition scripts.
           Args:
             output_directory: Directory where end_state.json should be created
             
@@ -895,9 +817,6 @@ class BaseLauncher:
                     "stop_time": self.stop_time.isoformat() if hasattr(self, 'stop_time') and self.stop_time else None,
                 },
                 "experiment_data": {
-                    "experiment_notes": getattr(self, 'experiment_notes', None),
-                    "animal_weight_prior": getattr(self, 'animal_weight_prior', None),
-                    "animal_weight_post": getattr(self, 'animal_weight_post', None),
                     "output_session_folder": getattr(self, 'output_session_folder', None),
                 },
                 "parameters": getattr(self, 'params', {}),
@@ -926,7 +845,7 @@ class BaseLauncher:
         Get custom end state data from subclasses.
         
         Subclasses can override this method to add their own data to the end state file.
-        This data will be available to post-processing tools.
+        This data will be available to post-acquisition tools.
         
         Returns:
             Dictionary of custom data to include in end state, or None if no custom data
@@ -994,3 +913,45 @@ class BaseLauncher:
         except Exception as debug_e:
             logging.error(f"Failed to save debug state: {debug_e}")
             return False
+
+    def run_pre_acquisition(self, param_file=None) -> bool:
+        """
+        Run pre-acquisition steps defined in the parameter file.
+        Args:
+            param_file (str, optional): Path to parameter JSON file. If None, uses self.param_file.
+        Returns:
+            True if all steps succeed, False otherwise.
+        """
+        if param_file is None:
+            param_file = self.param_file
+        params = param_utils.load_parameters(param_file=param_file)
+        pipeline = params.get("pre_acquisition_pipeline", [])
+        all_success = True
+        for module_name in pipeline:
+            try:
+                logging.info(f"Running pre-acquisition step: {module_name}")
+                mod = importlib.import_module(f"src.openscope_experimental_launcher.pre_acquisition.{module_name}")
+                if hasattr(mod, "run_pre_acquisition"):
+                    result = mod.run_pre_acquisition(param_file)
+                    if result not in (None, 0):
+                        logging.error(f"Pre-acquisition step failed: {module_name} (exit code {result})")
+                        all_success = False
+                    else:
+                        logging.info(f"Pre-acquisition step completed: {module_name}")
+                else:
+                    logging.warning(f"Module {module_name} does not have run_pre_acquisition()")
+            except Exception as e:
+                logging.error(f"Error running pre-acquisition module {module_name}: {e}")
+                all_success = False
+        if all_success:
+            logging.info("All pre-acquisition steps completed successfully.")
+        else:
+            logging.warning("Some pre-acquisition steps failed. Check logs for details.")
+        return all_success
+
+def run_from_params(param_file):
+    """
+    Module-level entry point for the unified launcher wrapper.
+    Calls BaseLauncher.run_from_params.
+    """
+    return BaseLauncher.run_from_params(param_file)

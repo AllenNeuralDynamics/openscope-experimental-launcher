@@ -11,10 +11,10 @@ Future implementations will include:
 - Integration with AIND data standards
 
 Currently, experiment-specific stimulus table generation is handled by
-dedicated post-processing tools in the post_processing module.
+dedicated post-acquisition tools in the post_acquisition module.
 
 For example:
-- Predictive Processing: Uses pp_stimulus_converter.py
+- Predictive Processing: Uses stimulus_table_predictive_processing.py
 - Other experiments: Will have dedicated converter tools
 
 This approach provides better modularity and maintainability compared to

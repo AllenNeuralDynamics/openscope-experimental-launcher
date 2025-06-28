@@ -14,7 +14,7 @@ The `launcher_metadata` folder provides a complete record of:
 - The parameters and configuration used for the experiment
 - The runtime environment and software versions
 - Any user prompts or overrides entered during the session
-- Additional metadata needed for post-processing and data provenance
+- Additional metadata needed for post-acquisition and data provenance
 
 Contents
 --------
@@ -23,7 +23,7 @@ Typical files found in the `launcher_metadata` folder include:
 
 - **processed_parameters.json**
   - The unified parameter file used for the experiment, including all overrides and runtime prompts.
-  - This is the canonical input for all post-processing tools.
+  - This is the canonical input for all post-acquisition tools.
 
 - **launcher_metadata.json**
   - Metadata about the launcher, including:
@@ -43,7 +43,7 @@ Typical files found in the `launcher_metadata` folder include:
   - If an error or crash occurs, this file contains exception details and stack traces for troubleshooting.
 
 - **Other files**
-  - Additional metadata or logs may be included by custom launchers or post-processing tools.
+  - Additional metadata or logs may be included by custom launchers or post-acquisition tools.
 
 How It Is Created
 -----------------
@@ -58,8 +58,8 @@ Best Practices
 --------------
 
 - **Do not edit files in `launcher_metadata` manually.**
-  - These files are used by post-processing tools and for data provenance.
-- **Always use `processed_parameters.json` as the input for post-processing.**
+  - These files are used by post-acquisition tools and for data provenance.
+- **Always use `processed_parameters.json` as the input for post-acquisition.**
 - **Retain the entire session folder, including `launcher_metadata`, for reproducibility and auditing.**
 
 Example Structure

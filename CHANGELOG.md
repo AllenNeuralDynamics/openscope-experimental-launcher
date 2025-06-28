@@ -8,15 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Modular Session Creation**: Moved session.json creation from launchers to post-processing for better extensibility
+- **Modular Session Creation**: Moved session.json creation from launchers to post-acquisition for better extensibility
 - **Session Creator**: New `SessionCreator` class for standardized session.json generation
 - **Session Enhancer Framework**: Launcher-specific enhancement system (e.g., `session_enhancer_bonsai.py`)
 - **Improved Metadata Organization**: Runtime state files now organized in `launcher_metadata/` directory
 - **Enhanced Test Coverage**: Comprehensive test suite with 158 passing tests (56% code coverage)
-- **Post-Processing Template**: Standardized template for creating new post-processing tools
+- **Post-Acquisition Template**: Standardized template for creating new post-acquisition tools
 
 ### Changed
-- **BREAKING**: Session creation moved from launchers to post-processing workflow
+- **BREAKING**: Session creation moved from launchers to post-acquisition workflow
 - **File Organization**: 
   - `end_state.json` moved to `launcher_metadata/end_state.json`
   - `debug_state.json` moved to `launcher_metadata/debug_state.json`
@@ -38,14 +38,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 - **Updated Badges**: Corrected test count (158 passed) and coverage (56%)
-- **Post-Processing Guide**: Enhanced documentation for new session creation workflow
-- **Architecture Documentation**: Updated to reflect modular post-processing design
+- **Post-Acquisition Guide**: Enhanced documentation for new session creation workflow
+- **Architecture Documentation**: Updated to reflect modular post-acquisition design
 
 ## Architecture Changes
 
 This release represents a major architectural improvement with these key changes:
 
-1. **Session Creation Separation**: Session.json creation is now handled in post-processing, allowing for:
+1. **Session Creation Separation**: Session.json creation is now handled in post-acquisition, allowing for:
    - Better testability and modularity
    - Launcher-specific enhancements without coupling
    - Standalone session creation from existing data
@@ -54,4 +54,4 @@ This release represents a major architectural improvement with these key changes
 
 3. **Enhanced Metadata**: More comprehensive metadata collection and storage for better experiment reproducibility
 
-4. **Modular Design**: Post-processing tools follow a consistent template pattern for easier maintenance and extension
+4. **Modular Design**: Post-acquisition tools follow a consistent template pattern for easier maintenance and extension

@@ -9,7 +9,7 @@ Parameter files are JSON configuration files that define experiment-specific set
    configuration details and :doc:`configuration` for the complete system overview.
 
 .. important::
-   All post-processing tools now expect a **param_file (JSON)** as input, not a session folder. This enables unified parameter prompting and future GUI integration.
+   All post-acquisition tools now expect a **param_file (JSON)** as input, not a session folder. This enables unified parameter prompting and future GUI integration.
 
 Core Parameters
 ---------------

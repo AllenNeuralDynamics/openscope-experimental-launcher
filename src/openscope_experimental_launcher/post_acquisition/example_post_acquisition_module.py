@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-Example template for creating new post-processing tools.
+Example template for creating new post-acquisition tools.
 
-This template shows the recommended structure for post-processing tools.
-Copy this file and modify it to create new tools.
+This template shows the recommended structure for post-acquisition tools.
 """
 
 import logging
@@ -54,9 +53,9 @@ def process_session(session_folder: str, output_folder: Optional[str] = None) ->
         logging.error(f"Processing failed: {e}")
         return False
 
-def run_postprocessing(param_file: str = None, overrides: dict = None) -> int:
+def run_post_acquisition(param_file: str = None, overrides: dict = None) -> int:
     """
-    Main entry point for example post-processing tool.
+    Main entry point for example post-acquisition tool.
     Loads parameters, prompts for missing fields, and runs processing.
     Returns 0 on success, nonzero on error.
     """
@@ -87,18 +86,3 @@ def run_postprocessing(param_file: str = None, overrides: dict = None) -> int:
         return 1
     logging.info("Processing completed successfully")
     return 0
-
-if __name__ == "__main__":
-    import argparse
-    import sys
-    parser = argparse.ArgumentParser(
-        description="Example post-processing tool template (now using unified parameter file)",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  python example_tool_template.py processed_parameters.json
-        """
-    )
-    parser.add_argument("param_file", help="Path to processed_parameters.json from the launcher")
-    args = parser.parse_args()
-    sys.exit(run_postprocessing(param_file=args.param_file))

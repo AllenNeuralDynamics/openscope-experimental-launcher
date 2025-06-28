@@ -46,7 +46,6 @@ extensions = [
     "sphinx_autodoc_typehints",
     "sphinx_copybutton",
     "myst_parser",
-    "sphinx.ext.graphviz",  # Added for Graphviz diagrams
 ]
 templates_path = ["_templates"]
 exclude_patterns = []

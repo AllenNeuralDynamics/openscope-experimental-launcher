@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test the session creator post-processing tool.
+Test the session creator post-acquisition tool.
 """
 
 import json
@@ -18,7 +18,7 @@ try:
 except ImportError:
     AIND_AVAILABLE = False
 
-from openscope_experimental_launcher.post_processing.session_creator import SessionCreator
+from openscope_experimental_launcher.post_acquisition.session_creator import SessionCreator
 
 
 class TestSessionCreator:

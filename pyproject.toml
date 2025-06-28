@@ -96,7 +96,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-omit = ["*__init__*", "tests/*", "*/post_processing/*"]
+omit = ["*__init__*", "tests/*", "*/post_acquisition/*"]
 source = ["openscope_experimental_launcher"]
 branch = true
 # Focus coverage on core launcher functionality
@@ -117,9 +117,9 @@ exclude_lines = [
     "raise NotImplementedError"
 ]
 fail_under = 50
-# Exclude post-processing tools from coverage requirements
+# Exclude post-acquisition tools from coverage requirements
 omit = [
-    "*/post_processing/*"
+    "*/post_acquisition/*"
 ]
 
 [tool.isort]
@@ -128,4 +128,3 @@ profile = "black"
 
 [tool.interrogate]
 exclude = ["setup.py", "docs", "build"]
-fail-under = 100

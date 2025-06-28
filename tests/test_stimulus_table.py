@@ -25,4 +25,4 @@ class TestStimulusTableFunctions:
         """Test that the module has appropriate documentation."""
         assert stimulus_table.__doc__ is not None
         assert "Stimulus Table Utilities" in stimulus_table.__doc__
-        assert "post_processing" in stimulus_table.__doc__
+        assert "post_acquisition" in stimulus_table.__doc__

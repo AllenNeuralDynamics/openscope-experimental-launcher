@@ -27,7 +27,6 @@ __all__ = [
     "BonsaiLauncher", 
     "MatlabLauncher",
     "PythonLauncher",
-    "SLAP2Launcher",
     "bonsai_interface",
     "matlab_interface", 
     "python_interface",

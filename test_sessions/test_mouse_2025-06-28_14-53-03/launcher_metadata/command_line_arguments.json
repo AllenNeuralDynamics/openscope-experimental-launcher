@@ -1,0 +1,12 @@
+{
+  "command_line": "run_launcher.py --param_file params/example_mouse_notes_pipeline.json",
+  "arguments": [
+    "run_launcher.py",
+    "--param_file",
+    "params/example_mouse_notes_pipeline.json"
+  ],
+  "working_directory": "C:\\Users\\jeromel\\Documents\\OpenScope\\Scripts\\openscope-experimental-launcher",
+  "python_executable": "C:\\Users\\jeromel\\AppData\\Local\\miniconda3\\envs\\openscope-experimental-launcher\\python.exe",
+  "original_param_file": "params/example_mouse_notes_pipeline.json",
+  "timestamp": "2025-06-28T14:53:03.806328"
+}

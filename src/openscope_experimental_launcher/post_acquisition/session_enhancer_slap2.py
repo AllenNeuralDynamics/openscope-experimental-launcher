@@ -1,3 +1,56 @@
+"""
+SLAP2 Session Enhancement Post-Acquisition Tool
+Enhances existing session.json files with SLAP2-specific information
+by adding SLAP2 stream objects and populating required fields.
+
+This module is intended to be used as a command-line tool, but the
+enhance_existing_slap2_session function can be used directly to enhance
+sessions programmatically.
+
+Usage:
+  python session_enhancer_slap2.py processed_parameters.json
+
+Arguments:
+  processed_parameters.json  Path to the processed_parameters.json file
+  containing output folder and other parameters.
+
+Description:
+  This script enhances existing session.json files with SLAP2-specific
+  information, including adding SLAP2 stream objects and populating
+  required fields. It is intended to be used as a command-line tool,
+  but the enhance_existing_slap2_session function can also be used
+  directly to enhance sessions programmatically.
+
+  The script performs the following steps:
+  - Finds the most recent DMD1 and DMD2 meta files, Summary.mat file,
+    and .harp folder under the session folder.
+  - Loads the session.json file and extracts the session start time.
+  - Extracts timing data from the HARP folder if available.
+  - Reads DMD dilation, raster size, and z-slice information from the
+    meta files.
+  - Creates SLAP2 stream objects for DMD1 and DMD2 by populating the
+    required fields in the aind-data-schema SlapFieldOfView and Stream
+    objects.
+  - Adds the SLAP2 streams to the session.json file and saves it.
+
+  The script also provides a run_post_acquisition function that serves as
+  a unified entry point for SLAP2 session enhancement. It loads
+  parameters, prompts for missing fields, and runs the enhancement
+  process.
+
+  Example:
+    python session_enhancer_slap2.py processed_parameters.json
+
+  This will enhance the session.json file in the specified output folder
+  with SLAP2 streams for DMD1 and DMD2.
+
+  Note:
+    - This module requires the aind-data-schema and
+      openscope_experimental_launcher packages.
+    - The session_folder parameter must contain the output_session_folder
+      field in its parameters.json file.
+"""
+
 import os
 import glob
 import json
@@ -17,7 +70,7 @@ except ImportError:
     AIND_AVAILABLE = False
 
 try:
-    from openscope_experimental_launcher.post_processing.pp_stimulus_converter import get_timing_data
+    from openscope_experimental_launcher.post_acquisition.stimulus_table_predictive_processing import get_timing_data
 except ImportError:
     get_timing_data = None
 
@@ -285,19 +338,19 @@ def enhance_existing_slap2_session(session_folder: str, targeted_structure=None,
     return True
 
 
-def main():
-    import argparse
-    parser = argparse.ArgumentParser(
-        description="Enhance existing session.json files with SLAP2 streams")
-    parser.add_argument("param_file", help="Path to processed_parameters.json from the launcher")
-    args = parser.parse_args()
-
+def run_post_acquisition(param_file: str = None, overrides: dict = None) -> int:
+    """
+    Unified entry point for SLAP2 session enhancement.
+    Loads parameters, prompts for missing fields, and runs enhancement.
+    Returns 0 on success, 1 on error.
+    """
+    import logging
+    from pathlib import Path
+    from openscope_experimental_launcher.utils import param_utils
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s'
     )
-
-    # Load parameters from processed_param_file and prompt for missing ones
     required_fields = [
         "output_session_folder", "session_type", "targeted_structure", "fov_coordinate_ml", "fov_coordinate_ap", "fov_coordinate_unit", "fov_reference", "magnification", "fov_scale_factor"
     ]
@@ -327,14 +380,13 @@ def main():
         if val not in ("Parent", "Branch"):
             raise ValueError("Session type must be 'Parent' or 'Branch'")
         return val
-    
     def _prompt_func(prompt, default):
         if 'session type' in prompt.lower():
             return param_utils.get_user_input(prompt, default, cast_func=_validate_session_type)
         return param_utils.get_user_input(prompt, default)
-    
     params = param_utils.load_parameters(
-        param_file=args.param_file,
+        param_file=param_file,
+        overrides=overrides,
         required_fields=required_fields,
         defaults=defaults,
         help_texts=help_texts,
@@ -342,11 +394,9 @@ def main():
     )
     session_folder = params["output_session_folder"]
     session_type = params["session_type"]
-
     if not Path(session_folder).exists():
-        logger.error(f"Session folder does not exist: {session_folder}")
+        logging.error(f"Session folder does not exist: {session_folder}")
         return 1
-
     try:
         ok = enhance_existing_slap2_session(
             session_folder,
@@ -360,13 +410,10 @@ def main():
             session_type=session_type
         )
     except Exception as e:
-        logger.error(f"Validation or runtime error: {e}")
+        logging.error(f"Validation or runtime error: {e}")
         return 1
     if not ok:
-        logger.error("Failed to enhance session with SLAP2 streams")
+        logging.error("Failed to enhance session with SLAP2 streams")
         return 1
-    logger.info("SLAP2 session enhancement completed successfully")
+    logging.info("SLAP2 session enhancement completed successfully")
     return 0
-if __name__ == "__main__":
-    import sys
-    sys.exit(main())

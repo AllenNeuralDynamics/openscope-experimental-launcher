@@ -1,4 +1,12 @@
 {
+    "launcher": "bonsai",
+    "pre_acquisition_pipeline": [
+        "zmq_ready_publisher",
+        "zmq_ready_waiter",
+        "example_pre_acquisition_module"
+    ],
+    "zmq_ready_publisher_wait": 1.0,
+    "zmq_ready_waiter_timeout": 5.0,
     "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
     "repository_commit_hash": "main",
     "local_repository_path": "C:/BonsaiDataPredictiveProcessingTest",
@@ -8,6 +16,11 @@
     "subject_id": "test_mouse",
     "user_id": "test_user",
     "output_root_folder": "C:/BonsaiDataPredictiveProcessing", 
-    "script_parameters": {
-    }
+    "script_parameters": {},
+    "post_acquisition_pipeline": [
+        "session_creator",
+        "session_enhancer_bonsai",
+        "stimulus_table_predictive_processing",
+        "session_enhancer_predictive_processing"
+    ]
 }

@@ -1,4 +1,11 @@
 {
+    "launcher": "base",
+    "pre_acquisition_pipeline": [
+        "example_pre_acquisition_module"
+    ],
+    "post_acquisition_pipeline": [
+        "example_post_acquisition_module"
+    ],
     "subject_id": "test_mouse_001",
     "user_id": "test_user",
     "script_path": "echo",

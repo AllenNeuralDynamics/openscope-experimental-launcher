@@ -46,22 +46,21 @@ class TestBaseLauncher:
         assert isinstance(experiment.params, dict)
 
     def test_start_process_success(self, temp_dir):
-        """Test successful process start via BaseLauncher (should fail without implementation)."""
+        """Test successful process start via BaseLauncher (dummy subprocess)."""
         experiment = BaseLauncher()
         experiment.params = {
             "script_path": os.path.join(temp_dir, "test_script.txt"),
             "subject_id": "test_mouse",
             "output_root_folder": temp_dir
         }
-        
         # Create a mock script file
         os.makedirs(temp_dir, exist_ok=True)
         with open(os.path.join(temp_dir, "test_script.txt"), "w") as f:
             f.write("test script")
-        
-        # BaseLauncher.create_process should raise NotImplementedError
-        with pytest.raises(NotImplementedError):
-            experiment.create_process()
+        # BaseLauncher.create_process should run a dummy subprocess and return a process object
+        process = experiment.create_process()
+        assert process is not None
+        assert hasattr(process, 'poll')
 
     def test_stop_process(self):
         """Test stopping the process."""
@@ -141,19 +140,19 @@ class TestBaseLauncher:
         
         assert isinstance(errors, str)
 
-    def test_post_experiment_processing(self):
-        """Test post-experiment processing functionality."""
+    def test_post_experiment_acquisition(self):
+        """Test post-experiment post-acquisition functionality."""
         experiment = BaseLauncher()
+        experiment.param_file = "/tmp/test_session"
         # Prepare a fake processed_parameters.json content
         fake_json = '{"output_session_folder": "/tmp/test_session"}'
-        # Patch open to return the fake JSON when the param file is read
         from unittest.mock import mock_open
         m = mock_open(read_data=fake_json)
         with patch('os.path.exists', return_value=True), \
              patch('builtins.open', m):
-            result = BaseLauncher.run_post_processing("/tmp/test_session")
+            result = experiment.run_post_acquisition(param_file="/tmp/test_session")
             assert isinstance(result, bool)
-    
+
     def test_run_success(self, temp_dir, param_file):
         """Test successful experiment run with mocked create_process."""
         # Initialize with the parameter file
@@ -174,7 +173,7 @@ class TestBaseLauncher:
              patch.object(experiment, 'start_experiment', side_effect=mock_start_experiment), \
              patch.object(experiment, 'determine_output_session_folder', return_value=temp_dir), \
              patch.object(experiment, 'save_launcher_metadata'), \
-             patch.object(BaseLauncher, 'run_post_processing', return_value=True):
+             patch.object(BaseLauncher, 'run_post_acquisition', return_value=True):
             
             result = experiment.run()
             
@@ -307,19 +306,3 @@ class TestBaseLauncher:
             experiment_with_rig_config = BaseLauncher(param_file=None, rig_config_path="/custom/path")
             assert hasattr(experiment_with_rig_config, 'params')
             assert isinstance(experiment_with_rig_config.params, dict)
-
-    def test_argument_parser_modes(self):
-        """Test argument parser with current implementation."""
-        parser = BaseLauncher.create_argument_parser()
-        
-        # Test with param file
-        args = parser.parse_args(['params.json'])
-        assert args.param_file == 'params.json'
-        
-        # Test without param file (optional)
-        args = parser.parse_args([])
-        assert args.param_file is None
-        
-        # Test with description
-        parser_with_desc = BaseLauncher.create_argument_parser("Custom description")
-        assert parser_with_desc.description == "Custom description"

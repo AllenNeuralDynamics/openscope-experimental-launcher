@@ -17,7 +17,7 @@ OpenScope Experimental Launcher Documentation
 .. image:: https://img.shields.io/badge/python->=3.8-blue?logo=python
    :alt: Python Version
 
-**Modular experimental launcher for OpenScope with support for Bonsai, MATLAB, and Python workflows.**
+**Modular, pipeline-driven experimental launcher for OpenScope. All pre- and post-acquisition logic is handled by standalone modules, not the launcher core.**
 
 Overview
 --------
@@ -28,7 +28,7 @@ Key Features
 ------------
 
 🏗️ **Modular Architecture**
-   Clean separation between launchers (process management) and interfaces (process creation)
+   Clean separation between launchers (process management), interfaces (process creation), and pipeline modules (pre/post-acquisition logic)
 
 🔧 **Multi-Interface Support**
    Dedicated launchers for Bonsai, MATLAB, and Python workflows
@@ -39,20 +39,8 @@ Key Features
 🗂️ **Unified Parameter Management**
    Consistent parameter handling with ``script_path`` convention across all interfaces
 
-🔄 **Git Repository Management**
-   Automatic cloning and version control of workflow repositories
-
-📈 **Process Monitoring**
-   Memory usage monitoring and automatic handling of runaway processes
-
-🎯 **Project Flexibility**
-   Custom project launchers via scripts without modifying core code
-
-🐁 **Runtime Data Collection**
-   Interactive prompts for protocol confirmation and animal weight collection
-
-🧪 **Stateless Design**
-   Interface modules provide pure functions with no global state for better testability
+🔌 **Pipeline Modules**
+   All pre- and post-acquisition steps are handled by modular, reusable Python modules, specified in the parameter file
 
 Quick Start
 -----------
@@ -90,7 +78,9 @@ Quick Start
           "repository_url": "https://github.com/user/repo.git",
           "output_root_folder": "C:/experiment_data",
           "collect_mouse_runtime_data": true,
-          "protocol_id": ["protocol_001"]
+          "protocol_id": ["protocol_001"],
+          "pre_acquisition_pipeline": ["mouse_weight_pre_prompt", "zmq_ready_publisher"],
+          "post_acquisition_pipeline": ["session_creator", "mouse_weight_post_prompt", "experiment_notes_post_prompt"]
       }
 
 Architecture
@@ -102,15 +92,16 @@ The package uses a modular architecture with clear separation of concerns:
 
 - **Launchers** (``src/openscope_experimental_launcher/launchers/``): Interface-specific launcher classes that inherit from ``BaseLauncher``
 - **Interfaces** (``src/openscope_experimental_launcher/interfaces/``): Stateless process creation utilities for each platform
+- **Pre/Post-Acquisition Modules** (``src/openscope_experimental_launcher/pre_acquisition/``, ``post_acquisition/``): Modular pipeline steps for experiment setup and teardown
 - **Utilities** (``src/openscope_experimental_launcher/utils/``): Shared utilities for configuration, Git management, and monitoring
 - **Scripts** (``scripts/``): Project-specific launcher scripts for custom experiments
 
 **Design Principles:**
 
-- **Single Responsibility**: Each launcher handles one interface type, each interface handles only process creation
+- **Single Responsibility**: Each launcher handles one interface type, each interface handles only process creation, each module handles one pipeline step
 - **Stateless Functions**: Interface modules provide pure functions with no global state
 - **Common Base Logic**: All launchers share functionality through ``BaseLauncher`` (process management, monitoring, logging)
-- **Project Flexibility**: Custom launchers can be created without modifying core code
+- **Project Flexibility**: Custom launchers and modules can be created without modifying core code
 
 System Requirements
 -------------------
@@ -140,10 +131,12 @@ Contents
    rig_config
    parameter_files
    rig_launchers
-   post_processing
+   pre_acquisition
+   post_acquisition
    logging
    launcher_metadata
    architecture
+   contributing
 
 Indices and Tables
 ==================

@@ -1,0 +1,13 @@
+{
+  "launcher": "base",
+  "subject_id": "test_mouse",
+  "user_id": "test_user",
+  "output_root_folder": "./test_sessions",
+  "pre_acquisition_pipeline": [
+    "mouse_weight_pre_prompt"
+  ],
+  "post_acquisition_pipeline": [
+    "mouse_weight_post_prompt",
+    "experiment_notes_post_prompt"
+  ]
+}

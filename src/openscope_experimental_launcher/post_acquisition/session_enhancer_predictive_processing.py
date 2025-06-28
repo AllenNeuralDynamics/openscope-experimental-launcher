@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Predictive Processing Session Enhancement Post-Processing Tool
+Predictive Processing Session Enhancement Post-Acquisition Tool
 
 This tool enhances existing session.json files by adding Predictive Processing-specific data streams
 and stimulus epochs. It loads the base session.json created by the standard SessionCreator and adds:
@@ -17,7 +17,6 @@ import pandas as pd
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional, Dict, Any
-from openscope_experimental_launcher.utils import param_utils
 
 try:
     from aind_data_schema.core.session import Session, Stream, StimulusEpoch, SlapFieldOfView
@@ -28,11 +27,11 @@ except ImportError:
     AIND_AVAILABLE = False
 
 try:
-    from .pp_stimulus_converter import get_timing_data
+    from .stimulus_table_predictive_processing import get_timing_data
 except ImportError:
     # Fallback for direct execution
     try:
-        from openscope_experimental_launcher.post_processing.pp_stimulus_converter import get_timing_data
+        from openscope_experimental_launcher.post_acquisition.stimulus_table_predictive_processing import get_timing_data
     except ImportError:
         get_timing_data = None
 
@@ -59,7 +58,7 @@ class PredictiveProcessingSessionEnhancer:
             return False
         
         if get_timing_data is None:
-            logging.error("pp_stimulus_converter not available, cannot read HARP timing data")
+            logging.error("stimulus_table_predictive_processing not available, cannot read HARP timing data")
             return False
         
         try:
@@ -354,11 +353,11 @@ def enhance_existing_session(session_folder: str) -> bool:
     return enhancer.enhance_session()
 
 
-def run_postprocessing(param_file: str = None, overrides: dict = None) -> int:
+def run_post_acquisition(param_file: str = None, overrides: dict = None) -> int:
     """
-    Main entry point for Predictive Processing session enhancement post-processing.
+    Unified entry point for Predictive Processing session enhancement.
     Loads parameters, prompts for missing fields, and runs enhancement.
-    Returns 0 on success, nonzero on error.
+    Returns 0 on success, 1 on error.
     """
     import logging
     from pathlib import Path
@@ -381,24 +380,9 @@ def run_postprocessing(param_file: str = None, overrides: dict = None) -> int:
     if not Path(session_folder).exists():
         logging.error(f"Session folder does not exist: {session_folder}")
         return 1
-    enhancer = PredictiveProcessingSessionEnhancer(session_folder)
-    if not enhancer.enhance_session():
+    # Call the main enhancement logic
+    if not enhance_existing_session(session_folder):
         logging.error("Failed to enhance session with Predictive Processing information")
         return 1
     logging.info("Predictive Processing session enhancement completed successfully")
     return 0
-
-if __name__ == "__main__":
-    import argparse
-    import sys
-    parser = argparse.ArgumentParser(
-        description="Enhance existing session.json files with Predictive Processing-specific information",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  python session_enhancer_predictive_processing.py processed_parameters.json
-        """
-    )
-    parser.add_argument("param_file", help="Path to processed_parameters.json from the launcher")
-    args = parser.parse_args()
-    sys.exit(run_postprocessing(param_file=args.param_file))

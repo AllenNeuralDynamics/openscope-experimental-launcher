@@ -24,6 +24,16 @@ Launcher Architecture
            MinimalistLauncher [label="MinimalistLauncher"];
        }
 
+       subgraph cluster_pre {
+           label="Pre-Acquisition Pipeline";
+           PreModules [label="Pre-Acquisition Modules\n(mouse weight, ZMQ, etc.)"];
+       }
+
+       subgraph cluster_post {
+           label="Post-Acquisition Pipeline";
+           PostModules [label="Post-Acquisition Modules\n(session_creator, notes, etc.)"];
+       }
+
        subgraph cluster_interfaces {
            label="Interfaces";
            InterfaceBonsai [label="BonsaiInterface"];
@@ -31,72 +41,58 @@ Launcher Architecture
            InterfacePython [label="PythonInterface"];
        }
 
-       subgraph cluster_post {
-           label="Post-Processing";
-           PostProcessing [label="Post-Processing\n(session_creator, etc.)"];
-       }
-
-       # Parameter tiers
        ParamFile [label="Parameter File (JSON)", shape=note, fillcolor=lightyellow];
        RigConfigFile [label="Rig Config (TOML)", shape=note, fillcolor=lightyellow];
        RuntimePrompt [label="Runtime Prompts", shape=note, fillcolor=lightyellow];
 
        # Relationships
+       ParamFile -> PreModules;
+       PreModules -> BaseLauncher;
        BaseLauncher -> BonsaiLauncher;
        BaseLauncher -> MatlabLauncher;
        BaseLauncher -> PythonLauncher;
        BaseLauncher -> MinimalistLauncher;
-
        BonsaiLauncher -> InterfaceBonsai;
        MatlabLauncher -> InterfaceMatlab;
        PythonLauncher -> InterfacePython;
-
        BaseLauncher -> ParamUtils;
        BaseLauncher -> RigConfig;
        BaseLauncher -> GitManager;
-       BaseLauncher -> Logging;
-       BaseLauncher -> PostProcessing;
-
-       # Parameter tiers flow
-       ParamFile -> ParamUtils;
-       RigConfigFile -> RigConfig;
-       RuntimePrompt -> ParamUtils;
-
-       # Logging flow
        BaseLauncher -> Logging;
        BonsaiLauncher -> Logging;
        MatlabLauncher -> Logging;
        PythonLauncher -> Logging;
        MinimalistLauncher -> Logging;
+       BaseLauncher -> PostModules;
+       PostModules -> ParamFile;
+       RigConfigFile -> RigConfig;
+       RuntimePrompt -> ParamUtils;
    }
 
 
-Architecture Details
---------------------
+Philosophy: Modular Pre- and Post-Acquisition
+---------------------------------------------
 
-- **Parameter Tiers:**
+The OpenScope launcher is designed for maximum flexibility and reproducibility. All experiment-specific logic (e.g., mouse weight prompts, ZMQ signaling, experiment notes, data enhancement) is handled by modular pipeline modules, not the launcher core. This ensures:
 
-  1. **Parameter File (JSON):** User-supplied experiment settings.
-  2. **Rig Config (TOML):** Hardware and rig-specific configuration.
-  3. **Runtime Prompts:** Interactive prompts for missing or runtime-only values.
-  - **Priority:** Runtime Prompts > Parameter File > Rig Config
+- **Generic launchers** for each language/software (Bonsai, MATLAB, Python)
+- **All pre- and post-acquisition steps** are modular and easily extended
+- **Parameter files** define which modules run for each experiment
+- **Symmetry**: Pre- and post-acquisition are handled identically, via ordered module lists
 
-- **Logging:**
+How Modules Are Inserted
+------------------------
 
-  - Each launcher and the core logic write to session-based log files.
-  - Optionally, logs are mirrored to a centralized directory.
-  - Logging covers all experiment phases: setup, execution, post-processing, and cleanup.
+To add a pre- or post-acquisition step, simply add the module name to the appropriate list in your parameter file:
 
-- **Post-Processing:**
+.. code-block:: json
 
-  - Modular tools (e.g., session_creator) operate on the output session folder and metadata.
+    {
+      "pre_acquisition_pipeline": ["mouse_weight_pre_prompt", "zmq_ready_publisher"],
+      "post_acquisition_pipeline": ["mouse_weight_post_prompt", "experiment_notes_post_prompt"],
+      ...
+    }
 
-- **Interfaces:**
+Each module is a Python file in `src/openscope_experimental_launcher/pre_acquisition/` or `post_acquisition/`, and must accept a `param_file` argument and return 0 for success, 1 for failure.
 
-  - Stateless modules for process creation (Bonsai, MATLAB, Python).
-
-- **Extensibility:**
-
-  - New launchers, interfaces, or post-processing tools can be added with minimal changes to the core.
-
-For more, see the code in `src/openscope_experimental_launcher/launchers/` and related modules.
+For more, see the [Pre-Acquisition](pre_acquisition.html) and [Post-Acquisition](post_acquisition.html) pages, and the [Contributing](contributing.html) guide.

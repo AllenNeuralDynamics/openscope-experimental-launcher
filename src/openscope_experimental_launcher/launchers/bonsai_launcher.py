@@ -151,26 +151,43 @@ class BonsaiLauncher(BaseLauncher):
         
         return process
 
-    @staticmethod
-    def run_post_processing(session_directory: str) -> bool:
+    @classmethod
+    def run_from_params(cls, param_file):
         """
-        Bonsai-specific post-processing using unified param_file workflow.
-        Calls session_creator and session_enhancer_bonsai run_postprocessing APIs.
-        Returns True if both steps succeed, False otherwise.
+        Run the experiment with the specified parameters (Bonsai version).
+        
+        Args:
+            param_file: Path to the JSON parameter file
+        
+        Returns:
+            True if successful, False otherwise
         """
-        logging.info(f"Running Bonsai post-processing for: {session_directory}")
-        metadata_dir = os.path.join(session_directory, "launcher_metadata")
-        param_file = os.path.join(metadata_dir, "processed_parameters.json")
-        from openscope_experimental_launcher.post_processing import session_creator
-        from openscope_experimental_launcher.post_processing import session_enhancer_bonsai
-        result1 = session_creator.run_postprocessing(param_file=param_file)
-        if result1 != 0:
-            logging.error(f"Session creation post-processing failed (exit code {result1})")
+        # Set up basic logging
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s'
+        )
+        try:
+            if param_file and not os.path.exists(param_file):
+                logging.error(f"Parameter file not found: {param_file}")
+                return False
+            launcher = cls(param_file=param_file)
+            logging.info(f"Starting {cls.__name__} with parameters: {param_file}")
+            process = launcher.create_process()
+            if process:
+                process.wait()
+                return process.returncode == 0
+            else:
+                return False
+        except Exception as e:
+            logging.error(f"Exception in BonsaiLauncher: {e}")
             return False
-        result2 = session_enhancer_bonsai.run_postprocessing(param_file=param_file)
-        if result2 != 0:
-            logging.warning(f"Bonsai session enhancement failed (exit code {result2}), but base session exists")
-        else:
-            logging.info("Bonsai session enhancement completed successfully")
-        logging.info("Bonsai post-processing completed successfully")
-        return True
+
+# Module-level entry point for unified launcher
+
+def run_from_params(param_file):
+    """
+    Module-level entry point for the unified launcher wrapper.
+    Calls BonsaiLauncher.run_from_params.
+    """
+    return BonsaiLauncher.run_from_params(param_file)

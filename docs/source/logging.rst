@@ -10,7 +10,7 @@ Key Features
 ------------
 
 - **Session-based logs:** Each experiment run creates a dedicated log file in the session output folder.
-- **Continuous logging:** Logs are written throughout the experiment lifecycle, including setup, execution, post-processing, and cleanup.
+- **Continuous logging:** Logs are written throughout the experiment lifecycle, including setup, execution, post-acquisition, and cleanup.
 - **Centralized log directory (optional):** Logs can be mirrored to a centralized location for backup or monitoring.
 - **Automatic log finalization:** All log handlers are flushed and closed at the end of each run.
 - **Error and exception reporting:** All errors and exceptions are logged with stack traces for troubleshooting.
@@ -42,9 +42,9 @@ Log Contents
   - Process creation and termination
   - Resource usage (memory, CPU)
 
-- **Post-processing:**
+- **Post-acquisition:**
 
-  - Post-processing steps and results
+  - Post-acquisition steps and results
   - Errors and warnings
 
 - **Custom notes:**
@@ -62,9 +62,9 @@ How Logging Works
 
    - All major events, warnings, and errors are logged.
    - Log messages include timestamps and severity levels.
-3. **Post-Processing:**
+3. **Post-Acquisition:**
 
-   - Post-processing modules log their progress and any issues.
+   - Post-acquisition modules log their progress and any issues.
 4. **Finalization:**
 
    - Log handlers are flushed and closed to ensure all messages are saved.
@@ -80,7 +80,7 @@ Customizing Logging
   - Set `centralized_log_directory` in your parameter file to enable log mirroring.
 - **Additional log messages:**
 
-  - You can add custom log messages in your own launcher or post-processing modules using Python's `logging` module.
+  - You can add custom log messages in your own launcher or post-acquisition modules using Python's `logging` module.
 
 Example: Accessing Log Files
 ----------------------------

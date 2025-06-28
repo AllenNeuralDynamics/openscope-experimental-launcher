@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Predictive Processing Stimulus Table Converter
+Predictive Processing Stimulus Table Post-Acquisition Tool
 
 Simple script to convert orientation data from SLAP2 experiments into 
 standardized stimulus tables for the OpenScope Predictive Processing project.
@@ -12,8 +12,10 @@ This does the essential work without all the launcher complexity:
 - Generates analysis reports
 
 Usage:
-    python pp_stimulus_converter.py <session_folder> [output_folder]
+    python stimulus_table_predictive_processing.py <session_folder> [output_folder]
 """
+
+# This file has been renamed. Please use stimulus_table_predictive_processing.py for all future development.
 
 import os
 import sys
@@ -292,9 +294,9 @@ def convert_orientation_to_stimulus_table(session_folder: str, output_folder: Op
     return True
 
 
-def run_postprocessing(param_file: str = None, overrides: dict = None) -> int:
+def run_post_acquisition(param_file: str = None, overrides: dict = None) -> int:
     """
-    Main entry point for stimulus table conversion post-processing.
+    Main entry point for stimulus table conversion post-acquisition.
     Loads parameters, prompts for missing fields, and runs conversion.
     Returns 0 on success, nonzero on error.
     """
@@ -325,18 +327,3 @@ def run_postprocessing(param_file: str = None, overrides: dict = None) -> int:
         return 1
     logging.info("Stimulus table conversion completed successfully for session: %s", session_folder)
     return 0
-
-if __name__ == "__main__":
-    import argparse
-    import sys
-    parser = argparse.ArgumentParser(
-        description="Convert orientation data from SLAP2 experiments into standardized stimulus tables for OpenScope Predictive Processing.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  python pp_stimulus_converter.py processed_parameters.json
-        """
-    )
-    parser.add_argument("param_file", help="Path to processed_parameters.json from the launcher")
-    args = parser.parse_args()
-    sys.exit(run_postprocessing(param_file=args.param_file))
