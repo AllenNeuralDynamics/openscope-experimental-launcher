@@ -69,6 +69,25 @@ Launcher Architecture
        RuntimePrompt -> ParamUtils;
    }
 
+.. note::
+   The above diagram is compiled automatically by GitHub Actions and reflects the current modular pipeline architecture.
+
+Repository Folder Structure
+--------------------------
+
+- ``src/openscope_experimental_launcher/``: Main package source code
+  - ``launchers/``: Generic and interface-specific launcher classes (Bonsai, MATLAB, Python, etc.)
+  - ``interfaces/``: Stateless process creation utilities for each platform
+  - ``pre_acquisition/``: Modular pre-acquisition pipeline modules (mouse weight, ZMQ, etc.)
+  - ``post_acquisition/``: Modular post-acquisition pipeline modules (session creation, notes, enhancement, etc.)
+  - ``utils/``: Shared utilities (configuration, git, logging, etc.)
+- ``params/``: Example and project-specific parameter files (JSON)
+- ``tests/``: Unit and integration tests for all core logic and modules
+- ``docs/``: Documentation sources (reStructuredText, Sphinx, and build scripts)
+- ``run_launcher.py``: CLI entry point for running experiments with a parameter file
+- ``run_module.py``: CLI entry point for running any pipeline module directly
+- ``setup.py``, ``pyproject.toml``: Packaging and build configuration
+- ``README.md``, ``LICENSE``, etc.: Project metadata and top-level documentation
 
 Philosophy: Modular Pre- and Post-Acquisition
 ---------------------------------------------

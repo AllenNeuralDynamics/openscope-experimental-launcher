@@ -10,7 +10,8 @@ Key Features
 ------------
 
 - **Session-based logs:** Each experiment run creates a dedicated log file in the session output folder.
-- **Continuous logging:** Logs are written throughout the experiment lifecycle, including setup, execution, post-acquisition, and cleanup.
+- **Continuous logging:** Logs are written throughout the experiment lifecycle, including setup, execution, pre-acquisition, post-acquisition, and cleanup.
+- **Modular pipeline logging:** All pre- and post-acquisition modules log to the same session log, ensuring a complete record of the pipeline.
 - **Centralized log directory (optional):** Logs can be mirrored to a centralized location for backup or monitoring.
 - **Automatic log finalization:** All log handlers are flushed and closed at the end of each run.
 - **Error and exception reporting:** All errors and exceptions are logged with stack traces for troubleshooting.
@@ -42,10 +43,10 @@ Log Contents
   - Process creation and termination
   - Resource usage (memory, CPU)
 
-- **Post-acquisition:**
+- **Pre- and Post-acquisition pipeline:**
 
-  - Post-acquisition steps and results
-  - Errors and warnings
+  - Each module logs its actions, results, and any errors or warnings
+  - The log provides a full trace of the pipeline steps
 
 - **Custom notes:**
 
@@ -62,9 +63,9 @@ How Logging Works
 
    - All major events, warnings, and errors are logged.
    - Log messages include timestamps and severity levels.
-3. **Post-Acquisition:**
+3. **Pre- and Post-Acquisition:**
 
-   - Post-acquisition modules log their progress and any issues.
+   - All pipeline modules log their progress and any issues to the session log.
 4. **Finalization:**
 
    - Log handlers are flushed and closed to ensure all messages are saved.
@@ -80,7 +81,13 @@ Customizing Logging
   - Set `centralized_log_directory` in your parameter file to enable log mirroring.
 - **Additional log messages:**
 
-  - You can add custom log messages in your own launcher or post-acquisition modules using Python's `logging` module.
+  - You can add custom log messages in your own launcher or pipeline modules using Python's `logging` module.
+
+Best Practices for Module Authors
+---------------------------------
+- Use the standard Python `logging` module for all log messages.
+- Log important actions, parameter values, and any errors or exceptions.
+- Avoid printing directly to stdout/stderr; use logging for traceability.
 
 Example: Accessing Log Files
 ----------------------------
