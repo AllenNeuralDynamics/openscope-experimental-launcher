@@ -1,35 +1,111 @@
 Launcher Architecture
 =====================
 
+Experiment Flow Diagram
+----------------------
+
 .. graphviz::
 
-   digraph launcher_flow {
+   digraph experiment_flow {
        rankdir=LR;
        node [shape=box, style=filled, fillcolor=lightgray];
 
        ParamFile [label="Parameter File (JSON)", shape=note, fillcolor=lightyellow];
        RigConfigFile [label="Rig Config (TOML)", shape=note, fillcolor=lightyellow];
        RuntimePrompt [label="Runtime Prompts", shape=note, fillcolor=lightyellow];
-       ParamMerge [label="Merged Parameters\n(param > rig config > runtime)", shape=box, fillcolor=lightblue];
+       Launcher [label="Launcher\n(flow orchestrator)", shape=box, fillcolor=lightblue, style="filled,bold"];
        PrePipeline [label="Pre-Acquisition Pipeline\n(modules)"];
        Acquisition [label="Acquisition Subprocess\n(Bonsai, MATLAB, Python, etc.)"];
        PostPipeline [label="Post-Acquisition Pipeline\n(modules)"];
        SessionFolder [label="Session Folder\n(all logs, metadata, data)", shape=folder, fillcolor=yellow];
 
-       ParamFile -> ParamMerge;
-       RigConfigFile -> ParamMerge;
-       RuntimePrompt -> ParamMerge;
-       ParamMerge -> PrePipeline;
-       PrePipeline -> Acquisition;
-       Acquisition -> PostPipeline;
+       ParamFile -> Launcher;
+       RigConfigFile -> Launcher;
+       RuntimePrompt -> Launcher;
+       Launcher -> PrePipeline;
        PrePipeline -> SessionFolder;
+       Launcher -> Acquisition;
        Acquisition -> SessionFolder;
+       Launcher -> PostPipeline;
        PostPipeline -> SessionFolder;
-       ParamMerge -> SessionFolder;
    }
 
 .. note::
-   The above diagram is compiled automatically by GitHub Actions and reflects the current modular pipeline architecture and data flow.
+   The launcher manages the entire experiment flow: merging parameters, prompting for missing info, running pre-acquisition modules, launching the acquisition subprocess, and running post-acquisition modules. All steps write to the session folder.
+
+System Architecture Diagram
+--------------------------
+
+.. graphviz::
+
+   digraph launcher_architecture {
+       rankdir=LR;
+       node [shape=box, style=filled, fillcolor=lightgray];
+
+       subgraph cluster_core {
+           label="Core Logic";
+           BaseLauncher [label="BaseLauncher\n(core logic)"];
+           ParamUtils [label="param_utils.py\n(parameter loading, prompts)"];
+           RigConfig [label="rig_config.py\n(rig hardware config)"];
+           GitManager [label="git_manager.py\n(repo management)"];
+           Logging [label="Logging\n(session + centralized)"];
+       }
+
+       subgraph cluster_launchers {
+           label="Launchers";
+           BonsaiLauncher [label="BonsaiLauncher"];
+           MatlabLauncher [label="MatlabLauncher"];
+           PythonLauncher [label="PythonLauncher"];
+           MinimalistLauncher [label="MinimalistLauncher"];
+       }
+
+       subgraph cluster_pre {
+           label="Pre-Acquisition Pipeline";
+           PreModules [label="Pre-Acquisition Modules\n(mouse weight, ZMQ, etc.)"];
+       }
+
+       subgraph cluster_post {
+           label="Post-Acquisition Pipeline";
+           PostModules [label="Post-Acquisition Modules\n(session_creator, notes, etc.)"];
+       }
+
+       subgraph cluster_interfaces {
+           label="Interfaces";
+           InterfaceBonsai [label="BonsaiInterface"];
+           InterfaceMatlab [label="MatlabInterface"];
+           InterfacePython [label="PythonInterface"];
+       }
+
+       ParamFile [label="Parameter File (JSON)", shape=note, fillcolor=lightyellow];
+       RigConfigFile [label="Rig Config (TOML)", shape=note, fillcolor=lightyellow];
+       RuntimePrompt [label="Runtime Prompts", shape=note, fillcolor=lightyellow];
+
+       # Relationships
+       ParamFile -> PreModules;
+       PreModules -> BaseLauncher;
+       BaseLauncher -> BonsaiLauncher;
+       BaseLauncher -> MatlabLauncher;
+       BaseLauncher -> PythonLauncher;
+       BaseLauncher -> MinimalistLauncher;
+       BonsaiLauncher -> InterfaceBonsai;
+       MatlabLauncher -> InterfaceMatlab;
+       PythonLauncher -> InterfacePython;
+       BaseLauncher -> ParamUtils;
+       BaseLauncher -> RigConfig;
+       BaseLauncher -> GitManager;
+       BaseLauncher -> Logging;
+       BonsaiLauncher -> Logging;
+       MatlabLauncher -> Logging;
+       PythonLauncher -> Logging;
+       MinimalistLauncher -> Logging;
+       BaseLauncher -> PostModules;
+       PostModules -> ParamFile;
+       RigConfigFile -> RigConfig;
+       RuntimePrompt -> ParamUtils;
+   }
+
+.. note::
+   This diagram shows the code structure: how launchers, interfaces, utils, and pipeline modules interact. Use this to understand extension points and the modular design.
 
 Launcher Flow Overview
 ----------------------
