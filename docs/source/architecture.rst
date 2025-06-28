@@ -28,10 +28,11 @@ Experiment Flow Diagram
        Acquisition -> SessionFolder;
        Launcher -> PostPipeline;
        PostPipeline -> SessionFolder;
+       Launcher -> SessionFolder; // <-- Launcher writes directly to session folder
    }
 
 .. note::
-   The launcher manages the entire experiment flow: merging parameters, prompting for missing info, running pre-acquisition modules, launching the acquisition subprocess, and running post-acquisition modules. All steps write to the session folder.
+   The launcher manages the entire experiment flow: merging parameters, prompting for missing info, running pre-acquisition modules, launching the acquisition subprocess, and running post-acquisition modules. All steps, including the launcher itself, write to the session folder.
 
 System Architecture Diagram
 --------------------------
