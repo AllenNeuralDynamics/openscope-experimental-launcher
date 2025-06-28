@@ -3,74 +3,51 @@ Launcher Architecture
 
 .. graphviz::
 
-   digraph launcher_architecture {
+   digraph launcher_flow {
        rankdir=LR;
        node [shape=box, style=filled, fillcolor=lightgray];
-
-       subgraph cluster_core {
-           label="Core Logic";
-           BaseLauncher [label="BaseLauncher\n(core logic)"];
-           ParamUtils [label="param_utils.py\n(parameter loading, prompts)"];
-           RigConfig [label="rig_config.py\n(rig hardware config)"];
-           GitManager [label="git_manager.py\n(repo management)"];
-           Logging [label="Logging\n(session + centralized)"];
-       }
-
-       subgraph cluster_launchers {
-           label="Launchers";
-           BonsaiLauncher [label="BonsaiLauncher"];
-           MatlabLauncher [label="MatlabLauncher"];
-           PythonLauncher [label="PythonLauncher"];
-           MinimalistLauncher [label="MinimalistLauncher"];
-       }
-
-       subgraph cluster_pre {
-           label="Pre-Acquisition Pipeline";
-           PreModules [label="Pre-Acquisition Modules\n(mouse weight, ZMQ, etc.)"];
-       }
-
-       subgraph cluster_post {
-           label="Post-Acquisition Pipeline";
-           PostModules [label="Post-Acquisition Modules\n(session_creator, notes, etc.)"];
-       }
-
-       subgraph cluster_interfaces {
-           label="Interfaces";
-           InterfaceBonsai [label="BonsaiInterface"];
-           InterfaceMatlab [label="MatlabInterface"];
-           InterfacePython [label="PythonInterface"];
-       }
 
        ParamFile [label="Parameter File (JSON)", shape=note, fillcolor=lightyellow];
        RigConfigFile [label="Rig Config (TOML)", shape=note, fillcolor=lightyellow];
        RuntimePrompt [label="Runtime Prompts", shape=note, fillcolor=lightyellow];
+       ParamMerge [label="Merged Parameters\n(param > rig config > runtime)", shape=box, fillcolor=lightblue];
+       PrePipeline [label="Pre-Acquisition Pipeline\n(modules)"];
+       Acquisition [label="Acquisition Subprocess\n(Bonsai, MATLAB, Python, etc.)"];
+       PostPipeline [label="Post-Acquisition Pipeline\n(modules)"];
+       SessionFolder [label="Session Folder\n(all logs, metadata, data)", shape=folder, fillcolor=yellow];
 
-       # Relationships
-       ParamFile -> PreModules;
-       PreModules -> BaseLauncher;
-       BaseLauncher -> BonsaiLauncher;
-       BaseLauncher -> MatlabLauncher;
-       BaseLauncher -> PythonLauncher;
-       BaseLauncher -> MinimalistLauncher;
-       BonsaiLauncher -> InterfaceBonsai;
-       MatlabLauncher -> InterfaceMatlab;
-       PythonLauncher -> InterfacePython;
-       BaseLauncher -> ParamUtils;
-       BaseLauncher -> RigConfig;
-       BaseLauncher -> GitManager;
-       BaseLauncher -> Logging;
-       BonsaiLauncher -> Logging;
-       MatlabLauncher -> Logging;
-       PythonLauncher -> Logging;
-       MinimalistLauncher -> Logging;
-       BaseLauncher -> PostModules;
-       PostModules -> ParamFile;
-       RigConfigFile -> RigConfig;
-       RuntimePrompt -> ParamUtils;
+       ParamFile -> ParamMerge;
+       RigConfigFile -> ParamMerge;
+       RuntimePrompt -> ParamMerge;
+       ParamMerge -> PrePipeline;
+       PrePipeline -> Acquisition;
+       Acquisition -> PostPipeline;
+       PrePipeline -> SessionFolder;
+       Acquisition -> SessionFolder;
+       PostPipeline -> SessionFolder;
+       ParamMerge -> SessionFolder;
    }
 
 .. note::
-   The above diagram is compiled automatically by GitHub Actions and reflects the current modular pipeline architecture.
+   The above diagram is compiled automatically by GitHub Actions and reflects the current modular pipeline architecture and data flow.
+
+Launcher Flow Overview
+----------------------
+
+1. **Parameter File Input:**
+   - The user provides a parameter file (JSON) to the launcher.
+2. **Rig Config Merge:**
+   - The launcher loads the rig config (TOML) and merges it with the parameter file (parameters override rig config).
+3. **Runtime Prompts:**
+   - The launcher interactively prompts for any missing required values, which override both param file and rig config.
+4. **Pre-Acquisition Pipeline:**
+   - The launcher runs each pre-acquisition module in order, passing the merged parameter file. Each module can read/write to the session folder.
+5. **Acquisition Subprocess:**
+   - The launcher starts the main experiment process (Bonsai, MATLAB, Python, etc.) with the merged parameters. The subprocess writes data and logs to the session folder.
+6. **Post-Acquisition Pipeline:**
+   - After acquisition, the launcher runs each post-acquisition module in order, again passing the merged parameter file. These modules can generate session files, enhance metadata, and write results to the session folder.
+
+**All steps (launcher, pre-acquisition modules, acquisition subprocess, post-acquisition modules) write logs, metadata, and data to the session folder.**
 
 Repository Folder Structure
 --------------------------
