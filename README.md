@@ -1,12 +1,12 @@
 # openscope-experimental-launcher
 
 [![License](https://img.shields.io/badge/license-MIT-brightgreen)](LICENSE)
-![Coverage](https://img.shields.io/badge/coverage-53%25-yellow?logo=codecov)
+![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen?logo=codecov)
 ![Python](https://img.shields.io/badge/python->=3.8-blue?logo=python)
 ![Platform](https://img.shields.io/badge/platform-Windows-blue?logo=windows)
 [![Documentation](https://img.shields.io/badge/docs-latest-blue?logo=gitbook)](https://allenneuraldynamics.github.io/openscope-experimental-launcher/)
 
-**Modular, pipeline-driven experimental launcher for OpenScope.**
+**Modular, pipeline-driven experimental launcher for OpenScope. All pre- and post-acquisition logic is handled by standalone modules, not the launcher core.**
 
 ---
 
@@ -37,6 +37,11 @@ python run_module.py --module_type post_acquisition --module_name example_post_a
 **Run tests and check coverage:**
 ```bash
 pytest --cov=src/openscope_experimental_launcher --cov-report=term-missing
+```
+
+**Interrogate code for type and docstring coverage:**
+```bash
+interrogate src/openscope_experimental_launcher
 ```
 
 ## Documentation
