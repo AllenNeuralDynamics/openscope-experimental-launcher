@@ -60,19 +60,32 @@ System Architecture Diagram
        Matlab [label="MATLAB", shape=box3d, fillcolor=white];
        Python [label="Python", shape=box3d, fillcolor=white];
 
+       # Core utilities
+       ParamUtils [label="param_utils.py\n(parameter loading, prompts)"];
+       RigConfig [label="rig_config.py\n(rig hardware config)"];
+       GitManager [label="git_manager.py\n(repo management)"];
+       Logging [label="Logging\n(session + centralized)"];
+
        # Parameter flow
        ParamFile -> BaseLauncher;
-       BaseLauncher -> BonsaiLauncher;
-       BaseLauncher -> MatlabLauncher;
-       BaseLauncher -> PythonLauncher;
+       BaseLauncher -> BonsaiLauncher [label="Parameter File (JSON)"];
+       BaseLauncher -> MatlabLauncher [label="Parameter File (JSON)"];
+       BaseLauncher -> PythonLauncher [label="Parameter File (JSON)"];
        BaseLauncher -> PreModules [label="Parameter File (JSON)"];
        BaseLauncher -> PostModules [label="Parameter File (JSON)"];
-       BonsaiLauncher -> BonsaiInterface [label="Parameter File (JSON)"];
-       MatlabLauncher -> MatlabInterface [label="Parameter File (JSON)"];
-       PythonLauncher -> PythonInterface [label="Parameter File (JSON)"];
-       BonsaiInterface -> Bonsai;
-       MatlabInterface -> Matlab;
-       PythonInterface -> Python;
+       BonsaiLauncher -> BonsaiInterface ;
+       MatlabLauncher -> MatlabInterface ;
+       PythonLauncher -> PythonInterface ;
+       BonsaiInterface -> Bonsai [label="Command-line Interface"];
+       MatlabInterface -> Matlab [label="Command-line Interface"];
+       PythonInterface -> Python [label="Command-line Interface"];
+
+       # Core logic relationships
+       BaseLauncher -> ParamUtils;
+       BaseLauncher -> RigConfig;
+       BaseLauncher -> GitManager;
+       BaseLauncher -> Logging;
+       ParamUtils -> RigConfig;
 
        # Pre and post modules do not talk to each other
        PreModules [group=pre];
