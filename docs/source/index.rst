@@ -125,16 +125,24 @@ Contents
    :maxdepth: 2
    :caption: User Guide
    
-   installation
    quickstart
+   installation
+
    configuration
    rig_config
    parameter_files
+
    rig_launchers
+   launcher-configuration
+   end_state_system
+
    pre_acquisition
    post_acquisition
+
+   resource-monitoring
    logging
    launcher_metadata
+
    architecture
    contributing
 

@@ -21,7 +21,24 @@ Configuration Tiers
 
 **Purpose**: Hardware and setup-specific settings that remain constant for a physical rig.
 
+Default Location:
+
+- Windows: ``C:/RigConfig/rig_config.toml``
+- Linux: ``/opt/rigconfig/rig_config.toml``
+
+Contains:
+
+- ``rig_id``: Unique identifier for this rig (defaults to hostname)
+- ``data_root_directory``: Base path for experiment data storage
+- Hardware-specific settings (camera configs, sync settings, etc.)
+
 See :doc:`rig_config` for complete details on rig configuration setup and options.
+
+Example::
+
+  [rig]
+  rig_id = "rig01"
+  data_root_directory = "D:/OpenScopeData"
 
 2. Experiment Parameters (JSON)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -29,6 +46,14 @@ See :doc:`rig_config` for complete details on rig configuration setup and option
 **Purpose**: Experiment-specific settings that change per experiment.
 
 See :doc:`parameter_files` for complete details on parameter file structure and options.
+
+Example::
+
+  {
+    "subject_id": "mouse123",
+    "user_id": "experimenter1",
+    "output_root_folder": "D:/OpenScopeData"
+  }
 
 3. Runtime Information
 ~~~~~~~~~~~~~~~~~~~~~~
