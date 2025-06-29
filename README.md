@@ -1,16 +1,18 @@
 # openscope-experimental-launcher
 
 [![License](https://img.shields.io/badge/license-MIT-brightgreen)](LICENSE)
-![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen?logo=codecov)
+![Coverage](https://img.shields.io/badge/coverage-55%25-yellow?logo=codecov)
 ![Python](https://img.shields.io/badge/python->=3.8-blue?logo=python)
 ![Platform](https://img.shields.io/badge/platform-Windows-blue?logo=windows)
 [![Documentation](https://img.shields.io/badge/docs-latest-blue?logo=gitbook)](https://allenneuraldynamics.github.io/openscope-experimental-launcher/)
 
-**Modular, pipeline-driven experimental launcher for OpenScope. All pre- and post-acquisition logic is handled by standalone modules, not the launcher core.**
+**Modular, pipeline-driven experimental launcher for OpenScope.**
 
 ---
 
 ## Overview
+
+The OpenScope Experimental Launcher is a modular package designed to manage and execute neuroscience experiments across multiple platforms. It features a clean architectural separation between interface-specific process creation and common launcher functionality, supporting Bonsai, MATLAB, and Python workflows.
 
 - **Modular pre- and post-acquisition pipelines:** All experiment setup and teardown logic is handled by standalone modules, not the launcher core.
 - **Multi-language support:** Launchers for Bonsai, MATLAB, and Python workflows.

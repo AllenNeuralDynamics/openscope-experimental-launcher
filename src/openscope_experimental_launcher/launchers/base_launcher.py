@@ -496,6 +496,58 @@ class BaseLauncher:
             logging.error(f"Error during cleanup: {e}")
         return None
     
+    def _start_resource_logging(self, session_folder: str, acquisition_pid: Optional[int] = None):
+        """Start a background thread to log resource usage for launcher and subprocess."""
+        # Place resource_usage.json in launcher_metadata directory inside session_folder
+        launcher_metadata_dir = os.path.join(session_folder, "launcher_metadata")
+        os.makedirs(launcher_metadata_dir, exist_ok=True)
+        self._resource_log_file = os.path.join(launcher_metadata_dir, "resource_usage.json")
+        self._resource_log_stop = threading.Event()
+        self._resource_log_data = []
+        interval = self.params.get("resource_log_interval", 5)
+        def log_loop():
+            import psutil, datetime, json, time
+            launcher_proc = psutil.Process(os.getpid())
+            acq_proc = None
+            if acquisition_pid:
+                try:
+                    acq_proc = psutil.Process(acquisition_pid)
+                except Exception:
+                    acq_proc = None
+            while not self._resource_log_stop.is_set():
+                entry = {
+                    "timestamp": datetime.datetime.now().isoformat(),
+                    "launcher": {
+                        "cpu_percent": launcher_proc.cpu_percent(interval=None),
+                        "memory_mb": launcher_proc.memory_info().rss / 1024 / 1024,
+                    },
+                }
+                if acq_proc:
+                    try:
+                        entry["acquisition"] = {
+                            "cpu_percent": acq_proc.cpu_percent(interval=None),
+                            "memory_mb": acq_proc.memory_info().rss / 1024 / 1024,
+                        }
+                    except (psutil.NoSuchProcess, ProcessLookupError):
+                        entry["acquisition"] = None
+                        acq_proc = None
+                    except Exception:
+                        entry["acquisition"] = None
+                else:
+                    entry["acquisition"] = None
+                self._resource_log_data.append(entry)
+                with open(self._resource_log_file, "w") as f:
+                    json.dump(self._resource_log_data, f, indent=2)
+                time.sleep(interval)
+        self._resource_log_thread = threading.Thread(target=log_loop, daemon=True)
+        self._resource_log_thread.start()
+
+    def _stop_resource_logging(self):
+        if hasattr(self, '_resource_log_stop'):
+            self._resource_log_stop.set()
+        if hasattr(self, '_resource_log_thread') and self._resource_log_thread:
+            self._resource_log_thread.join(timeout=2)
+
     def run(self) -> bool:
         """
         Run the experiment.
@@ -513,64 +565,73 @@ class BaseLauncher:
             True if successful, False otherwise
         """
         signal.signal(signal.SIGINT, self.signal_handler)
-        
+
         try:
-            # Set start time
             self.start_time = datetime.datetime.now()
-            
-            # Note: initialization now happens in __init__, not here
-            
+
             # Set up repository
             if not git_manager.setup_repository(self.params):
                 logging.error("Repository setup failed")
-                return False            
-            # Determine output_session_folder (specific directory where experiment data will be saved)
+                return False
+
+            # Set up output session folder
             output_session_folder = self.determine_output_session_folder()
-            self.output_session_folder = output_session_folder  # Store for post-acquisition and interface use
-            
-            # we save this here for any post-acquisition tools that need it
+            self.output_session_folder = output_session_folder
             self.params["output_session_folder"] = output_session_folder
 
-            # Set up continuous logging to output_session_folder
+            # Set up logging and metadata
             if output_session_folder:
                 centralized_log_dir = self.params.get("centralized_log_directory")
-                self.setup_continuous_logging(output_session_folder, centralized_log_dir)                  # Save launcher metadata after logging is set up
+                self.setup_continuous_logging(output_session_folder, centralized_log_dir)
                 self.save_launcher_metadata(output_session_folder)
-            
+                # Start resource logging (launcher only for now)
+                # Start resource logging only if enabled in params (must be explicitly True)
+                if self.params.get("resource_log_enabled") is True:
+                    self._start_resource_logging(output_session_folder, acquisition_pid=None)
+
             # Run pre-acquisition steps
             if not self.run_pre_acquisition():
                 logging.warning("Pre-acquisition processing failed, but continuing with experiment.")
-            
+
             # Start the experiment (implemented by interface-specific launchers)
-            if not self.start_experiment():
+            experiment_success = self.start_experiment()
+
+            # Update resource logger to include acquisition PID
+            if self.process is not None:
+                try:
+                    self._stop_resource_logging()
+                    self._start_resource_logging(output_session_folder, acquisition_pid=self.process.pid)
+                except Exception as e:
+                    logging.warning(f"Could not update resource logger with acquisition PID: {e}")
+
+            if not experiment_success:
                 logging.error(f"{self._get_launcher_type_name()} experiment failed to start")
                 return False
-            
+
             # Check for errors
             if not self.check_experiment_success():
                 logging.error(f"{self._get_launcher_type_name()} experiment failed")
                 return False
-            
-            # Save end state for post-acquisition tools (e.g., session creation)
+
+            # Save end state for post-acquisition tools
             self.save_end_state(self.output_session_folder)
-            
-            # Perform rig-specific post-acquisition
+
+            # Run post-acquisition steps
             if not self.run_post_acquisition():
                 logging.warning("Post-acquisition processing failed, but experiment data was collected")
-                   
-
 
             return True
-            
+
         except Exception as e:
-            # Save debug state for crash analysis
             if hasattr(self, 'output_session_folder') and self.output_session_folder:
                 self.save_debug_state(self.output_session_folder, e)
             logging.exception(f"{self._get_launcher_type_name()} experiment failed: {e}")
             return False
+
         finally:
+            self._stop_resource_logging()
             self.stop()
-    
+
     def start_experiment(self) -> bool:
         """
         Start the experiment using the appropriate interface.
