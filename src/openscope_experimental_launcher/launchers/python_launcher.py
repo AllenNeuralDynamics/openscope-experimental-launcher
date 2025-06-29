@@ -4,12 +4,9 @@ Python launcher for OpenScope experiments.
 This module provides a launcher for running Python scripts.
 """
 
-import os
 import subprocess
-import logging
 from .base_launcher import BaseLauncher
 from ..interfaces import python_interface
-from ..utils import git_manager
 
 
 class PythonLauncher(BaseLauncher):
@@ -54,33 +51,6 @@ class PythonLauncher(BaseLauncher):
         )
         
         return process
-
-    @classmethod
-    def run_from_params(cls, param_file):
-        """
-        Run the experiment with the specified parameters (Python version).
-        
-        Args:
-            param_file: Path to the JSON parameter file
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        # Set up basic logging
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s'
-        )
-        try:
-            if param_file and not os.path.exists(param_file):
-                logging.error(f"Parameter file not found: {param_file}")
-                return False
-            launcher = cls(param_file=param_file)
-            logging.info(f"Starting {cls.__name__} with parameters: {param_file}")
-            return launcher.run()
-        except Exception as e:
-            logging.error(f"Exception in PythonLauncher: {e}")
-            return False
 
 def run_from_params(param_file):
     """

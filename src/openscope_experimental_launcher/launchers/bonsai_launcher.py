@@ -151,40 +151,6 @@ class BonsaiLauncher(BaseLauncher):
         
         return process
 
-    @classmethod
-    def run_from_params(cls, param_file):
-        """
-        Run the experiment with the specified parameters (Bonsai version).
-        
-        Args:
-            param_file: Path to the JSON parameter file
-        
-        Returns:
-            True if successful, False otherwise
-        """
-        # Set up basic logging
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s'
-        )
-        try:
-            if param_file and not os.path.exists(param_file):
-                logging.error(f"Parameter file not found: {param_file}")
-                return False
-            launcher = cls(param_file=param_file)
-            logging.info(f"Starting {cls.__name__} with parameters: {param_file}")
-            process = launcher.create_process()
-            if process:
-                process.wait()
-                return process.returncode == 0
-            else:
-                return False
-        except Exception as e:
-            logging.error(f"Exception in BonsaiLauncher: {e}")
-            return False
-
-# Module-level entry point for unified launcher
-
 def run_from_params(param_file):
     """
     Module-level entry point for the unified launcher wrapper.

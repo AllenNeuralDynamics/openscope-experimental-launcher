@@ -1,12 +1,5 @@
 {
     "launcher": "bonsai",
-    "pre_acquisition_pipeline": [
-        "zmq_ready_publisher",
-        "zmq_ready_waiter",
-        "example_pre_acquisition_module"
-    ],
-    "zmq_ready_publisher_wait": 1.0,
-    "zmq_ready_waiter_timeout": 5.0,
     "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
     "repository_commit_hash": "main",
     "local_repository_path": "C:/BonsaiDataPredictiveProcessingTest",

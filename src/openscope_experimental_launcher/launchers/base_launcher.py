@@ -19,7 +19,7 @@ import json
 import subprocess
 import threading
 import importlib
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 
 # Import AIND data schema utilities for standardized folder naming
 try:
@@ -369,12 +369,19 @@ class BaseLauncher:
         """
         Run a configurable, stackable post-acquisition pipeline using unified parameter workflow.
         Args:
-            param_file (str, optional): Path to parameter JSON file. If None, uses self.param_file.
+            param_file (str, optional): Path to parameter JSON file. If None, uses processed_parameters.json if available, else self.param_file.
         Returns:
             True if all steps succeed, False otherwise.
         """
+        import os
+        # Prefer processed_parameters.json if available
+        processed_params_path = None
+        if self.output_session_folder:
+            candidate = os.path.join(self.output_session_folder, "launcher_metadata", "processed_parameters.json")
+            if os.path.exists(candidate):
+                processed_params_path = candidate
         if param_file is None:
-            param_file = self.param_file
+            param_file = processed_params_path if processed_params_path else self.param_file
         params = param_utils.load_parameters(param_file=param_file)
         pipeline = params.get("post_acquisition_pipeline", [])
         all_success = True
