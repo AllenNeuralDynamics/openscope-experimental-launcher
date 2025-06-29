@@ -142,11 +142,6 @@ These interfaces can be used independently for custom launcher implementations:
            return BonsaiInterface.create_process(script_path, parameters)
 
 
-Session Files and Metadata
---------------------------
-
-**Note:** All session file creation (e.g., ``session.json``) and metadata enrichment are now handled by post-acquisition pipeline modules, not by the launcher itself. To generate or enhance session files, add the appropriate module (e.g., ``session_creator``, ``session_enhancer_bonsai``) to your ``post_acquisition_pipeline`` in the parameter file.
-
 Custom Launcher Development
 ---------------------------
 
