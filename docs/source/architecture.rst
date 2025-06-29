@@ -117,11 +117,13 @@ Repository Folder Structure
 --------------------------
 
 - ``src/openscope_experimental_launcher/``: Main package source code
+
   - ``launchers/``: Generic and interface-specific launcher classes (Bonsai, MATLAB, Python, etc.)
   - ``interfaces/``: Stateless process creation utilities for each platform
   - ``pre_acquisition/``: Modular pre-acquisition pipeline modules (mouse weight, ZMQ, etc.)
   - ``post_acquisition/``: Modular post-acquisition pipeline modules (session creation, notes, enhancement, etc.)
   - ``utils/``: Shared utilities (configuration, git, logging, etc.)
+  
 - ``params/``: Example and project-specific parameter files (JSON)
 - ``tests/``: Unit and integration tests for all core logic and modules
 - ``docs/``: Documentation sources (reStructuredText, Sphinx, and build scripts)
@@ -155,4 +157,4 @@ To add a pre- or post-acquisition step, simply add the module name to the approp
 
 Each module is a Python file in `src/openscope_experimental_launcher/pre_acquisition/` or `post_acquisition/`, and must accept a `param_file` argument and return 0 for success, 1 for failure.
 
-For more, see the [Pre-Acquisition](pre_acquisition.html) and [Post-Acquisition](post_acquisition.html) pages, and the [Contributing](contributing.html) guide.
+For more, see the :doc:`pre_acquisition` and :doc:`post_acquisition` pages, and the :doc:`contributing` guide.
