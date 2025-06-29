@@ -43,66 +43,40 @@ System Architecture Diagram
        rankdir=LR;
        node [shape=box, style=filled, fillcolor=lightgray];
 
-       subgraph cluster_core {
-           label="Core Logic";
-           BaseLauncher [label="BaseLauncher\n(core logic)"];
-           ParamUtils [label="param_utils.py\n(parameter loading, prompts)"];
-           RigConfig [label="rig_config.py\n(rig hardware config)"];
-           GitManager [label="git_manager.py\n(repo management)"];
-           Logging [label="Logging\n(session + centralized)"];
-       }
-
-       subgraph cluster_launchers {
-           label="Launchers";
-           BonsaiLauncher [label="BonsaiLauncher"];
-           MatlabLauncher [label="MatlabLauncher"];
-           PythonLauncher [label="PythonLauncher"];
-           MinimalistLauncher [label="MinimalistLauncher"];
-       }
-
-       subgraph cluster_pre {
-           label="Pre-Acquisition Pipeline";
-           PreModules [label="Pre-Acquisition Modules\n(mouse weight, ZMQ, etc.)"];
-       }
-
-       subgraph cluster_post {
-           label="Post-Acquisition Pipeline";
-           PostModules [label="Post-Acquisition Modules\n(session_creator, notes, etc.)"];
-       }
-
-       subgraph cluster_interfaces {
-           label="Interfaces";
-           InterfaceBonsai [label="BonsaiInterface"];
-           InterfaceMatlab [label="MatlabInterface"];
-           InterfacePython [label="PythonInterface"];
-       }
-
+       # Parameter flow
        ParamFile [label="Parameter File (JSON)", shape=note, fillcolor=lightyellow];
-       RigConfigFile [label="Rig Config (TOML)", shape=note, fillcolor=lightyellow];
-       RuntimePrompt [label="Runtime Prompts", shape=note, fillcolor=lightyellow];
+       BaseLauncher [label="BaseLauncher\n(core logic)", fillcolor=lightblue, style="filled,bold"];
+       BonsaiLauncher [label="BonsaiLauncher"];
+       MatlabLauncher [label="MatlabLauncher"];
+       PythonLauncher [label="PythonLauncher"];
+       PreModules [label="Pre-Acquisition Modules\n(mouse weight, ZMQ, etc.)"];
+       PostModules [label="Post-Acquisition Modules\n(session_creator, notes, etc.)"];
 
-       # Relationships
-       ParamFile -> PreModules;
-       PreModules -> BaseLauncher;
+       # Interfaces and software
+       BonsaiInterface [label="BonsaiInterface"];
+       MatlabInterface [label="MatlabInterface"];
+       PythonInterface [label="PythonInterface"];
+       Bonsai [label="Bonsai", shape=box3d, fillcolor=white];
+       Matlab [label="MATLAB", shape=box3d, fillcolor=white];
+       Python [label="Python", shape=box3d, fillcolor=white];
+
+       # Parameter flow
+       ParamFile -> BaseLauncher;
        BaseLauncher -> BonsaiLauncher;
        BaseLauncher -> MatlabLauncher;
        BaseLauncher -> PythonLauncher;
-       BaseLauncher -> MinimalistLauncher;
-       BonsaiLauncher -> InterfaceBonsai;
-       MatlabLauncher -> InterfaceMatlab;
-       PythonLauncher -> InterfacePython;
-       BaseLauncher -> ParamUtils;
-       BaseLauncher -> RigConfig;
-       BaseLauncher -> GitManager;
-       BaseLauncher -> Logging;
-       BonsaiLauncher -> Logging;
-       MatlabLauncher -> Logging;
-       PythonLauncher -> Logging;
-       MinimalistLauncher -> Logging;
-       BaseLauncher -> PostModules;
-       PostModules -> ParamFile;
-       RigConfigFile -> RigConfig;
-       RuntimePrompt -> ParamUtils;
+       BaseLauncher -> PreModules [label="Parameter File (JSON)"];
+       BaseLauncher -> PostModules [label="Parameter File (JSON)"];
+       BonsaiLauncher -> BonsaiInterface [label="Parameter File (JSON)"];
+       MatlabLauncher -> MatlabInterface [label="Parameter File (JSON)"];
+       PythonLauncher -> PythonInterface [label="Parameter File (JSON)"];
+       BonsaiInterface -> Bonsai;
+       MatlabInterface -> Matlab;
+       PythonInterface -> Python;
+
+       # Pre and post modules do not talk to each other
+       PreModules [group=pre];
+       PostModules [group=post];
    }
 
 .. note::
