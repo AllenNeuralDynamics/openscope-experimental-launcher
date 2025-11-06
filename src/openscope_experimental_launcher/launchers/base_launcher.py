@@ -366,41 +366,116 @@ class BaseLauncher:
             print(f"Error finalizing logging: {e}")
     
     def run_post_acquisition(self, param_file=None) -> bool:
+        """Run post-acquisition pipeline using simplified entry schema.
+
+        Entry dict format:
+          {
+            "module_type": "launcher_module" | "script_module",
+            "module_path": "dotted.name" OR "relative/path/in/repo.py",
+            "module_parameters": {key: value}
+          }
+
+        Plain string entries remain supported (treated as launcher_module).
         """
-        Run a configurable, stackable post-acquisition pipeline using unified parameter workflow.
-        Args:
-            param_file (str, optional): Path to parameter JSON file. If None, uses processed_parameters.json if available, else self.param_file.
-        Returns:
-            True if all steps succeed, False otherwise.
-        """
-        import os
-        # Prefer processed_parameters.json if available
+        if param_file is None:
+            param_file = self.param_file
+        # Prefer processed parameters if available
         processed_params_path = None
         if self.output_session_folder:
             candidate = os.path.join(self.output_session_folder, "launcher_metadata", "processed_parameters.json")
             if os.path.exists(candidate):
                 processed_params_path = candidate
-        if param_file is None:
-            param_file = processed_params_path if processed_params_path else self.param_file
-        params = param_utils.load_parameters(param_file=param_file)
+        if processed_params_path:
+            params = param_utils.load_parameters(param_file=processed_params_path)
+        else:
+            params = param_utils.load_parameters(param_file=param_file)
+
         pipeline = params.get("post_acquisition_pipeline", [])
         all_success = True
-        for module_name in pipeline:
+        repo_path = git_manager.get_repository_path(params)
+        session_folder = params.get("output_session_folder") or self.output_session_folder
+
+        def _invoke_launcher_module(mod_name: str, merged_params: dict) -> bool:
             try:
-                logging.info(f"Running post-acquisition step: {module_name}")
-                mod = importlib.import_module(f"openscope_experimental_launcher.post_acquisition.{module_name}")
+                logging.info(f"Post-acquisition launcher module: {mod_name}")
+                mod = importlib.import_module(f"openscope_experimental_launcher.post_acquisition.{mod_name}")
+                func = None
                 if hasattr(mod, "run_post_acquisition"):
-                    result = mod.run_post_acquisition(param_file)
-                    if result not in (None, 0):
-                        logging.error(f"Post-acquisition step failed: {module_name} (exit code {result})")
-                        all_success = False
-                    else:
-                        logging.info(f"Post-acquisition step completed: {module_name}")
+                    func = getattr(mod, "run_post_acquisition")
+                elif hasattr(mod, "run"):
+                    func = getattr(mod, "run")
                 else:
-                    logging.warning(f"Module {module_name} does not have run_post_acquisition()")
+                    logging.warning(f"Module {mod_name} has no run_post_acquisition() or run(); skipping.")
+                    return True
+                result = func(param_file) if func.__code__.co_argcount == 1 else func(merged_params)
+                return result in (None, 0, True)
             except Exception as e:
-                logging.error(f"Error running post-acquisition module {module_name}: {e}")
+                logging.error(f"Launcher module error {mod_name}: {e}")
+                return False
+
+        def _invoke_script_module(path_in_repo: str, merged_params: dict) -> bool:
+            try:
+                if not repo_path:
+                    raise RuntimeError("No repository path available for script_module")
+                abs_path = os.path.join(repo_path, path_in_repo.replace('/', os.sep))
+                if not os.path.isfile(abs_path):
+                    raise FileNotFoundError(f"Script module file not found: {abs_path}")
+                spec = importlib.util.spec_from_file_location("script_post_module", abs_path)
+                if spec is None or spec.loader is None:
+                    raise RuntimeError("Failed to build import spec for script module")
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)  # type: ignore[attr-defined]
+                func_name = merged_params.get("function")
+                func = None
+                if func_name and hasattr(mod, func_name):
+                    func = getattr(mod, func_name)
+                elif hasattr(mod, "run_post_acquisition"):
+                    func = getattr(mod, "run_post_acquisition")
+                elif hasattr(mod, "run"):
+                    func = getattr(mod, "run")
+                else:
+                    raise AttributeError("No callable entry point found (run_post_acquisition/run/function)")
+                try:
+                    if func.__code__.co_argcount == 1:
+                        result = func(merged_params)
+                    else:
+                        result = func()
+                except Exception as inner_e:
+                    logging.error(f"Error invoking script module function: {inner_e}")
+                    return False
+                return result in (None, 0, True)
+            except Exception as e:
+                logging.error(f"Script module error {path_in_repo}: {e}")
+                return False
+
+        for raw_entry in pipeline:
+            if isinstance(raw_entry, str):
+                entry = {"module_type": "launcher_module", "module_path": raw_entry, "module_parameters": {}}
+            elif isinstance(raw_entry, dict):
+                entry = raw_entry
+            else:
+                logging.warning(f"Ignoring unsupported pipeline entry: {raw_entry}")
+                continue
+            module_type = entry.get("module_type", "launcher_module")
+            module_path = entry.get("module_path")
+            module_params = entry.get("module_parameters", {}) or {}
+            merged = dict(params)
+            merged.update(module_params)
+            if session_folder:
+                merged.setdefault("output_session_folder", session_folder)
+            if module_type == "launcher_module":
+                ok = _invoke_launcher_module(module_path, merged)
+            elif module_type == "script_module":
+                ok = _invoke_script_module(module_path, merged)
+            else:
+                logging.warning(f"Unknown module_type '{module_type}' in post-acquisition entry")
+                continue
+            if not ok:
                 all_success = False
+                logging.error(f"Post-acquisition step failed: {module_path}")
+            else:
+                logging.info(f"Post-acquisition step completed: {module_path}")
+
         if all_success:
             logging.info("All post-acquisition steps completed successfully.")
         else:
@@ -983,34 +1058,129 @@ class BaseLauncher:
             return False
 
     def run_pre_acquisition(self, param_file=None) -> bool:
-        """
-        Run pre-acquisition steps defined in the parameter file.
-        Args:
-            param_file (str, optional): Path to parameter JSON file. If None, uses self.param_file.
-        Returns:
-            True if all steps succeed, False otherwise.
+        """Run pre-acquisition pipeline using simplified entry schema.
+
+        New unified entry format (dict):
+          {
+            "module_type": "launcher_module" | "script_module",
+            "module_path": "relative.dotted.name" OR "relative/path/in/repo.py",
+            "module_parameters": {"key": "value", ...}  # optional
+          }
+
+        Backward compatibility:
+          - Plain string entries are treated as launcher_module with module_path=string.
+
+        Resolution rules:
+          launcher_module -> import path: src.openscope_experimental_launcher.pre_acquisition.<module_path>
+          script_module   -> loaded from cloned repository root joined with module_path (file path);
+                             expects a callable `run_pre_acquisition(params_dict)` OR a function name
+                             specified via module_parameters["function"]; if neither present uses
+                             a default `run()` if available.
+
+        The `module_parameters` dict is merged into base params and passed to the function.
         """
         if param_file is None:
             param_file = self.param_file
         params = param_utils.load_parameters(param_file=param_file)
         pipeline = params.get("pre_acquisition_pipeline", [])
         all_success = True
-        for module_name in pipeline:
+        repo_path = git_manager.get_repository_path(params)
+        session_folder = params.get("output_session_folder") or self.output_session_folder
+
+        def _invoke_launcher_module(mod_name: str, merged_params: dict) -> bool:
             try:
-                logging.info(f"Running pre-acquisition step: {module_name}")
-                mod = importlib.import_module(f"src.openscope_experimental_launcher.pre_acquisition.{module_name}")
+                logging.info(f"Pre-acquisition launcher module: {mod_name}")
+                mod = importlib.import_module(f"src.openscope_experimental_launcher.pre_acquisition.{mod_name}")
+                func = None
                 if hasattr(mod, "run_pre_acquisition"):
-                    result = mod.run_pre_acquisition(param_file)
-                    if result not in (None, 0):
-                        logging.error(f"Pre-acquisition step failed: {module_name} (exit code {result})")
-                        all_success = False
-                    else:
-                        logging.info(f"Pre-acquisition step completed: {module_name}")
+                    func = getattr(mod, "run_pre_acquisition")
+                elif hasattr(mod, "run"):
+                    func = getattr(mod, "run")
                 else:
-                    logging.warning(f"Module {module_name} does not have run_pre_acquisition()")
+                    logging.warning(f"Module {mod_name} has no run_pre_acquisition() or run(); skipping.")
+                    return True
+                result = func(param_file) if func.__code__.co_argcount == 1 else func(merged_params)
+                return result in (None, 0, True)
             except Exception as e:
-                logging.error(f"Error running pre-acquisition module {module_name}: {e}")
+                logging.error(f"Launcher module error {mod_name}: {e}")
+                return False
+
+        def _invoke_script_module(path_in_repo: str, merged_params: dict) -> bool:
+            try:
+                if not repo_path:
+                    raise RuntimeError("No repository path available for script_module")
+                abs_path = os.path.join(repo_path, path_in_repo.replace('/', os.sep))
+                if not os.path.isfile(abs_path):
+                    raise FileNotFoundError(f"Script module file not found: {abs_path}")
+                spec = importlib.util.spec_from_file_location("script_pre_module", abs_path)
+                if spec is None or spec.loader is None:
+                    raise RuntimeError("Failed to build import spec for script module")
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)  # type: ignore[attr-defined]
+                func_name = merged_params.get("function")
+                func = None
+                if func_name and hasattr(mod, func_name):
+                    func = getattr(mod, func_name)
+                elif hasattr(mod, "run_pre_acquisition"):
+                    func = getattr(mod, "run_pre_acquisition")
+                elif hasattr(mod, "run"):
+                    func = getattr(mod, "run")
+                else:
+                    raise AttributeError("No callable entry point found (run_pre_acquisition/run/function)")
+                # Provide merged parameters to script-level function. If it expects one arg use dict.
+                call_ok = True
+                try:
+                    if func.__code__.co_argcount == 1:
+                        result = func(merged_params)
+                    else:
+                        # Try no-arg call if function takes zero args
+                        result = func()
+                except Exception as inner_e:
+                    logging.error(f"Error invoking script module function: {inner_e}")
+                    return False
+                return result in (None, 0, True)
+            except Exception as e:
+                logging.error(f"Script module error {path_in_repo}: {e}")
+                return False
+
+        for raw_entry in pipeline:
+            # Normalize entry to dict form
+            if isinstance(raw_entry, str):
+                entry = {
+                    "module_type": "launcher_module",
+                    "module_path": raw_entry,
+                    "module_parameters": {}
+                }
+            elif isinstance(raw_entry, dict):
+                entry = raw_entry
+            else:
+                logging.warning(f"Ignoring unsupported pipeline entry: {raw_entry}")
+                continue
+
+            module_type = entry.get("module_type", "launcher_module")
+            module_path = entry.get("module_path")
+            module_params = entry.get("module_parameters", {}) or {}
+            # Merge into base params for convenience
+            merged = dict(params)
+            merged.update(module_params)
+            if session_folder:
+                merged.setdefault("output_session_folder", session_folder)
+
+            success = False
+            if module_type == "launcher_module":
+                success = _invoke_launcher_module(module_path, merged)
+            elif module_type == "script_module":
+                success = _invoke_script_module(module_path, merged)
+            else:
+                logging.warning(f"Unknown module_type '{module_type}' in pre-acquisition entry")
+                continue
+
+            if not success:
                 all_success = False
+                logging.error(f"Pre-acquisition step failed: {module_path}")
+            else:
+                logging.info(f"Pre-acquisition step completed: {module_path}")
+
         if all_success:
             logging.info("All pre-acquisition steps completed successfully.")
         else:

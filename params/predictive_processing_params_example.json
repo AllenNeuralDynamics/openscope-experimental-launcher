@@ -10,10 +10,26 @@
     "user_id": "test_user",
     "output_root_folder": "C:/BonsaiDataPredictiveProcessing", 
     "script_parameters": {},
+    "pre_acquisition_pipeline": [
+        {
+            "module_type": "script_module",
+            "module_path": "code/stimulus-control/src/Mindscope/generate_experiment_csv.py",
+            "module_parameters": {
+                "function": "generate_single_session_csv",
+                "session_type": "short_test",
+                "seed": 42,
+                "output_path": "predictive_processing_session.csv"
+            }
+        }
+    ],
     "post_acquisition_pipeline": [
         "session_creator",
+        {
+            "module_type": "launcher_module",
+            "module_path": "stimulus_table_predictive_processing",
+            "module_parameters": {}
+        },
         "session_enhancer_bonsai",
-        "stimulus_table_predictive_processing",
         "session_enhancer_predictive_processing"
     ]
 }

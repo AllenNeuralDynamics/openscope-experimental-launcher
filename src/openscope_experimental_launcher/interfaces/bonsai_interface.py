@@ -413,7 +413,7 @@ def start_workflow(workflow_path: str, bonsai_exe_path: str, arguments: List[str
     if output_folder:
         # Normalize the output folder path as well
         output_folder_normalized = os.path.normpath(output_folder)
-        cmd_args.extend(["-p", f"OutputFolder={output_folder_normalized}"])
+        cmd_args.extend(["-p", f"RootFolder={output_folder_normalized}"])
         logging.info(f"Output will be saved to: {output_folder_normalized}")
     
     logging.info(f"Starting Bonsai workflow: {' '.join(cmd_args)}")
