@@ -1,17 +1,24 @@
-"""
-Test configuration and utilities for openscope-experimental-launcher.
+"""Test configuration and utilities for openscope-experimental-launcher.
 
-This module provides common test fixtures, utilities, and configuration
-for the test suite.
+Ensures the in-workspace `src` directory for the launcher under the
+`slap_launchers` path takes precedence over any other duplicate copy
+that might exist elsewhere on the machine. This prevents stale versions
+of `base_launcher.py` being imported during tests.
 """
 
 import os
+import sys
 import tempfile
 import shutil
 import json
 from typing import Dict, Any
 import pytest
 from unittest.mock import Mock, patch
+
+# Prepend workspace src path (if present) to ensure tests use edited code
+_workspace_src = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src'))
+if os.path.isdir(_workspace_src) and _workspace_src not in sys.path:
+    sys.path.insert(0, _workspace_src)
 
 
 @pytest.fixture

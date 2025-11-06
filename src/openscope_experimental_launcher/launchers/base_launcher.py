@@ -1090,7 +1090,8 @@ class BaseLauncher:
         def _invoke_launcher_module(mod_name: str, merged_params: dict) -> bool:
             try:
                 logging.info(f"Pre-acquisition launcher module: {mod_name}")
-                mod = importlib.import_module(f"src.openscope_experimental_launcher.pre_acquisition.{mod_name}")
+                # Correct package import (no 'src.' prefix for runtime use)
+                mod = importlib.import_module(f"openscope_experimental_launcher.pre_acquisition.{mod_name}")
                 func = None
                 if hasattr(mod, "run_pre_acquisition"):
                     func = getattr(mod, "run_pre_acquisition")
@@ -1111,7 +1112,17 @@ class BaseLauncher:
                     raise RuntimeError("No repository path available for script_module")
                 abs_path = os.path.join(repo_path, path_in_repo.replace('/', os.sep))
                 if not os.path.isfile(abs_path):
-                    raise FileNotFoundError(f"Script module file not found: {abs_path}")
+                    # Fallback: try searching for the filename anywhere under repo_path
+                    fallback = None
+                    target_name = os.path.basename(path_in_repo)
+                    for root, _dirs, files in os.walk(repo_path):
+                        if target_name in files:
+                            fallback = os.path.join(root, target_name)
+                            break
+                    if fallback and os.path.isfile(fallback):
+                        abs_path = fallback
+                    else:
+                        raise FileNotFoundError(f"Script module file not found: {abs_path}")
                 spec = importlib.util.spec_from_file_location("script_pre_module", abs_path)
                 if spec is None or spec.loader is None:
                     raise RuntimeError("Failed to build import spec for script module")
@@ -1127,14 +1138,36 @@ class BaseLauncher:
                     func = getattr(mod, "run")
                 else:
                     raise AttributeError("No callable entry point found (run_pre_acquisition/run/function)")
-                # Provide merged parameters to script-level function. If it expects one arg use dict.
-                call_ok = True
+                # Argument mapping for multi-arg legacy functions (e.g. generate_single_session_csv)
                 try:
-                    if func.__code__.co_argcount == 1:
+                    argcount = func.__code__.co_argcount
+                    result = None
+                    if argcount == 0:
+                        result = func()
+                    elif argcount == 1:
                         result = func(merged_params)
                     else:
-                        # Try no-arg call if function takes zero args
-                        result = func()
+                        # Build ordered args from common keys
+                        import inspect
+                        sig = inspect.signature(func)
+                        ordered_args = []
+                        for i, (p_name, p) in enumerate(sig.parameters.items()):
+                            if p_name in ("params", "parameters") and argcount == 1:
+                                ordered_args.append(merged_params)
+                            elif p_name == "output_path" and "output_filename" in merged_params:
+                                session_folder = merged_params.get("output_session_folder") or merged_params.get("output_root_folder")
+                                ordered_args.append(os.path.join(session_folder, merged_params.get("output_filename")))
+                            elif p_name == "session_type" and "session_type" in merged_params:
+                                ordered_args.append(merged_params.get("session_type"))
+                            elif p_name == "seed" and "seed" in merged_params:
+                                ordered_args.append(merged_params.get("seed"))
+                            else:
+                                # Best-effort: pass None or default
+                                if p.default is inspect._empty:
+                                    ordered_args.append(None)
+                                else:
+                                    ordered_args.append(p.default)
+                        result = func(*ordered_args)
                 except Exception as inner_e:
                     logging.error(f"Error invoking script module function: {inner_e}")
                     return False
@@ -1144,13 +1177,29 @@ class BaseLauncher:
                 return False
 
         for raw_entry in pipeline:
-            # Normalize entry to dict form
+            # Legacy repo_module support
+            if isinstance(raw_entry, dict) and raw_entry.get("type") == "repo_module":
+                legacy_path = raw_entry.get("repo_relative_path")
+                legacy_func = raw_entry.get("function")
+                legacy_kwargs = raw_entry.get("kwargs", {})
+                # Build merged params and include legacy function name so script module invoker can find it
+                merged = dict(params)
+                merged.update(legacy_kwargs or {})
+                if session_folder:
+                    merged.setdefault("output_session_folder", session_folder)
+                if legacy_func:
+                    merged.setdefault("function", legacy_func)
+                ok = _invoke_script_module(legacy_path, merged)
+                if not ok:
+                    all_success = False
+                    logging.error(f"Pre-acquisition legacy repo_module failed: {legacy_path}")
+                else:
+                    logging.info(f"Pre-acquisition legacy repo_module completed: {legacy_path}")
+                continue  # move to next pipeline entry
+
+            # Normalize simplified schema or plain string
             if isinstance(raw_entry, str):
-                entry = {
-                    "module_type": "launcher_module",
-                    "module_path": raw_entry,
-                    "module_parameters": {}
-                }
+                entry = {"module_type": "launcher_module", "module_path": raw_entry, "module_parameters": {}}
             elif isinstance(raw_entry, dict):
                 entry = raw_entry
             else:
@@ -1160,22 +1209,20 @@ class BaseLauncher:
             module_type = entry.get("module_type", "launcher_module")
             module_path = entry.get("module_path")
             module_params = entry.get("module_parameters", {}) or {}
-            # Merge into base params for convenience
             merged = dict(params)
             merged.update(module_params)
             if session_folder:
                 merged.setdefault("output_session_folder", session_folder)
 
-            success = False
             if module_type == "launcher_module":
-                success = _invoke_launcher_module(module_path, merged)
+                ok = _invoke_launcher_module(module_path, merged)
             elif module_type == "script_module":
-                success = _invoke_script_module(module_path, merged)
+                ok = _invoke_script_module(module_path, merged)
             else:
                 logging.warning(f"Unknown module_type '{module_type}' in pre-acquisition entry")
                 continue
 
-            if not success:
+            if not ok:
                 all_success = False
                 logging.error(f"Pre-acquisition step failed: {module_path}")
             else:
