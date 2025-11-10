@@ -1,80 +1,34 @@
 # openscope-experimental-launcher
 
 [![License](https://img.shields.io/badge/license-MIT-brightgreen)](LICENSE)
-![Coverage](https://img.shields.io/badge/coverage-55%25-yellow?logo=codecov)
 ![Python](https://img.shields.io/badge/python->=3.8-blue?logo=python)
 ![Platform](https://img.shields.io/badge/platform-Windows-blue?logo=windows)
-[![Documentation](https://img.shields.io/badge/docs-latest-blue?logo=gitbook)](https://allenneuraldynamics.github.io/openscope-experimental-launcher/)
+[![Documentation](https://img.shields.io/badge/docs-latest-blue)](https://allenneuraldynamics.github.io/openscope-experimental-launcher/)
 
-**Modular, pipeline-driven experimental launcher for OpenScope.**
-
----
-
-## Overview
-
-The OpenScope Experimental Launcher is a modular package designed to manage and execute neuroscience experiments across multiple platforms. It features a clean architectural separation between interface-specific process creation and common launcher functionality, supporting Bonsai, MATLAB, and Python workflows.
-
-- **Modular pre- and post-acquisition pipelines:** All experiment setup and teardown logic is handled by standalone modules, not the launcher core.
-- **Multi-language support:** Launchers for Bonsai, MATLAB, and Python workflows.
-- **Unified parameter files:** All modules and launchers use a single JSON parameter file for configuration.
-- **Robust, testable, and extensible:** All modules return 0 for success, 1 for failure; pipeline is fully testable and easy to extend.
-- **Clean architecture:** All details and advanced usage are documented in the `docs/` folder.
+Minimal, testable experiment orchestration for OpenScope: parameter merge (rig config + JSON + runtime prompts), subprocess launch, resource logging, and flattened metadata output (`end_state.json`, `debug_state.json`, `processed_parameters.json`).
 
 ## Quick Start
 
 ```bash
 pip install -e .
-```
-
-**Run an experiment:**
-```bash
 python run_launcher.py --param_file params/example_minimalist_params.json
 ```
 
-**Run a pipeline module directly:**
+To run a pipeline module directly:
+
 ```bash
-python run_module.py --module_type post_acquisition --module_name example_post_acquisition_module --param_file params/example_minimalist_params.json
+python run_module.py --module_type post_acquisition --module_name session_creator --param_file params/example_minimalist_params.json
 ```
 
-**Run tests and check coverage:**
-```bash
-pytest --cov=src/openscope_experimental_launcher --cov-report=term-missing
-```
+## Rig Parameter Placeholders
 
-**Interrogate code for type and docstring coverage:**
-```bash
-interrogate src/openscope_experimental_launcher
-```
-
-## Documentation
-
-See the [docs/](docs/) folder or the [online documentation](https://allenneuraldynamics.github.io/openscope-experimental-launcher/) for:
-- Full configuration and parameter file reference
-- Pipeline module development
-- Launcher customization
-- Advanced usage and troubleshooting
-
----
-
-MIT License. See [LICENSE](LICENSE) for details.
-
----
-
-## Rig Configuration Placeholder Mapping
-
-You can inject rig configuration (or any top-level merged parameter) into `script_parameters` using:
+Inject rig config values into `script_parameters`:
 
 ```
 {rig_param:<key>}
 ```
 
-Example rig config:
-```
-COM_port = "COM5"
-RecordCameras = true
-```
-
-Example param JSON snippet:
+Example snippet:
 ```json
 {
 	"script_parameters": {
@@ -84,6 +38,24 @@ Example param JSON snippet:
 }
 ```
 
-During launcher initialization, placeholders are replaced. Missing keys log a warning and become an empty string.
-Booleans are passed as `True`/`False`; interface layers may normalize (e.g. Bonsai lowercases).
+Missing keys -> warning + empty string substitution.
+
+## Metadata Outputs (Flattened)
+
+- `end_state.json`: `{subject_id, user_id, session_uuid, start_time, stop_time, process_returncode, rig_config, experiment_data, custom_data}`
+- `debug_state.json`: crash snapshot with `crash_info` and `launcher_state`.
+- `processed_parameters.json`: unified parameters after prompting + rig merge.
+
+## Full Documentation
+
+See the comprehensive docs site or `docs/` folder for:
+
+- Parameter & rig config reference
+- Placeholder expansion details
+- Post-acquisition tools (session_creator)
+- Extending launcher via `get_custom_end_state()`
+
+## License
+
+MIT – see [LICENSE](LICENSE).
 

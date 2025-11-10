@@ -1,80 +1,61 @@
 Launcher Metadata Folder
-=======================
+========================
 
 Overview
 --------
 
-Each experiment session run with the OpenScope Experimental Launcher creates a `launcher_metadata` folder inside the session output directory. This folder contains metadata and configuration files that document the full context of the experiment, supporting reproducibility, troubleshooting, and downstream analysis.
+Each experiment session creates a ``launcher_metadata`` directory inside the session output folder containing small, machine-readable JSON files for downstream tools.
 
-Purpose
--------
+Current File Set
+----------------
 
-The `launcher_metadata` folder provides a complete record of:
+* **processed_parameters.json** – final merged parameters (rig config + param file + runtime prompts).
+* **end_state.json** – flattened final state (no nested ``session_info``) with core identifiers and optional ``custom_data``.
+* **debug_state.json** – only on crash; contains ``crash_info`` + ``launcher_state`` snapshot.
 
-- The parameters and configuration used for the experiment
-- The runtime environment and software versions
-- Any user prompts or overrides entered during the session
-- Additional metadata needed for post-acquisition and data provenance
+The design uses a minimal, flattened set of files for clarity and easy parsing.
 
-Contents
---------
-
-Typical files found in the `launcher_metadata` folder include:
-
-- **processed_parameters.json**
-  - The unified parameter file used for the experiment, including all overrides and runtime prompts.
-  - This is the canonical input for all post-acquisition tools.
-
-- **launcher_metadata.json**
-  - Metadata about the launcher, including:
-    - Launcher type and version
-    - Timestamps (start, stop)
-    - User and subject IDs
-    - Script and repository information
-    - System/platform details
-
-- **end_state.json**
-  - Captures the final state of the experiment, including:
-    - Outcome (success/failure)
-    - User notes
-    - Any runtime-collected data (e.g., animal weight)
-
-- **debug_state.json** (optional)
-  - If an error or crash occurs, this file contains exception details and stack traces for troubleshooting.
-
-- **Other files**
-  - Additional metadata or logs may be included by custom launchers or post-acquisition tools.
-
-How It Is Created
------------------
-
-- The folder is created automatically by the launcher at the start of each experiment session.
-- Files are written as the experiment progresses:
-
-  - Parameters and launcher metadata are saved at initialization.
-  - End state and debug files are saved at experiment completion or on error.
-
-Best Practices
---------------
-
-- **Do not edit files in `launcher_metadata` manually.**
-  - These files are used by post-acquisition tools and for data provenance.
-- **Always use `processed_parameters.json` as the input for post-acquisition.**
-- **Retain the entire session folder, including `launcher_metadata`, for reproducibility and auditing.**
-
-Example Structure
+Structure Example
 -----------------
 
 .. code-block:: text
 
-   output_session_folder/
-   ├── experiment.log
-   ├── session.json
-   ├── launcher_metadata/
-   │   ├── processed_parameters.json
-   │   ├── launcher_metadata.json
-   │   ├── end_state.json
-   │   └── debug_state.json
-   └── ... (other experiment files)
+  output_session_folder/
+  ├── experiment.log
+  ├── session.json            # Generated post-acquisition (optional)
+  ├── launcher_metadata/
+  │   ├── processed_parameters.json
+  │   ├── end_state.json
+  │   └── debug_state.json    # Only present if a crash occurred
+  └── ... other data files
 
-For more details, see the code in `src/openscope_experimental_launcher/launchers/base_launcher.py` and related modules.
+Creation Timeline
+-----------------
+
+1. At initialization: ``processed_parameters.json`` written after merges & prompts.
+2. On normal completion: ``end_state.json`` saved.
+3. On unexpected exception: ``debug_state.json`` written before shutdown.
+
+Best Practices
+--------------
+
+* Treat files as immutable audit artifacts; do not edit manually.
+* Use ``processed_parameters.json`` as the canonical input for post-acquisition tools.
+* Extend metadata only via ``custom_data`` in the end state.
+
+Extending Metadata
+------------------
+
+Implement ``get_custom_end_state()`` in a subclass returning a dict. Its contents are placed under ``custom_data`` without affecting core keys.
+
+
+
+Downstream Consumption
+----------------------
+
+The ``session_creator`` tool consumes both ``processed_parameters.json`` and ``end_state.json``. Missing optional fields are handled gracefully with warnings.
+
+Reference Implementation
+------------------------
+
+See ``BaseLauncher.save_end_state`` and ``BaseLauncher.save_debug_state`` in ``src/openscope_experimental_launcher/launchers/base_launcher.py``.

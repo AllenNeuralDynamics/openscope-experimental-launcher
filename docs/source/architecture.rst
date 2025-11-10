@@ -43,57 +43,40 @@ System Architecture Diagram
        rankdir=LR;
        node [shape=box, style=filled, fillcolor=lightgray];
 
-       # Parameter flow
+       # Core entities
        ParamFile [label="Parameter File (JSON)", shape=note, fillcolor=lightyellow];
-       BaseLauncher [label="BaseLauncher\n(core logic)", fillcolor=lightblue, style="filled,bold"];
-       BonsaiLauncher [label="BonsaiLauncher"];
-       MatlabLauncher [label="MatlabLauncher"];
-       PythonLauncher [label="PythonLauncher"];
+       BaseLauncher [label="BaseLauncher\n(core orchestration)", fillcolor=lightblue, style="filled,bold"];
+       InterfaceAdapter [label="Interface Adapter\n(Bonsai / MATLAB / Python / Custom)", fillcolor=white, style="filled"];
        PreModules [label="Pre-Acquisition Modules\n(mouse weight, ZMQ, etc.)"];
        PostModules [label="Post-Acquisition Modules\n(session_creator, notes, etc.)"];
+       AcquisitionProc [label="Acquisition Process\n(external executable)"];
 
-       # Interfaces and software
-       BonsaiInterface [label="BonsaiInterface"];
-       MatlabInterface [label="MatlabInterface"];
-       PythonInterface [label="PythonInterface"];
-       Bonsai [label="Bonsai", shape=box3d, fillcolor=white];
-       Matlab [label="MATLAB", shape=box3d, fillcolor=white];
-       Python [label="Python", shape=box3d, fillcolor=white];
+       # Utilities
+       ParamUtils [label="param_utils.py\n(load + prompts)"];
+       RigConfig [label="rig_config.py\n(rig placeholders)"];
+       GitManager [label="git_manager.py\n(optional repo mgmt)"];
+       Logging [label="logging utils\n(session + centralized)"];
 
-       # Core utilities
-       ParamUtils [label="param_utils.py\n(parameter loading, prompts)"];
-       RigConfig [label="rig_config.py\n(rig hardware config)"];
-       GitManager [label="git_manager.py\n(repo management)"];
-       Logging [label="Logging\n(session + centralized)"];
-
-       # Parameter flow
+       # Relationships
        ParamFile -> BaseLauncher;
-       BaseLauncher -> BonsaiLauncher [label="Parameter File (JSON)"];
-       BaseLauncher -> MatlabLauncher [label="Parameter File (JSON)"];
-       BaseLauncher -> PythonLauncher [label="Parameter File (JSON)"];
-       BaseLauncher -> PreModules [label="Parameter File (JSON)"];
-       BaseLauncher -> PostModules [label="Parameter File (JSON)"];
-       BonsaiLauncher -> BonsaiInterface ;
-       MatlabLauncher -> MatlabInterface ;
-       PythonLauncher -> PythonInterface ;
-       BonsaiInterface -> Bonsai [label="Command-line Interface"];
-       MatlabInterface -> Matlab [label="Command-line Interface"];
-       PythonInterface -> Python [label="Command-line Interface"];
-
-       # Core logic relationships
        BaseLauncher -> ParamUtils;
-       BaseLauncher -> RigConfig;
+       ParamUtils -> RigConfig;
+       BaseLauncher -> PreModules;
+       BaseLauncher -> InterfaceAdapter;
+       InterfaceAdapter -> AcquisitionProc [label="subprocess spawn"];
+       BaseLauncher -> PostModules;
        BaseLauncher -> GitManager;
        BaseLauncher -> Logging;
-       ParamUtils -> RigConfig;
+       PreModules -> AcquisitionProc [style=dashed, label="optional signals"];
+       PostModules -> AcquisitionProc [style=dashed, label="optional logs"];
 
-       # Pre and post modules do not talk to each other
+       # Pre and post remain independent
        PreModules [group=pre];
        PostModules [group=post];
    }
 
 .. note::
-   This diagram shows the code structure: how launchers, interfaces, utils, and pipeline modules interact. Use this to understand extension points and the modular design.
+   A single ``BaseLauncher`` orchestrates experiments. Lightweight interface adapters handle only subprocess creation; extend or override ``_create_process`` for custom environments.
 
 Launcher Flow Overview
 ----------------------
@@ -116,13 +99,13 @@ Launcher Flow Overview
 Repository Folder Structure
 --------------------------
 
-- ``src/openscope_experimental_launcher/``: Main package source code
+ - ``src/openscope_experimental_launcher/``: Main package source code
 
-  - ``launchers/``: Generic and interface-specific launcher classes (Bonsai, MATLAB, Python, etc.)
-  - ``interfaces/``: Stateless process creation utilities for each platform
-  - ``pre_acquisition/``: Modular pre-acquisition pipeline modules (mouse weight, ZMQ, etc.)
-  - ``post_acquisition/``: Modular post-acquisition pipeline modules (session creation, notes, enhancement, etc.)
-  - ``utils/``: Shared utilities (configuration, git, logging, etc.)
+    - ``launchers/``: Core ``BaseLauncher`` and optional custom subclasses
+    - ``interfaces/``: Lightweight interface adapters for spawning external processes
+    - ``pre_acquisition/``: Modular pre-acquisition pipeline modules (mouse weight, ZMQ, etc.)
+    - ``post_acquisition/``: Modular post-acquisition pipeline modules (session creation, notes, enhancement, etc.)
+    - ``utils/``: Shared utilities (configuration, git, logging, etc.)
   
 - ``params/``: Example and project-specific parameter files (JSON)
 - ``tests/``: Unit and integration tests for all core logic and modules

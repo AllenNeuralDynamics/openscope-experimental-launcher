@@ -1,124 +1,70 @@
 Quick Start Guide
 =================
 
-This guide will help you run your first experiment with the OpenScope Experimental Launcher.
+Minimal steps to launch an experiment with the OpenScope Experimental Launcher.
 
-Configuration Overview
-----------------------
+Configuration Layers
+--------------------
 
-The launcher uses a **three-tier configuration system**:
+1. **Rig Config (TOML)** – static hardware + defaults.
+2. **Parameter File (JSON)** – experiment-specific settings.
+3. **Runtime Prompts** – fill / override missing required fields interactively.
 
-- **Rig Config** (TOML): Hardware constants (rig_id, data paths)
-- **Parameter Files** (JSON): Experiment settings (subject_id, protocols)  
-- **Runtime Prompts**: Interactive collection of missing values
+Precedence: Runtime Prompts > Parameter File > Rig Config.
 
-**Priority**: Runtime Prompts > JSON Parameters > Rig Config
+Example Minimal Parameter File
+------------------------------
 
-.. tip::
-   **First Time Setup**: The launcher automatically creates a default rig configuration 
-   file on first run. The rig_id defaults to your computer's hostname.
+.. code-block:: json
+   :caption: example_params.json
 
-For complete details, see :doc:`configuration`.
+   {
+     "subject_id": "mouse_001",
+     "user_id": "operator",
+     "script_path": "C:/local/scripts/task.py",
+     "output_root_folder": "D:/OpenScopeData"
+   }
 
-Basic Experiment Setup
------------------------
-
-1. **Create a Parameter File**   Create a JSON file with your experiment parameters:
-
-   .. code-block:: json
-      :caption: example_params.json
-
-      {
-          "subject_id": "test_mouse_001",
-          "user_id": "researcher_name",
-          "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
-          "repository_commit_hash": "main",
-          "local_repository_path": "C:/BonsaiExperiments",
-          "script_path": "code/stimulus-control/src/predictive_processing_workflow.bonsai",
-          "bonsai_exe_path": "code/stimulus-control/bonsai/Bonsai.exe",
-          "output_root_folder": "C:/experiment_data",
-          "collect_mouse_runtime_data": true,
-          "protocol_id": ["protocol_001"]
-      }
-
-2. **Choose Your Interface**
-
-   Select the appropriate launcher for your experiment type:   **For Bonsai Workflows:**
-
-   .. code-block:: python
-
-      from openscope_experimental_launcher.launchers import BonsaiLauncher
-
-      # Create launcher instance
-      launcher = BonsaiLauncher()
-
-      # Initialize with parameter file (uses default rig config)
-      launcher.initialize_launcher(param_file="example_params.json")
-      
-      # Run the experiment
-      success = launcher.run("example_params.json")
-      if success:
-          print("Experiment completed successfully!")
-          print(f"Data saved to: {launcher.output_session_folder}")
-      else:
-          print("Experiment failed. Check logs for details.")   .. note::
-      For testing, you can specify a custom rig config path, but this is rarely needed:
-      
-      .. code-block:: python
-      
-         launcher.initialize_launcher(param_file="test.json", rig_config_path="/custom/path")
-
-   **For MATLAB Scripts:**
-
-   .. code-block:: python
-
-      from openscope_experimental_launcher.launchers import MatlabLauncher
-
-      # Create launcher instance  
-      launcher = MatlabLauncher()
-
-      # Initialize and run the experiment
-      launcher.initialize_launcher(param_file="matlab_params.json")
-      success = launcher.run("matlab_params.json")   **For Python Scripts:**
-
-   .. code-block:: python
-
-      from openscope_experimental_launcher.launchers import PythonLauncher
-
-      # Create launcher instance
-      launcher = PythonLauncher()
-
-      # Initialize and run the experiment
-      launcher.initialize_launcher(param_file="python_params.json")
-      success = launcher.run("python_params.json")
-
-3. **Using Project Scripts**   For project-specific experiments, use the launcher scripts:
-
-   .. code-block:: bash
-
-      # Test BaseLauncher functionality
-      python scripts/minimalist_launcher.py scripts/example_minimalist_params.json
-
-      # Predictive processing experiments  
-      python scripts/predictive_processing_launcher.py path/to/pp_params.json
-
-Command Line Usage
-------------------
-
-You can also run experiments directly from the command line:
+Run the Launcher
+----------------
 
 .. code-block:: bash
 
-   # Run with parameter file
-   python -m openscope_experimental_launcher.base.experiment example_params.json
+   python run_launcher.py --param_file params/example_minimalist_params.json
 
-   # Run Predictive Processing experiment
-   python scripts/predictive_processing_launcher.py pp_params.json
+Placeholders
+------------
+
+Use rig config values inside ``script_parameters`` via:
+
+``{rig_param:COM_port}`` → replaced at initialization.
+
+Pipeline Modules
+----------------
+
+Add ordered module names to your parameter file:
+
+.. code-block:: json
+
+   {
+     "pre_acquisition_pipeline": ["mouse_weight_pre_prompt"],
+     "post_acquisition_pipeline": ["session_creator"]
+   }
+
+Outputs
+-------
+
+Session folder will contain ``launcher_metadata/`` with:
+
+* processed_parameters.json
+* end_state.json (flattened)
+* debug_state.json (if crash)
+
+Post-acquisition ``session_creator`` can build ``session.json`` later.
 
 Next Steps
 ----------
 
-- Learn about :doc:`parameter_files` for advanced configuration
-- Explore :doc:`rig_launchers` for rig-specific features
-- See :doc:`examples` for complete working examples
-- Check the :doc:`api/base` for detailed API documentation
+* See :doc:`parameter_files` for full schema.
+* See :doc:`rig_config` for rig TOML details.
+* See :doc:`end_state_system` for metadata formats.

@@ -22,25 +22,22 @@ OpenScope Experimental Launcher Documentation
 Overview
 --------
 
-The OpenScope Experimental Launcher is a modular package designed to manage and execute neuroscience experiments across multiple platforms. It features a clean architectural separation between interface-specific process creation and common launcher functionality, supporting Bonsai, MATLAB, and Python workflows.
+The launcher merges rig config + JSON parameter file + runtime prompts, starts a subprocess (generic or interface-specific), monitors resources, and writes flattened metadata (``processed_parameters.json``, ``end_state.json``, ``debug_state.json``) for post-acquisition tools.
 
 Key Features
 ------------
 
-🏗️ **Modular Architecture**
-   Clean separation between launchers (process management), interfaces (process creation), and pipeline modules (pre/post-acquisition logic)
+🏗️ **Modular Pipelines** – Ordered pre/post module lists drive setup and teardown.
 
-🔧 **Multi-Interface Support**
-   Dedicated launchers for Bonsai, MATLAB, and Python workflows
+🧩 **Flattened Metadata** – No nested ``session_info``; concise ``end_state.json`` + crash-focused ``debug_state.json``.
 
-📊 **Session Tracking**
-   Generate unique session IDs and comprehensive experiment metadata
+� **Rig Placeholders** – Use ``{rig_param:<key>}`` in ``script_parameters`` for dynamic injection.
 
-🗂️ **Unified Parameter Management**
-   Consistent parameter handling with ``script_path`` convention across all interfaces
+🗂️ **Unified Parameters** – All sources merged into ``processed_parameters.json``.
 
-🔌 **Pipeline Modules**
-   All pre- and post-acquisition steps are handled by modular, reusable Python modules, specified in the parameter file
+🛠️ **Custom End State** – Extend via ``get_custom_end_state()`` under ``custom_data``.
+
+� **Post-Acquisition Generation** – ``session_creator`` builds standards-compliant ``session.json``.
 
 Quick Start
 -----------
@@ -54,12 +51,11 @@ Quick Start
 2. **Basic Usage**:
 
    .. code-block:: python
-   
-      from openscope_experimental_launcher.launchers import BonsaiLauncher
-      
-      # Create and run Bonsai experiment
-      launcher = BonsaiLauncher()
-      success = launcher.run("path/to/parameters.json")
+
+      from openscope_experimental_launcher.launchers.base_launcher import BaseLauncher
+
+      launcher = BaseLauncher(param_file="path/to/parameters.json")
+      success = launcher.run()
 
 3. **Using Project Scripts**:
 

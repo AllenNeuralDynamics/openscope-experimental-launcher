@@ -1,7 +1,7 @@
 Launcher Configuration Parameters
 =================================
 
-This page documents all configuration parameters available for the OpenScope Experimental Launcher and its interface-specific launchers (Bonsai, Python, MATLAB).
+This page documents all configuration parameters available for the OpenScope Experimental Launcher. A single ``BaseLauncher`` handles orchestration; interface adapters (Bonsai / MATLAB / Python / Custom) provide only subprocess spawning.
 
 BaseLauncher Parameters
 ----------------------
@@ -37,26 +37,30 @@ These parameters control the core behavior of the launcher and are accepted in t
 | local_repository_path     | string    | Local directory to clone/use the repository. Optional.              |
 +---------------------------+-----------+---------------------------------------------------------------------+
 
-BonsaiLauncher Parameters
-------------------------
-- Inherits all BaseLauncher parameters.
-- ``workflow_path``: Path to the Bonsai workflow file (.bonsai). Required.
-- ``bonsai_executable``: Path to the Bonsai executable. Optional.
-- ``bonsai_args``: List of additional arguments to pass to Bonsai. Optional.
+Optional Interface-Specific Parameters
+-------------------------------------
+The following keys apply only when launching a specific external environment. Include only those you need; unused keys are ignored.
 
-PythonLauncher Parameters
-------------------------
-- Inherits all BaseLauncher parameters.
-- ``script_path``: Path to the Python experiment script. Required.
-- ``python_executable``: Path to the Python interpreter. Optional.
-- ``python_args``: List of additional arguments to pass to Python. Optional.
++----------------------+-----------+-----------------------------------------------+
+| Parameter            | Type      | Applies To / Description                      |
++======================+===========+===============================================+
+| workflow_path        | string    | Bonsai: path to ``.bonsai`` workflow file.    |
++----------------------+-----------+-----------------------------------------------+
+| bonsai_executable    | string    | Bonsai: override Bonsai executable path.      |
++----------------------+-----------+-----------------------------------------------+
+| bonsai_args          | list      | Bonsai: extra CLI args.                       |
++----------------------+-----------+-----------------------------------------------+
+| python_executable    | string    | Python: interpreter path override.            |
++----------------------+-----------+-----------------------------------------------+
+| python_args          | list      | Python: extra CLI args.                       |
++----------------------+-----------+-----------------------------------------------+
+| matlab_executable    | string    | MATLAB: executable path override.             |
++----------------------+-----------+-----------------------------------------------+
+| matlab_args          | list      | MATLAB: extra CLI args.                       |
++----------------------+-----------+-----------------------------------------------+
 
-MatlabLauncher Parameters
-------------------------
-- Inherits all BaseLauncher parameters.
-- ``script_path``: Path to the MATLAB experiment script. Required.
-- ``matlab_executable``: Path to the MATLAB executable. Optional.
-- ``matlab_args``: List of additional arguments to pass to MATLAB. Optional.
+.. note::
+  These interface parameters are optional and may be superseded by a custom ``_create_process`` implementation in a subclass or adapter.
 
 Example Parameter File
 ---------------------
@@ -69,13 +73,13 @@ Example Parameter File
     "resource_log_enabled": true,
     "resource_log_interval": 5,
     "workflow_path": "C:/Workflows/my_experiment.bonsai",
-    "bonsai_executable": "C:/Program Files/Bonsai/Bonsai.exe",
-    "pre_acquisition_pipeline": ["example_pre_module"],
-    "post_acquisition_pipeline": ["example_post_module"]
+    "pre_acquisition_pipeline": ["mouse_weight_pre_prompt"],
+    "post_acquisition_pipeline": ["experiment_notes_post_prompt"]
   }
 
 Notes
 -----
 - All parameters are case-sensitive.
-- Unused parameters are ignored by launchers that do not require them.
+- Unused optional interface parameters are ignored.
+- Use placeholders (``{rig_param:<key>}``) inside values to inject rig configuration.
 - For more details on resource monitoring, see :doc:`resource-monitoring`.

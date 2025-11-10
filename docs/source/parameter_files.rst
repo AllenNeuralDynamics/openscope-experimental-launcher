@@ -1,308 +1,82 @@
 Parameter Files
 ===============
 
-Parameter files are JSON configuration files that define experiment-specific settings. They specify script paths, execution parameters, and output locations for individual experiments.
+JSON parameter files define experiment-specific configuration merged with rig config and runtime prompts.
 
-.. note::
-   Parameter files contain **experiment-specific settings** only. Hardware settings 
-   like rig_id belong in the rig configuration file. See :doc:`rig_config` for rig 
-   configuration details and :doc:`configuration` for the complete system overview.
+Core Keys
+---------
 
-.. important::
-   All post-acquisition tools now expect a **param_file (JSON)** as input, not a session folder. This enables unified parameter prompting and future GUI integration.
+``script_path`` (required)
+   Path to executable / script (Python, MATLAB, Bonsai, etc.).
 
-Core Parameters
----------------
+``output_root_folder`` (optional)
+   Base folder for session output; if omitted uses rig config default.
 
-These are the essential parameters that define your experiment:
+``subject_id`` / ``user_id`` (optional)
+   Prompted if missing.
 
-**script_path** (string, required)
-   Path to the experiment script, workflow, or program to execute:
-   
-   - ``.bonsai`` files for BonsaiLauncher
-   - ``.py`` files for PythonLauncher  
-   - ``.m`` files for MATLABLauncher
-   - Any executable for BaseLauncher
+``pre_acquisition_pipeline`` / ``post_acquisition_pipeline`` (optional)
+   Ordered lists of module names.
 
-**output_root_folder** (string, optional)
-   Base directory for storing experiment data. If not specified, uses the rig configuration default.
-   The launcher creates a timestamped SessionFolder within this output_root_folder for each experiment.
+Placeholders
+------------
 
-**subject_id** (string, optional)
-   Identifier for the experimental subject. If not provided, you'll be prompted at runtime.
+Inject rig config values into ``script_parameters``:
 
-**user_id** (string, optional)
-   Identifier for the person running the experiment. If not provided, you'll be prompted at runtime.
-
-.. note::
-   **Folder Structure**: The system uses a two-tier folder structure:
-   
-   - **output_root_folder**: Base directory (from parameter file or rig config)
-   - **output_session_folder**: output_root_folder + timestamped session name (automatically created)
-   
-   Your experiment processes receive the full output_session_folder path.
+``{rig_param:COM_port}``
 
 Basic Example
-~~~~~~~~~~~~~
+-------------
 
 .. code-block:: json
-   :caption: Minimal parameter file
 
-   {
-       "script_path": "workflows/my_experiment.bonsai",
+    {
        "subject_id": "mouse_001",
-       "user_id": "researcher"
-   }
-   
-.. code-block:: json
-   :caption: With custom output_root_folder override
-
-   {
-       "script_path": "workflows/my_experiment.bonsai",
-       "output_root_folder": "D:/special_experiments",
-       "subject_id": "mouse_001", 
-       "user_id": "researcher"
-   }
-
-Optional Parameters
--------------------
-
-**script_parameters** (object, optional)
-   Interface-specific parameters passed to the script/workflow:
-   
-   - **Bonsai**: Passed as ``-p name=value`` command-line arguments
-   - **MATLAB**: Available in the workspace during script execution
-   - **Python**: Passed as command-line arguments or environment variables
-
-**script_arguments** (array, optional)
-   Additional command-line arguments passed directly to the script/program
-
-Git Repository Parameters
---------------------------
-
-For experiments stored in Git repositories:
-
-**repository_url** (string, optional)
-   Git repository URL containing the experiment code/workflows
-
-**repository_commit_hash** (string, optional, default: "main")
-   Specific commit, branch, or tag to checkout
-
-**local_repository_path** (string, optional)
-   Local directory where the repository should be cloned/stored
-
-Runtime Data Collection
-------------------------
-
-The launcher can collect mouse weight and experiment information interactively:
-
-.. code-block:: json
-   :caption: Enable mouse weight collection
-
-   {
-       "script_path": "experiment.bonsai",
-       "output_root_folder": "C:/experiment_data",
-       "collect_mouse_runtime_data": true,
-       "protocol_id": ["protocol_001"],
-       "mouse_platform_name": "behavior_platform",
-       "active_mouse_platform": true
-   }
-
-**collect_mouse_runtime_data** (boolean, optional)
-   When true, prompts for animal weight before and after the experiment
-
-**protocol_id** (array, optional)
-   Protocol identifiers (user will be prompted to confirm at runtime)
-
-**mouse_platform_name** (string, optional)
-   Platform identifier (user will be prompted to confirm at runtime)
-
-**active_mouse_platform** (boolean, optional)
-   Platform status (user will be prompted to confirm at runtime)
-
-**Runtime Prompts:**
-   - Animal weight prior to experiment (at start)
-   - Protocol and platform confirmation (simplified: press Enter to keep, or type new value)
-   - Animal weight post experiment (at end)
-   - Final experiment notes (optional)
-
-Additional Parameter Examples
------------------------------
-
-Python Launcher Parameters
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: json
-   :caption: Python launcher parameters
-
-   {
-       "repository_url": "https://github.com/user/python-experiment.git",
-       "script_path": "experiments/visual_task.py",
-       "repository_commit_hash": "main",
-       "local_repository_path": "C:/repositories",
+       "user_id": "operator",
+       "script_path": "C:/tasks/run_task.py",
+       "output_root_folder": "D:/OpenScopeData",
        "script_parameters": {
-           "num_trials": 100,
-           "stimulus_duration": 2.0,
-           "subject_id": "mouse_001"
-       }
-   }
+          "PortName": "{rig_param:COM_port}",
+          "RecordCameras": "{rig_param:RecordCameras}"
+       },
+       "pre_acquisition_pipeline": ["mouse_weight_pre_prompt"],
+       "post_acquisition_pipeline": ["session_creator"]
+    }
 
-MATLAB Launcher Parameters
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Git Repository Support (Optional)
+---------------------------------
 
-.. code-block:: json
-   :caption: MATLAB launcher parameters
+``repository_url`` / ``repository_commit_hash`` / ``local_repository_path`` allow cloning & pinning code; omitted for purely local workflows.
 
-   {
-       "repository_url": "https://github.com/user/matlab-experiment.git",
-       "script_path": "experiments/analysis_script.m",
-       "repository_commit_hash": "main",
-       "local_repository_path": "C:/repositories",
-       "script_parameters": {
-           "data_path": "C:/raw_data",
-           "analysis_type": "spectral",
-           "gpu_enabled": true
-       }
-   }
+Runtime Data Collection (Optional)
+----------------------------------
 
-Minimalist Launcher Parameters
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``collect_mouse_runtime_data``: boolean enabling weight prompts.
+``protocol_id``: list of identifiers.
+``mouse_platform_name`` / ``active_mouse_platform``: platform metadata.
 
-.. code-block:: json
-   :caption: Minimalist launcher parameters (no Git dependencies)
+Script Parameters
+-----------------
 
-   {
-       "script_path": "C:/local/workflows/simple_task.bonsai",
-       "subject_id": "mouse_001"
-   }
+Arbitrary key-value pairs passed to the underlying process. Booleans preserved; launcher performs placeholder expansion before invocation.
 
-Additional Parameters
---------------------
+Session Output
+--------------
 
-**local_repository_path** (string, default: "C:/BonsaiTemp")
-   Local directory for cloning Git repositories (BonsaiLauncher only)
+Launcher creates a timestamped session folder under ``output_root_folder`` containing a ``launcher_metadata`` directory with:
 
-**session_type** (string, default: "experiment")
-   Type of experimental session for metadata
+* processed_parameters.json
+* end_state.json
+* debug_state.json (only if crash)
 
-**additional_parameters** (object)
-   Interface-specific parameters passed to the script or workflow
+Post-acquisition tools (e.g. ``session_creator``) derive ``session.json`` from these.
 
-Script-Specific Parameters
----------------------------
+Extensibility
+-------------
 
-Pass parameters directly to your scripts using interface-specific sections:
+Add custom end state data via subclass ``get_custom_end_state()`` returning a dict; placed under ``custom_data``.
 
-Bonsai Parameters
-~~~~~~~~~~~~~~~~~
+Reference
+---------
 
-.. code-block:: json   {
-       "script_path": "workflow.bonsai",
-       "script_parameters": {
-           "NumTrials": 100,
-           "StimulusDuration": 5.0,
-           "InterTrialInterval": 2.0,
-           "RewardSize": 0.01
-       }
-   }
-
-Python Parameters
-~~~~~~~~~~~~~~~~~
-
-.. code-block:: json
-
-   {
-       "script_path": "experiment.py",
-       "script_parameters": {
-           "num_trials": 100,
-           "stimulus_type": "gratings",
-           "save_raw_data": true
-       }
-   }
-
-MATLAB Parameters
-~~~~~~~~~~~~~~~~~
-
-.. code-block:: json
-
-   {
-       "script_path": "analysis.m",
-       "script_parameters": {
-           "data_file": "raw_data.mat",
-           "analysis_type": "spectral",
-           "plot_results": true
-       }
-   }
-
-.. note::
-   Parameters are passed to scripts in a format appropriate for each interface. Bonsai receives them as workflow properties (``-p name=value``), Python as command-line arguments or environment variables, and MATLAB as function parameters.
-
-
-Parameter Schema Reference
---------------------------
-
-For implementation details, see the ``initialize_launcher()`` method in the ``BaseLauncher`` class.
-
-Session Files and Output
--------------------------
-
-Every experiment automatically generates a comprehensive ``session.json`` file in the output directory using the AIND data schema format.
-
-Session File Contents
-~~~~~~~~~~~~~~~~~~~~~
-
-The generated ``session.json`` includes:
-
-- **Session Information**: Start/end times, session UUID, subject and user IDs
-- **Data Streams**: Information about data collection streams and software  
-- **Platform Details**: Rig identification, mouse platform configuration
-- **Animal Data**: Pre/post experiment weights (when collected)
-- **Software Information**: Details about the launcher and specific script/workflow executed
-- **Experiment Parameters**: Complete parameter sets used during the experiment
-
-Example Session File Structure
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: json
-
-   {
-     "describedBy": "https://raw.githubusercontent.com/AllenNeuralDynamics/aind-data-schema/main/src/aind_data_schema/core/session.py",
-     "schema_version": "1.4.0", 
-     "experimenter_full_name": ["researcher_name"],
-     "session_start_time": "2025-06-21T10:30:00.000000-07:00",
-     "session_end_time": "2025-06-21T10:45:30.000000-07:00",
-     "session_type": "OpenScope experiment",
-     "rig_id": "your_rig_id",
-     "subject_id": "test_mouse_001",
-     "data_streams": [
-       {
-         "stream_start_time": "2025-06-21T10:30:00.000000-07:00",
-         "stream_end_time": "2025-06-21T10:45:30.000000-07:00",
-         "daq_names": ["Launcher"],
-         "stream_modalities": [{"abbreviation": "BEH", "name": "Behavior"}]
-       }
-     ],
-     "notes": "Experiment completed successfully with runtime data collection"
-   }
-
-Extending Session Metadata
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Custom launchers can add specific data streams by overriding the ``get_data_streams`` method:
-
-.. code-block:: python
-
-   class MyCustomLauncher(BonsaiLauncher):
-       def get_data_streams(self, start_time, end_time):
-           """Add custom data streams for this rig."""
-           streams = super().get_data_streams(start_time, end_time)
-           
-           # Add custom stream for this rig
-           streams.append({
-               "stream_start_time": start_time,
-               "stream_end_time": end_time, 
-               "daq_names": ["MyCustomDAQ"],
-               "stream_modalities": [{"abbreviation": "EPHYS", "name": "Electrophysiology"}]
-           })
-           
-           return streams
+See ``BaseLauncher._expand_rig_param_placeholders`` and ``BaseLauncher.save_end_state`` for implementation details.
