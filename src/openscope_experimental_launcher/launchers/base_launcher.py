@@ -19,6 +19,9 @@ import json
 import subprocess
 import threading
 import importlib
+import importlib.util
+import traceback
+
 from typing import Dict, Optional, Any
 
 # Import AIND data schema utilities for standardized folder naming
@@ -121,6 +124,9 @@ class BaseLauncher:
             if k not in self.params:
                 self.params[k] = v
 
+        # Expand any {rig_param:<key>} placeholders in script_parameters generically
+        self._expand_rig_param_placeholders()
+
         self.original_input_params = dict(self.params)  # Store for metadata
 
         # Extract subject_id and user_id from params (no fallback default needed)
@@ -129,6 +135,7 @@ class BaseLauncher:
         logging.info(f"Using subject_id: {self.subject_id}, user_id: {self.user_id}")
         logging.info(f"Using rig: {self.rig_config['rig_id']}")
         logging.info("BaseLauncher initialized")
+
     
     def _get_platform_info(self) -> Dict[str, Any]:
         """Get system and version information."""
@@ -138,6 +145,34 @@ class BaseLauncher:
             "hardware": (platform.processor(), platform.machine()),
             "computer_name": platform.node(),
         }
+
+    def _expand_rig_param_placeholders(self):
+        """Replace {rig_param:<key>} placeholders in script_parameters with merged param values.
+
+        This allows param JSON files to declaratively map rig configuration fields (or any
+        top-level param) into workflow script parameters without launcher-specific logic.
+
+        Example:
+            "script_parameters": {"PortName": "{rig_param:COM_port}"}
+
+        If COM_port exists in params (from rig_config or user overrides), it will be substituted.
+        Unknown keys are logged and replaced with empty string.
+        """
+        script_parameters = self.params.get("script_parameters")
+        if not script_parameters or not isinstance(script_parameters, dict):
+            return
+        import re
+        pattern = re.compile(r"\{rig_param:([^}]+)\}")
+        for name, value in list(script_parameters.items()):
+            if isinstance(value, str) and '{rig_param:' in value:
+                def repl(m):
+                    key = m.group(1)
+                    if key in self.params:
+                        return str(self.params[key])
+                    raise RuntimeError(f"rig_param placeholder references unknown key '{key}' for script parameter '{name}'")
+                new_val = pattern.sub(repl, value)
+                script_parameters[name] = new_val
+        # No return needed; script_parameters mutated in place
     
     def determine_output_session_folder(self) -> Optional[str]:
         """
@@ -365,17 +400,12 @@ class BaseLauncher:
         except Exception as e:
             print(f"Error finalizing logging: {e}")
     
-    def run_post_acquisition(self, param_file=None) -> bool:
-        """Run post-acquisition pipeline using simplified entry schema.
+    def _run_stage(self, *, stage_name: str, pipeline_key: str, param_file: Optional[str] = None,
+                   enable_legacy_repo_module: bool = False) -> bool:
+        """Generic runner for pipeline stages (pre/post acquisition).
 
-        Entry dict format:
-          {
-            "module_type": "launcher_module" | "script_module",
-            "module_path": "dotted.name" OR "relative/path/in/repo.py",
-            "module_parameters": {key: value}
-          }
-
-        Plain string entries remain supported (treated as launcher_module).
+        Keeps BaseLauncher generic: modules can mutate params or write artifacts.
+        Supports new unified schema and legacy repo_module entries.
         """
         if param_file is None:
             param_file = self.param_file
@@ -390,22 +420,25 @@ class BaseLauncher:
         else:
             params = param_utils.load_parameters(param_file=param_file)
 
-        pipeline = params.get("post_acquisition_pipeline", [])
-        all_success = True
+        pipeline = params.get(pipeline_key, [])
         repo_path = git_manager.get_repository_path(params)
         session_folder = params.get("output_session_folder") or self.output_session_folder
+        all_success = True
 
         def _invoke_launcher_module(mod_name: str, merged_params: dict) -> bool:
             try:
-                logging.info(f"Post-acquisition launcher module: {mod_name}")
-                mod = importlib.import_module(f"openscope_experimental_launcher.post_acquisition.{mod_name}")
+                logging.info(f"{stage_name} launcher module: {mod_name}")
+                pkg_stage = pipeline_key.replace('_pipeline', '')
+                mod = importlib.import_module(f"openscope_experimental_launcher.{pkg_stage}.{mod_name}")
+                # Preferred function name ordering
+                candidates = [f"run_{pkg_stage}", "run"]
                 func = None
-                if hasattr(mod, "run_post_acquisition"):
-                    func = getattr(mod, "run_post_acquisition")
-                elif hasattr(mod, "run"):
-                    func = getattr(mod, "run")
-                else:
-                    logging.warning(f"Module {mod_name} has no run_post_acquisition() or run(); skipping.")
+                for cand in candidates:
+                    if hasattr(mod, cand):
+                        func = getattr(mod, cand)
+                        break
+                if not func:
+                    logging.warning(f"Module {mod_name} has no callable entry point; skipping.")
                     return True
                 result = func(param_file) if func.__code__.co_argcount == 1 else func(merged_params)
                 return result in (None, 0, True)
@@ -419,36 +452,100 @@ class BaseLauncher:
                     raise RuntimeError("No repository path available for script_module")
                 abs_path = os.path.join(repo_path, path_in_repo.replace('/', os.sep))
                 if not os.path.isfile(abs_path):
-                    raise FileNotFoundError(f"Script module file not found: {abs_path}")
-                spec = importlib.util.spec_from_file_location("script_post_module", abs_path)
-                if spec is None or spec.loader is None:
-                    raise RuntimeError("Failed to build import spec for script module")
+                    target_name = os.path.basename(path_in_repo)
+                    for root, _dirs, files in os.walk(repo_path):
+                        if target_name in files:
+                            abs_path = os.path.join(root, target_name)
+                            break
+                    if not os.path.isfile(abs_path):
+                        raise FileNotFoundError(f"Script module file not found: {abs_path}")
+                # Direct import using importlib.util (fallbacks removed)
+                spec = importlib.util.spec_from_file_location(f"script_{pipeline_key}", abs_path)
+                if not spec or not spec.loader:
+                    raise ImportError(f"Could not create spec for script module: {abs_path}")
                 mod = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(mod)  # type: ignore[attr-defined]
+                # New schema: function arguments are passed via a nested 'function_args' dict inside
+                # module_parameters. Backward compatibility: if 'function_args' isn't provided we
+                # fall back to legacy behavior (single params dict or positional heuristic).
                 func_name = merged_params.get("function")
+                func_args = merged_params.get("function_args")  # expected dict if present
                 func = None
-                if func_name and hasattr(mod, func_name):
-                    func = getattr(mod, func_name)
-                elif hasattr(mod, "run_post_acquisition"):
-                    func = getattr(mod, "run_post_acquisition")
-                elif hasattr(mod, "run"):
-                    func = getattr(mod, "run")
+                preferred = [func_name, f"run_{pipeline_key.replace('_pipeline','')}", "run"]
+                for cand in preferred:
+                    if cand and hasattr(mod, cand):
+                        func = getattr(mod, cand)
+                        break
+                if not func:
+                    raise AttributeError("No callable entry point found in script module")
+                import inspect
+                sig = inspect.signature(func)
+                # Invocation strategy simplified:
+                # If function_args provided, ONLY pass those (plus derived output_path) as kwargs.
+                # No automatic merging of other parameters. Caller must supply what it needs.
+                # Otherwise fall back to legacy behaviors.
+                # Expand placeholders and resolve relative paths inside function_args before calling.
+                if func_args and isinstance(func_args, dict):
+                    sess_dir = merged_params.get('output_session_folder') or merged_params.get('output_root_folder')
+                    expanded_args = {}
+                    for k, v in func_args.items():
+                        if isinstance(v, str):
+                            # Placeholder expansion
+                            if '{session_folder}' in v and sess_dir:
+                                v = v.replace('{session_folder}', sess_dir)
+                            # Auto-resolve for *_path/_file keys if relative
+                            if sess_dir and not os.path.isabs(v) and (k.endswith('_path') or k.endswith('_file')):
+                                v = os.path.normpath(os.path.join(sess_dir, v))
+                        expanded_args[k] = v
+                    func_args = expanded_args
+                if func_args and isinstance(func_args, dict):
+                    call_kwargs = {}
+                    for p_name in sig.parameters.keys():
+                        if p_name in func_args:
+                            call_kwargs[p_name] = func_args[p_name]
+                        elif p_name == 'output_path' and 'output_filename' in func_args:
+                            sess_dir = merged_params.get('output_session_folder') or merged_params.get('output_root_folder')
+                            call_kwargs[p_name] = os.path.join(sess_dir, func_args['output_filename'])
+                    result = func(**call_kwargs)
+                elif len(sig.parameters) == 0:
+                    result = func()
+                elif len(sig.parameters) == 1:
+                    result = func(merged_params)
                 else:
-                    raise AttributeError("No callable entry point found (run_post_acquisition/run/function)")
-                try:
-                    if func.__code__.co_argcount == 1:
-                        result = func(merged_params)
-                    else:
-                        result = func()
-                except Exception as inner_e:
-                    logging.error(f"Error invoking script module function: {inner_e}")
-                    return False
+                    ordered = []
+                    for p_name, p in sig.parameters.items():
+                        if p_name in merged_params:
+                            ordered.append(merged_params[p_name])
+                        elif p_name == 'output_path' and 'output_filename' in merged_params:
+                            sess_dir = merged_params.get('output_session_folder') or merged_params.get('output_root_folder')
+                            ordered.append(os.path.join(sess_dir, merged_params['output_filename']))
+                        else:
+                            ordered.append(None if p.default is inspect._empty else p.default)
+                    result = func(*ordered)
                 return result in (None, 0, True)
             except Exception as e:
                 logging.error(f"Script module error {path_in_repo}: {e}")
                 return False
 
         for raw_entry in pipeline:
+            if enable_legacy_repo_module and isinstance(raw_entry, dict) and raw_entry.get('type') == 'repo_module':
+                legacy_path = raw_entry.get('repo_relative_path')
+                legacy_func = raw_entry.get('function')
+                legacy_kwargs = raw_entry.get('kwargs', {}) or {}
+                merged = dict(params)
+                merged.update(legacy_kwargs)
+                if session_folder:
+                    merged.setdefault('output_session_folder', session_folder)
+                if legacy_func:
+                    merged.setdefault('function', legacy_func)
+                ok = _invoke_script_module(legacy_path, merged)
+                if not ok:
+                    all_success = False
+                    logging.error(f"{stage_name} legacy repo_module failed: {legacy_path}")
+                else:
+                    logging.info(f"{stage_name} legacy repo_module completed: {legacy_path}")
+                continue
+
             if isinstance(raw_entry, str):
                 entry = {"module_type": "launcher_module", "module_path": raw_entry, "module_parameters": {}}
             elif isinstance(raw_entry, dict):
@@ -456,111 +553,49 @@ class BaseLauncher:
             else:
                 logging.warning(f"Ignoring unsupported pipeline entry: {raw_entry}")
                 continue
-            module_type = entry.get("module_type", "launcher_module")
-            module_path = entry.get("module_path")
-            module_params = entry.get("module_parameters", {}) or {}
+            module_type = entry.get('module_type', 'launcher_module')
+            module_path = entry.get('module_path')
+            module_params = entry.get('module_parameters', {}) or {}
             merged = dict(params)
             merged.update(module_params)
             if session_folder:
-                merged.setdefault("output_session_folder", session_folder)
-            if module_type == "launcher_module":
+                merged.setdefault('output_session_folder', session_folder)
+            if module_type == 'launcher_module':
                 ok = _invoke_launcher_module(module_path, merged)
-            elif module_type == "script_module":
+            elif module_type == 'script_module':
                 ok = _invoke_script_module(module_path, merged)
             else:
-                logging.warning(f"Unknown module_type '{module_type}' in post-acquisition entry")
+                logging.warning(f"Unknown module_type '{module_type}' in {stage_name} entry")
                 continue
             if not ok:
                 all_success = False
-                logging.error(f"Post-acquisition step failed: {module_path}")
+                logging.error(f"{stage_name} step failed: {module_path}")
             else:
-                logging.info(f"Post-acquisition step completed: {module_path}")
+                logging.info(f"{stage_name} step completed: {module_path}")
 
         if all_success:
-            logging.info("All post-acquisition steps completed successfully.")
+            logging.info(f"All {stage_name.lower()} steps completed successfully.")
         else:
-            logging.warning("Some post-acquisition steps failed. Check logs for details.")
+            logging.warning(f"Some {stage_name.lower()} steps failed. See logs.")
+        self.params.update(params)
         return all_success
-       
-    
-    def _get_launcher_type_name(self) -> str:
-        """
-        Get the name of the launcher type for logging and error messages.
-        
-        This method should be overridden by interface-specific launchers.
-        
-        Returns:
-            String name of the launcher type (default: "Generic")
-        """
-        return "Generic"
-    
-    def _get_script_path(self) -> str:
-        """
-        Get the absolute path to the script/workflow file.
-        
-        This method resolves the script_path parameter, handling both absolute
-        and relative paths. For relative paths, it tries to resolve them relative
-        to the repository path if available.
-        
-        Returns:
-            Absolute path to the script/workflow file
-            
-        Raises:
-            ValueError: If no script_path is specified in parameters
-            FileNotFoundError: If the script file does not exist
-        """
-        script_path = self.params.get('script_path')
-        if not script_path:
-            raise ValueError("No script_path specified in parameters")
-        
-        resolved_path = script_path
-        if not os.path.isabs(resolved_path):
-            # Try to find script in repository
-            repo_path = git_manager.get_repository_path(self.params)
-            if repo_path:
-                resolved_path = os.path.join(repo_path, script_path)
-        
-        if not os.path.exists(resolved_path):
-            raise FileNotFoundError(f"Script file not found: {resolved_path}")
-        
-        return resolved_path
-    
-    def signal_handler(self, sig, frame):
-        """Handle Ctrl+C and other signals."""
-        logging.info("Received signal to terminate")
-        self.stop()
-        sys.exit(0)
-    
-    def stop(self):
-        """
-        Stop the experiment process if it's running.
-        """
-        self.stop_time = datetime.datetime.now()
-        
-        if self.process and self.process.poll() is None:
-            logging.info(f"Stopping {self._get_launcher_type_name()} process...")
-            
-            try:
-                # Try graceful termination first
-                self.process.terminate()
-                
-                # Wait for termination
-                start_time = datetime.datetime.now()
-                while (datetime.datetime.now() - start_time).total_seconds() < 5:
-                    if self.process.poll() is not None:
-                        logging.info(f"{self._get_launcher_type_name()} process terminated gracefully")
-                        break
-                    time.sleep(0.1)
-                
-                # Force kill if needed
-                if self.process.poll() is None:
-                    logging.warning(f"Forcing kill of {self._get_launcher_type_name()} process")
-                    self.process.kill()
-                    
-            except Exception as e:
-                logging.error(f"Error stopping {self._get_launcher_type_name()} process: {e}")
-          # Finalize logging to flush all logs and close handlers
-        self.finalize_logging()
+
+    # Public wrappers expected by tests
+    def run_pre_acquisition(self, param_file: Optional[str] = None, enable_legacy_repo_module: bool = True) -> bool:
+        return self._run_stage(
+            stage_name="Pre-acquisition",
+            pipeline_key="pre_acquisition_pipeline",
+            param_file=param_file,
+            enable_legacy_repo_module=enable_legacy_repo_module,
+        )
+
+    def run_post_acquisition(self, param_file: Optional[str] = None, enable_legacy_repo_module: bool = True) -> bool:
+        return self._run_stage(
+            stage_name="Post-acquisition",
+            pipeline_key="post_acquisition_pipeline",
+            param_file=param_file,
+            enable_legacy_repo_module=enable_legacy_repo_module,
+        )
     
     def cleanup(self):
         """Clean up resources when the script exits."""
@@ -766,13 +801,7 @@ class BaseLauncher:
             return None
     
     def check_experiment_success(self) -> bool:
-        """
-        Check if the experiment completed successfully.
-        
-        Returns:
-            True if experiment completed successfully, False otherwise
-        """
-        # Check if process exists and has completed successfully
+        """Check if the experiment completed successfully based on process return code."""
         if self.process and hasattr(self.process, 'returncode'):
             return self.process.returncode == 0
         return False
@@ -836,403 +865,164 @@ class BaseLauncher:
             
             try:
                 for line in iter(self.process.stdout.readline, b''):
-                    if line:
-                        line_str = line.decode('utf-8').rstrip() if isinstance(line, bytes) else line.rstrip()
-                        if line_str:  # Only log non-empty lines
-                            self.stdout_data.append(line_str)
-                            logging.info(f"{self._get_launcher_type_name()} output: {line_str}")
-                    else:
-                        break  # Exit if we get empty line
+                    if not line:
+                        break
+                    line_str = line.decode('utf-8').rstrip() if isinstance(line, bytes) else line.rstrip()
+                    if line_str:
+                        self.stdout_data.append(line_str)
+                        logging.info(f"{self._get_launcher_type_name()} output: {line_str}")
             except Exception as e:
                 logging.debug(f"stdout reader error: {e}")
             finally:
                 try:
                     self.process.stdout.close()
-                except:
+                except Exception:
                     pass
-        
+
         def stderr_reader():
-            # Check if we're dealing with a Mock object (in tests)
             if hasattr(self.process.stderr, '_mock_name'):
-                # For mock objects, just exit immediately to prevent infinite loops
                 return
-            
             try:
                 for line in iter(self.process.stderr.readline, b''):
-                    if line:
-                        line_str = line.decode('utf-8').rstrip() if isinstance(line, bytes) else line.rstrip()
-                        if line_str:  # Only log non-empty lines
-                            self.stderr_data.append(line_str)
-                            logging.error(f"{self._get_launcher_type_name()} error: {line_str}")
-                    else:
-                        break  # Exit if we get empty line
+                    if not line:
+                        break
+                    line_str = line.decode('utf-8').rstrip() if isinstance(line, bytes) else line.rstrip()
+                    if line_str:
+                        self.stderr_data.append(line_str)
+                        logging.error(f"{self._get_launcher_type_name()} error: {line_str}")
+                        # Record first stderr timestamp for optional fail-fast
+                        if not hasattr(self, '_first_stderr_ts'):
+                            self._first_stderr_ts = time.time()
             except Exception as e:
                 logging.debug(f"stderr reader error: {e}")
             finally:
                 try:
                     self.process.stderr.close()
-                except:
+                except Exception:
                     pass
-        
+
         self._output_threads = [
-            threading.Thread(target=stdout_reader),
-            threading.Thread(target=stderr_reader)
+            threading.Thread(target=stdout_reader, daemon=True),
+            threading.Thread(target=stderr_reader, daemon=True)
         ]
-        
-        for thread in self._output_threads:
-            thread.daemon = True
-            thread.start()
-    
-    def _monitor_process(self):
-        """Monitor the process until it completes."""
-        logging.info(f"Monitoring {self._get_launcher_type_name()} process...")
-        
+        for t in self._output_threads:
+            t.start()
+
+    # === Added generic lifecycle helpers (previously removed during refactor) ===
+    def signal_handler(self, sig, frame):  # type: ignore[override]
+        """Handle SIGINT (Ctrl+C) to stop experiment cleanly."""
+        logging.info("Interrupt received; stopping experiment...")
         try:
-            # Wait for process to complete
-            self.process.wait()
-            
-            # Wait for output threads to finish
-            for thread in self._output_threads:
-                thread.join(timeout=2.0)
-            
-            # Check return code and log results
-            return_code = self.process.returncode
-            if return_code != 0:
-                logging.error(f"{self._get_launcher_type_name()} exited with code: {return_code}")
-                if self.stderr_data:
-                    error_msg = "\n".join(self.stderr_data)
-                    logging.error(f"Complete {self._get_launcher_type_name()} error output:\n{error_msg}")
-                logging.error(f"MID, {self.subject_id}, UID, {self.user_id}, Action, Errored, "
-                             f"Return_code, {return_code}")
-            else:
-                logging.info(f"{self._get_launcher_type_name()} completed successfully")
-                if self.stderr_data:
-                    warning_msg = "\n".join(self.stderr_data)
-                    logging.warning(f"{self._get_launcher_type_name()} reported warnings:\n{warning_msg}")
-                
-                self.stop_time = datetime.datetime.now()
-                duration_min = (self.stop_time - self.start_time).total_seconds() / 60.0
-                logging.info(f"MID, {self.subject_id}, UID, {self.user_id}, Action, Completed, "
-                            f"Duration_min, {round(duration_min, 2)}")
-        
-        except Exception as e:
-            logging.error(f"Error monitoring {self._get_launcher_type_name()} process: {e}")
             self.stop()
-    
-    def get_process_errors(self) -> str:
-        """Return any errors reported by the process."""
-        if not self.stderr_data:
-            return f"No errors reported by {self._get_launcher_type_name()}."
-        return "\n".join(self.stderr_data)
-
-    def save_end_state(self, output_directory: str) -> bool:
-        """
-        Save end-of-experiment state for post-acquisition tools.
-        
-        This saves essential runtime information that post-acquisition tools need,
-        such as session creation. The data is saved in a simple JSON format that
-        can be easily read by post-acquisition scripts.
-          Args:
-            output_directory: Directory where end_state.json should be created
-            
-        Returns:
-            True if end state was saved successfully, False otherwise
-        """
-        try:
-            # Create metadata directory if it doesn't exist
-            metadata_dir = os.path.join(output_directory, "launcher_metadata")
-            os.makedirs(metadata_dir, exist_ok=True)
-            
-            end_state_file = os.path.join(metadata_dir, "end_state.json")
-            
-            # Collect end state data
-            end_state = {
-                "launcher_info": {
-                    "class_name": self.__class__.__name__,
-                    "module": self.__class__.__module__,
-                    "version": getattr(self, '_version', 'unknown')
-                },
-                "session_info": {
-                    "subject_id": getattr(self, 'subject_id', None),
-                    "user_id": getattr(self, 'user_id', None),
-                    "session_uuid": getattr(self, 'session_uuid', None),
-                    "start_time": self.start_time.isoformat() if hasattr(self, 'start_time') and self.start_time else None,
-                    "stop_time": self.stop_time.isoformat() if hasattr(self, 'stop_time') and self.stop_time else None,
-                },
-                "experiment_data": {
-                    "output_session_folder": getattr(self, 'output_session_folder', None),
-                },
-                "parameters": getattr(self, 'params', {}),
-                "rig_config": getattr(self, 'rig_config', {}),
-                "saved_at": datetime.datetime.now().isoformat()
-            }
-            
-            # Allow subclasses to add custom end state data
-            custom_end_state = self.get_custom_end_state()
-            if custom_end_state:
-                end_state["custom_data"] = custom_end_state
-            
-            # Write end state file
-            with open(end_state_file, 'w') as f:
-                json.dump(end_state, f, indent=2, default=str)
-                
-            logging.info(f"End state saved to: {end_state_file}")
-            return True
-            
         except Exception as e:
-            logging.error(f"Failed to save end state: {e}")
-            return False
-    
-    def get_custom_end_state(self) -> Dict[str, Any]:
-        """
-        Get custom end state data from subclasses.
-        
-        Subclasses can override this method to add their own data to the end state file.
-        This data will be available to post-acquisition tools.
-        
-        Returns:
-            Dictionary of custom data to include in end state, or None if no custom data
-        """
-        return None
-    
-    def save_debug_state(self, output_directory: str, exception: Exception) -> bool:
-        """
-        Save debug state when an experiment crashes.
-        
-        This saves the complete launcher state at the time of crash for debugging purposes.
-        Unlike end state, this includes all internal variables and is only created on errors.
-        
-        Args:
-            output_directory: Directory where debug_state.json should be created
-            exception: The exception that caused the crash
-            
-        Returns:
-            True if debug state was saved successfully, False otherwise
-        """
-        try:
-            # Create metadata directory if it doesn't exist
-            metadata_dir = os.path.join(output_directory, "launcher_metadata")
-            os.makedirs(metadata_dir, exist_ok=True)
-            
-            debug_state_file = os.path.join(metadata_dir, "debug_state.json")
-            
-            # Collect all accessible attributes for debugging
-            debug_state = {
-                "crash_info": {
-                    "exception_type": type(exception).__name__,
-                    "exception_message": str(exception),
-                    "crash_time": datetime.datetime.now().isoformat()
-                },
-                "launcher_state": {},
-                "system_info": {
-                    "python_version": sys.version,
-                    "platform": sys.platform,
-                    "cwd": os.getcwd()
-                }
-            }
-            
-            # Collect all launcher attributes (for debugging)
-            for attr_name in dir(self):
-                if not attr_name.startswith('_') and not callable(getattr(self, attr_name)):
-                    try:
-                        value = getattr(self, attr_name)
-                        # Try to serialize the value
-                        json.dumps(value, default=str)  # Test serialization
-                        debug_state["launcher_state"][attr_name] = value
-                    except (TypeError, ValueError):
-                        # If serialization fails, store type info instead
-                        debug_state["launcher_state"][attr_name] = f"<non-serializable: {type(value).__name__}>"
-                    except Exception:
-                        # Skip attributes that cause other errors
-                        debug_state["launcher_state"][attr_name] = "<error accessing attribute>"
-            
-            # Write debug state file
-            with open(debug_state_file, 'w') as f:
-                json.dump(debug_state, f, indent=2, default=str)
-                
-            logging.error(f"Debug state saved to: {debug_state_file}")
-            return True
-            
-        except Exception as debug_e:
-            logging.error(f"Failed to save debug state: {debug_e}")
-            return False
+            logging.error(f"Error during interrupt stop: {e}")
 
-    def run_pre_acquisition(self, param_file=None) -> bool:
-        """Run pre-acquisition pipeline using simplified entry schema.
-
-        New unified entry format (dict):
-          {
-            "module_type": "launcher_module" | "script_module",
-            "module_path": "relative.dotted.name" OR "relative/path/in/repo.py",
-            "module_parameters": {"key": "value", ...}  # optional
-          }
-
-        Backward compatibility:
-          - Plain string entries are treated as launcher_module with module_path=string.
-
-        Resolution rules:
-          launcher_module -> import path: src.openscope_experimental_launcher.pre_acquisition.<module_path>
-          script_module   -> loaded from cloned repository root joined with module_path (file path);
-                             expects a callable `run_pre_acquisition(params_dict)` OR a function name
-                             specified via module_parameters["function"]; if neither present uses
-                             a default `run()` if available.
-
-        The `module_parameters` dict is merged into base params and passed to the function.
-        """
-        if param_file is None:
-            param_file = self.param_file
-        params = param_utils.load_parameters(param_file=param_file)
-        pipeline = params.get("pre_acquisition_pipeline", [])
-        all_success = True
-        repo_path = git_manager.get_repository_path(params)
-        session_folder = params.get("output_session_folder") or self.output_session_folder
-
-        def _invoke_launcher_module(mod_name: str, merged_params: dict) -> bool:
+    def stop(self):
+        """Stop acquisition process (if running) and finalize logging."""
+        if hasattr(self, 'stop_time') and self.stop_time is None:
+            self.stop_time = datetime.datetime.now()
+        proc = getattr(self, 'process', None)
+        if proc is not None and getattr(proc, 'poll', lambda: None)() is None:
             try:
-                logging.info(f"Pre-acquisition launcher module: {mod_name}")
-                # Correct package import (no 'src.' prefix for runtime use)
-                mod = importlib.import_module(f"openscope_experimental_launcher.pre_acquisition.{mod_name}")
-                func = None
-                if hasattr(mod, "run_pre_acquisition"):
-                    func = getattr(mod, "run_pre_acquisition")
-                elif hasattr(mod, "run"):
-                    func = getattr(mod, "run")
-                else:
-                    logging.warning(f"Module {mod_name} has no run_pre_acquisition() or run(); skipping.")
-                    return True
-                result = func(param_file) if func.__code__.co_argcount == 1 else func(merged_params)
-                return result in (None, 0, True)
-            except Exception as e:
-                logging.error(f"Launcher module error {mod_name}: {e}")
-                return False
-
-        def _invoke_script_module(path_in_repo: str, merged_params: dict) -> bool:
-            try:
-                if not repo_path:
-                    raise RuntimeError("No repository path available for script_module")
-                abs_path = os.path.join(repo_path, path_in_repo.replace('/', os.sep))
-                if not os.path.isfile(abs_path):
-                    # Fallback: try searching for the filename anywhere under repo_path
-                    fallback = None
-                    target_name = os.path.basename(path_in_repo)
-                    for root, _dirs, files in os.walk(repo_path):
-                        if target_name in files:
-                            fallback = os.path.join(root, target_name)
-                            break
-                    if fallback and os.path.isfile(fallback):
-                        abs_path = fallback
-                    else:
-                        raise FileNotFoundError(f"Script module file not found: {abs_path}")
-                spec = importlib.util.spec_from_file_location("script_pre_module", abs_path)
-                if spec is None or spec.loader is None:
-                    raise RuntimeError("Failed to build import spec for script module")
-                mod = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(mod)  # type: ignore[attr-defined]
-                func_name = merged_params.get("function")
-                func = None
-                if func_name and hasattr(mod, func_name):
-                    func = getattr(mod, func_name)
-                elif hasattr(mod, "run_pre_acquisition"):
-                    func = getattr(mod, "run_pre_acquisition")
-                elif hasattr(mod, "run"):
-                    func = getattr(mod, "run")
-                else:
-                    raise AttributeError("No callable entry point found (run_pre_acquisition/run/function)")
-                # Argument mapping for multi-arg legacy functions (e.g. generate_single_session_csv)
+                logging.info("Terminating acquisition process...")
+                proc.terminate()
                 try:
-                    argcount = func.__code__.co_argcount
-                    result = None
-                    if argcount == 0:
-                        result = func()
-                    elif argcount == 1:
-                        result = func(merged_params)
-                    else:
-                        # Build ordered args from common keys
-                        import inspect
-                        sig = inspect.signature(func)
-                        ordered_args = []
-                        for i, (p_name, p) in enumerate(sig.parameters.items()):
-                            if p_name in ("params", "parameters") and argcount == 1:
-                                ordered_args.append(merged_params)
-                            elif p_name == "output_path" and "output_filename" in merged_params:
-                                session_folder = merged_params.get("output_session_folder") or merged_params.get("output_root_folder")
-                                ordered_args.append(os.path.join(session_folder, merged_params.get("output_filename")))
-                            elif p_name == "session_type" and "session_type" in merged_params:
-                                ordered_args.append(merged_params.get("session_type"))
-                            elif p_name == "seed" and "seed" in merged_params:
-                                ordered_args.append(merged_params.get("seed"))
-                            else:
-                                # Best-effort: pass None or default
-                                if p.default is inspect._empty:
-                                    ordered_args.append(None)
-                                else:
-                                    ordered_args.append(p.default)
-                        result = func(*ordered_args)
-                except Exception as inner_e:
-                    logging.error(f"Error invoking script module function: {inner_e}")
-                    return False
-                return result in (None, 0, True)
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    logging.warning("Process did not exit after terminate; killing")
+                    proc.kill()
             except Exception as e:
-                logging.error(f"Script module error {path_in_repo}: {e}")
-                return False
+                logging.error(f"Error terminating process: {e}")
+        self.finalize_logging()
+        return True
 
-        for raw_entry in pipeline:
-            # Legacy repo_module support
-            if isinstance(raw_entry, dict) and raw_entry.get("type") == "repo_module":
-                legacy_path = raw_entry.get("repo_relative_path")
-                legacy_func = raw_entry.get("function")
-                legacy_kwargs = raw_entry.get("kwargs", {})
-                # Build merged params and include legacy function name so script module invoker can find it
-                merged = dict(params)
-                merged.update(legacy_kwargs or {})
-                if session_folder:
-                    merged.setdefault("output_session_folder", session_folder)
-                if legacy_func:
-                    merged.setdefault("function", legacy_func)
-                ok = _invoke_script_module(legacy_path, merged)
-                if not ok:
-                    all_success = False
-                    logging.error(f"Pre-acquisition legacy repo_module failed: {legacy_path}")
-                else:
-                    logging.info(f"Pre-acquisition legacy repo_module completed: {legacy_path}")
-                continue  # move to next pipeline entry
+    def _get_launcher_type_name(self) -> str:
+        """Return a human-readable launcher type name."""
+        return self.__class__.__name__
 
-            # Normalize simplified schema or plain string
-            if isinstance(raw_entry, str):
-                entry = {"module_type": "launcher_module", "module_path": raw_entry, "module_parameters": {}}
-            elif isinstance(raw_entry, dict):
-                entry = raw_entry
-            else:
-                logging.warning(f"Ignoring unsupported pipeline entry: {raw_entry}")
-                continue
+    def _monitor_process(self):
+        """Monitor process; support optional fail-fast termination on stderr errors."""
+        proc = getattr(self, 'process', None)
+        if proc is None:
+            logging.warning("No process to monitor.")
+            return
+        fail_fast = self.params.get('acquisition_error_terminate') is True
+        grace = 0.0
+        if fail_fast:
+            try:
+                grace = float(self.params.get('acquisition_error_grace_period_sec', 0))
+            except Exception:
+                grace = 0.0
+        try:
+            if not fail_fast:
+                proc.wait()
+                return
+            # Polling loop with 0.5s interval
+            while True:
+                rc = proc.poll()
+                if rc is not None:
+                    break
+                if fail_fast and hasattr(self, '_first_stderr_ts'):
+                    elapsed = time.time() - getattr(self, '_first_stderr_ts', 0)
+                    if elapsed >= grace:
+                        logging.error(f"Fail-fast termination after stderr error (grace {grace}s).")
+                        try:
+                            proc.terminate()
+                            proc.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            logging.warning("Process did not exit; killing.")
+                            try:
+                                proc.kill()
+                            except Exception:
+                                pass
+                        break
+                time.sleep(0.5)
+        except Exception as e:
+            logging.error(f"Monitoring error: {e}")
 
-            module_type = entry.get("module_type", "launcher_module")
-            module_path = entry.get("module_path")
-            module_params = entry.get("module_parameters", {}) or {}
-            merged = dict(params)
-            merged.update(module_params)
-            if session_folder:
-                merged.setdefault("output_session_folder", session_folder)
+    def save_end_state(self, output_directory: Optional[str]):
+        """Persist final launcher state for downstream post-acquisition tools."""
+        if not output_directory:
+            return
+        try:
+            md_dir = os.path.join(output_directory, "launcher_metadata")
+            os.makedirs(md_dir, exist_ok=True)
+            end_state_path = os.path.join(md_dir, "end_state.json")
+            data = {
+                "session_uuid": self.session_uuid,
+                "subject_id": self.subject_id,
+                "user_id": self.user_id,
+                "start_time": self.start_time.isoformat() if self.start_time else None,
+                "stop_time": self.stop_time.isoformat() if self.stop_time else None,
+                "process_returncode": getattr(self.process, 'returncode', None),
+                "version": self._version,
+            }
+            with open(end_state_path, 'w') as f:
+                json.dump(data, f, indent=2)
+            logging.info(f"Saved end_state to {end_state_path}")
+        except Exception as e:
+            logging.error(f"Failed to save end_state: {e}")
 
-            if module_type == "launcher_module":
-                ok = _invoke_launcher_module(module_path, merged)
-            elif module_type == "script_module":
-                ok = _invoke_script_module(module_path, merged)
-            else:
-                logging.warning(f"Unknown module_type '{module_type}' in pre-acquisition entry")
-                continue
+    def save_debug_state(self, output_directory: Optional[str], exc: Exception):
+        """Persist debug information when an unexpected exception occurs."""
+        if not output_directory:
+            return
+        try:
+            md_dir = os.path.join(output_directory, "launcher_metadata")
+            os.makedirs(md_dir, exist_ok=True)
+            debug_path = os.path.join(md_dir, "debug_state.json")
+            info = {
+                "exception": repr(exc),
+                "traceback": traceback.format_exc(),
+                "timestamp": datetime.datetime.now().isoformat(),
+                "session_uuid": self.session_uuid,
+            }
+            with open(debug_path, 'w') as f:
+                json.dump(info, f, indent=2)
+            logging.info(f"Saved debug_state to {debug_path}")
+        except Exception as e:
+            logging.error(f"Failed to save debug_state: {e}")
 
-            if not ok:
-                all_success = False
-                logging.error(f"Pre-acquisition step failed: {module_path}")
-            else:
-                logging.info(f"Pre-acquisition step completed: {module_path}")
-
-        if all_success:
-            logging.info("All pre-acquisition steps completed successfully.")
-        else:
-            logging.warning("Some pre-acquisition steps failed. Check logs for details.")
-        return all_success
 
 def run_from_params(param_file):
     """

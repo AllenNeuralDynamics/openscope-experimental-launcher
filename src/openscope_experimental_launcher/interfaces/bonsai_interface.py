@@ -338,12 +338,29 @@ def create_bonsai_property_arguments(params: Dict[str, Any]) -> List[str]:
     bonsai_args = []
     # Only add parameters from script_parameters section - no automatic defaults
     script_parameters = params.get("script_parameters", {})
-        
+    session_folder = params.get("output_session_folder")
+
     if script_parameters:
         logging.info(f"Adding {len(script_parameters)} custom Bonsai parameters")
         for param_name, param_value in script_parameters.items():
-            # Convert parameter value to string for Bonsai
-            param_str = str(param_value)
+            # Expand placeholders for strings
+            if isinstance(param_value, str):
+                expanded = param_value
+                # {session_folder} placeholder
+                if '{session_folder}' in expanded:
+                    if session_folder:
+                        expanded = expanded.replace('{session_folder}', session_folder)
+                    else:
+                        logging.warning(f"Placeholder {{session_folder}} used but session folder not set yet: {param_name}")
+                # Auto-resolve relative paths for *_path/_file parameters after replacement
+                if session_folder and not os.path.isabs(expanded) and (param_name.endswith('_path') or param_name.endswith('_file')):
+                    expanded = os.path.normpath(os.path.join(session_folder, expanded))
+                param_value = expanded
+            # Normalize booleans to lowercase true/false for Bonsai conventions
+            if isinstance(param_value, bool):
+                param_str = 'true' if param_value else 'false'
+            else:
+                param_str = str(param_value)
             bonsai_args.extend(["-p", f"{param_name}={param_str}"])
             logging.info(f"Added Bonsai parameter: {param_name}={param_str}")
     else:

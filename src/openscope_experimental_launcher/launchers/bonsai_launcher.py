@@ -45,6 +45,7 @@ class BonsaiLauncher(BaseLauncher):
         self.hJob = None
         if WINDOWS_MODULES_AVAILABLE:
             self._setup_windows_job()
+    # No additional Bonsai-specific error handling; BaseLauncher generic monitoring used.
     
     def _setup_windows_job(self):
         """Set up Windows job object for process management."""
@@ -99,6 +100,25 @@ class BonsaiLauncher(BaseLauncher):
                     resolved_params[param_name] = param_value                    
         return resolved_params
 
+    def _get_script_path(self) -> str:
+        """Resolve and return absolute path to Bonsai workflow (.bonsai file).
+
+        Uses 'script_path' from params, resolves relative to repository path if not absolute.
+        Raises RuntimeError if path is missing or file does not exist.
+        """
+        script_path = self.params.get('script_path')
+        if not script_path:
+            raise RuntimeError("Missing 'script_path' parameter for Bonsai workflow")
+        if os.path.isabs(script_path):
+            candidate = script_path
+        else:
+            repo_root = git_manager.get_repository_path(self.params)
+            candidate = os.path.join(repo_root, script_path) if repo_root else script_path
+        if not os.path.isfile(candidate):
+            raise RuntimeError(f"Bonsai workflow not found: {candidate}")
+        logging.info(f"Using Bonsai workflow: {candidate}")
+        return candidate
+
     def _assign_to_job_object(self):
         """Assign Bonsai process to Windows job object."""
         if not (WINDOWS_MODULES_AVAILABLE and self.hJob and self.process):
@@ -150,6 +170,8 @@ class BonsaiLauncher(BaseLauncher):
             self._assign_to_job_object()
         
         return process
+
+    # No _start_output_readers override; inherit BaseLauncher behavior for stdout/stderr logging.
 
 def run_from_params(param_file):
     """

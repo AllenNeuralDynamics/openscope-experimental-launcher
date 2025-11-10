@@ -3,33 +3,31 @@
     "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
     "repository_commit_hash": "main",
     "local_repository_path": "C:/BonsaiDataPredictiveProcessingTest",
-    "script_path": "code/stimulus-control/src/Standard_oddball_slap2.bonsai",
+    "script_path": "code/stimulus-control/src/Mindscope/generic_oddball_slap2.bonsai",
     "bonsai_exe_path": "code/stimulus-control/bonsai/Bonsai.exe",
     "bonsai_setup_script": "code/stimulus-control/bonsai/setup.cmd",
     "subject_id": "test_mouse",
     "user_id": "test_user",
     "output_root_folder": "C:/BonsaiDataPredictiveProcessing", 
-    "script_parameters": {},
+    "script_parameters": {
+        "stimulus_table_path": "{session_folder}\\predictive_processing_session.csv",
+        "PortName": "{rig_param:COM_port}",
+        "RecordCameras": "{rig_param:RecordCameras}"
+    },
     "pre_acquisition_pipeline": [
         {
             "module_type": "script_module",
             "module_path": "code/stimulus-control/src/Mindscope/generate_experiment_csv.py",
             "module_parameters": {
                 "function": "generate_single_session_csv",
-                "session_type": "short_test",
-                "seed": 42,
-                "output_path": "predictive_processing_session.csv"
+                "function_args": {
+                    "session_type": "short_test",
+                    "seed": 42,
+                    "output_path": "{session_folder}\\predictive_processing_session.csv"
+                }
             }
         }
     ],
     "post_acquisition_pipeline": [
-        "session_creator",
-        {
-            "module_type": "launcher_module",
-            "module_path": "stimulus_table_predictive_processing",
-            "module_parameters": {}
-        },
-        "session_enhancer_bonsai",
-        "session_enhancer_predictive_processing"
     ]
 }

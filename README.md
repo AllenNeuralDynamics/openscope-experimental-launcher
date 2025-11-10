@@ -57,3 +57,33 @@ See the [docs/](docs/) folder or the [online documentation](https://allenneurald
 ---
 
 MIT License. See [LICENSE](LICENSE) for details.
+
+---
+
+## Rig Configuration Placeholder Mapping
+
+You can inject rig configuration (or any top-level merged parameter) into `script_parameters` using:
+
+```
+{rig_param:<key>}
+```
+
+Example rig config:
+```
+COM_port = "COM5"
+RecordCameras = true
+```
+
+Example param JSON snippet:
+```json
+{
+	"script_parameters": {
+		"PortName": "{rig_param:COM_port}",
+		"RecordCameras": "{rig_param:RecordCameras}"
+	}
+}
+```
+
+During launcher initialization, placeholders are replaced. Missing keys log a warning and become an empty string.
+Booleans are passed as `True`/`False`; interface layers may normalize (e.g. Bonsai lowercases).
+
