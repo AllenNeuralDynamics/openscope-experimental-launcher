@@ -635,24 +635,32 @@ class BaseLauncher:
         return None
     
     def _start_resource_logging(self, session_folder: str, acquisition_pid: Optional[int] = None):
-        """Start a background thread to log resource usage for launcher and subprocess."""
-        # Place resource_usage.json in launcher_metadata directory inside session_folder
+        """Start resource logging thread once; supports later PID injection without data loss.
+
+        If called multiple times, subsequent calls are ignored. Acquisition PID can be set
+        later via `set_resource_logging_pid`.
+        """
+        if hasattr(self, '_resource_log_thread') and getattr(self, '_resource_log_thread'):
+            return  # Already running; do not restart
         launcher_metadata_dir = os.path.join(session_folder, "launcher_metadata")
         os.makedirs(launcher_metadata_dir, exist_ok=True)
         self._resource_log_file = os.path.join(launcher_metadata_dir, "resource_usage.json")
         self._resource_log_stop = threading.Event()
-        self._resource_log_data = []
-        interval = self.params.get("resource_log_interval", 5)
+        if not hasattr(self, '_resource_log_data'):
+            self._resource_log_data = []
+        self._resource_log_interval = self.params.get("resource_log_interval", 5)
+        self._resource_logging_acq_pid = acquisition_pid
         def log_loop():
             import psutil, datetime, json, time
             launcher_proc = psutil.Process(os.getpid())
             acq_proc = None
-            if acquisition_pid:
-                try:
-                    acq_proc = psutil.Process(acquisition_pid)
-                except Exception:
-                    acq_proc = None
             while not self._resource_log_stop.is_set():
+                # Attempt to resolve acquisition process if we have a PID and not yet a handle
+                if self._resource_logging_acq_pid and acq_proc is None:
+                    try:
+                        acq_proc = psutil.Process(self._resource_logging_acq_pid)
+                    except Exception:
+                        acq_proc = None
                 entry = {
                     "timestamp": datetime.datetime.now().isoformat(),
                     "launcher": {
@@ -674,11 +682,18 @@ class BaseLauncher:
                 else:
                     entry["acquisition"] = None
                 self._resource_log_data.append(entry)
-                with open(self._resource_log_file, "w") as f:
-                    json.dump(self._resource_log_data, f, indent=2)
-                time.sleep(interval)
+                try:
+                    with open(self._resource_log_file, "w") as f:
+                        json.dump(self._resource_log_data, f, indent=2)
+                except Exception:
+                    pass
+                time.sleep(self._resource_log_interval)
         self._resource_log_thread = threading.Thread(target=log_loop, daemon=True)
         self._resource_log_thread.start()
+
+    def set_resource_logging_pid(self, acquisition_pid: int):
+        """Inject acquisition PID for resource logging without restarting thread."""
+        self._resource_logging_acq_pid = acquisition_pid
 
     def _stop_resource_logging(self):
         if hasattr(self, '_resource_log_stop'):
@@ -722,10 +737,8 @@ class BaseLauncher:
                 centralized_log_dir = self.params.get("centralized_log_directory")
                 self.setup_continuous_logging(output_session_folder, centralized_log_dir)
                 self.save_launcher_metadata(output_session_folder)
-                # Start resource logging (launcher only for now)
-                # Start resource logging only if enabled in params (must be explicitly True)
-                if self.params.get("resource_log_enabled") is True:
-                    self._start_resource_logging(output_session_folder, acquisition_pid=None)
+                # Start resource logging (launcher only for now) always enabled
+                self._start_resource_logging(output_session_folder, acquisition_pid=None)
 
             # Run pre-acquisition steps
             if not self.run_pre_acquisition():
@@ -737,10 +750,9 @@ class BaseLauncher:
             # Update resource logger to include acquisition PID
             if self.process is not None:
                 try:
-                    self._stop_resource_logging()
-                    self._start_resource_logging(output_session_folder, acquisition_pid=self.process.pid)
+                    self.set_resource_logging_pid(self.process.pid)
                 except Exception as e:
-                    logging.warning(f"Could not update resource logger with acquisition PID: {e}")
+                    logging.warning(f"Could not inject acquisition PID for resource logging: {e}")
 
             if not experiment_success:
                 logging.error(f"{self._get_launcher_type_name()} experiment failed to start")

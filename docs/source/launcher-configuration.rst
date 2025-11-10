@@ -16,7 +16,6 @@ These parameters control the core behavior of the launcher and are accepted in t
 +---------------------------+-----------+---------------------------------------------------------------------+
 | output_root_folder        | string    | Root directory for output session folders. Defaults to cwd.         |
 +---------------------------+-----------+---------------------------------------------------------------------+
-| resource_log_enabled      | bool      | If ``true``, enables resource usage monitoring. Default: off.       |
 +---------------------------+-----------+---------------------------------------------------------------------+
 | resource_log_interval     | int/float | Interval (seconds) between resource log entries. Optional.          |
 +---------------------------+-----------+---------------------------------------------------------------------+
@@ -70,7 +69,6 @@ Example Parameter File
     "subject_id": "mouse123",
     "user_id": "experimenter1",
     "output_root_folder": "D:/OpenScopeData",
-    "resource_log_enabled": true,
     "resource_log_interval": 5,
     "workflow_path": "C:/Workflows/my_experiment.bonsai",
     "pre_acquisition_pipeline": ["mouse_weight_pre_prompt"],

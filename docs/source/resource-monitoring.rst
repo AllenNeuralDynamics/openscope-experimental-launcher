@@ -9,29 +9,19 @@ Resource monitoring allows you to track CPU and memory usage for both the launch
 
 How It Works
 ------------
-- When enabled, the launcher logs resource usage statistics (CPU %, memory in MB) for both itself and the acquisition subprocess.
-- The log is written to ``launcher_metadata/resource_usage.json`` inside the session output folder.
-- Logging occurs at a configurable interval (see below).
+The launcher always logs resource usage statistics (CPU %, memory in MB) for both itself and (once started) the acquisition subprocess.
+The log is written continuously to ``launcher_metadata/resource_usage.json`` inside the session output folder.
+Logging occurs at a configurable interval (``resource_log_interval`` parameter; default 5 seconds if not provided).
 
-Enabling Resource Monitoring
----------------------------
-Resource monitoring is **off by default**. To enable it, add the following to your parameter file::
+Configuration
+-------------
+Optional parameter to adjust interval::
 
   {
-    "resource_log_enabled": true,
     "resource_log_interval": 5
   }
 
-- ``resource_log_enabled``: Set to ``true`` to enable resource monitoring.
-- ``resource_log_interval``: (Optional) Interval in seconds between log entries (default: 5 seconds if not specified).
-
-Disabling Resource Monitoring
-----------------------------
-To disable resource monitoring, either omit the ``resource_log_enabled`` key or set it to ``false``::
-
-  {
-    "resource_log_enabled": false
-  }
+If omitted, the default interval of 5 seconds is used. There is no on/off toggle.
 
 Log File Location
 -----------------
@@ -57,10 +47,10 @@ Example entry::
 
 Notes
 -----
-- Resource monitoring is robust to subprocess exit and will continue logging launcher usage if the acquisition process ends.
-- The log file is overwritten at each interval, so only the latest run's data is preserved.
+* Monitoring continues for the launcher even after the acquisition subprocess exits.
+* Data points are appended; previous samples are preserved for the entire session duration.
 
 Troubleshooting
 ---------------
-- If you see 100% CPU usage, it means the process is using one full CPU core. This may be normal during heavy computation.
-- If the log file is missing, ensure ``resource_log_enabled`` is set to ``true`` in your parameters.
+* 100% CPU usage means one full core; may be normal during computation.
+* If the log file is missing, verify the session folder was created and the launcher was not terminated immediately after start.
