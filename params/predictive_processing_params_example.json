@@ -1,7 +1,7 @@
 {
     "launcher": "bonsai",
     "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
-    "repository_commit_hash": "ac193a0bd21aefdd25cab3707ec8dd5f755bdd70",
+    "repository_commit_hash": "ac2b22c288b17bcd41d332dce27ef32ae87f6540",
     "local_repository_path": "C:/BonsaiDataPredictiveProcessingTest",
     "script_path": "code/stimulus-control/src/Mindscope/generic_oddball_slap2.bonsai",
     "bonsai_exe_path": "code/stimulus-control/bonsai/Bonsai.exe",
