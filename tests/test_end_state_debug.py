@@ -48,32 +48,6 @@ class TestEndStateDebugState:
         assert debug_state["crash_info"]["message"] == "Test error for debugging"
         assert "crash_time" in debug_state["crash_info"]
 
-    def test_custom_end_state_data(self, tmp_path):
-        """Test that subclasses can add custom end state data."""
-        
-        class CustomLauncher(BaseLauncher):
-            def __init__(self):
-                super().__init__()
-                self.custom_value = "custom_data"
-                
-            def get_custom_end_state(self):
-                return {
-                    "custom_field": self.custom_value,
-                    "launcher_specific_info": "important_data"
-                }
-        
-        # Create custom launcher
-        launcher = CustomLauncher()
-        launcher.subject_id = "custom_subject"
-        launcher.rig_config = {"rig_id": "custom_rig"}
-        launcher.save_end_state(str(tmp_path))
-        end_state_file = tmp_path / "launcher_metadata" / "end_state.json"
-        with open(end_state_file) as f:
-            end_state = json.load(f)
-        assert end_state["custom_data"]["custom_field"] == "custom_data"
-        assert end_state["custom_data"]["launcher_specific_info"] == "important_data"
-        assert end_state["subject_id"] == "custom_subject"
-
     def test_debug_state_on_crash(self, tmp_path):
         """Test that debug state is saved when run() crashes."""
         

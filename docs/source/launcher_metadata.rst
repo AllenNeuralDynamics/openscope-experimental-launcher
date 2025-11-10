@@ -10,7 +10,7 @@ Current File Set
 ----------------
 
 * **processed_parameters.json** – final merged parameters (rig config + param file + runtime prompts).
-* **end_state.json** – flattened final state (no nested ``session_info``) with core identifiers and optional ``custom_data``.
+* **end_state.json** – flattened final state (no nested ``session_info``) with core identifiers.
 * **debug_state.json** – only on crash; contains ``crash_info`` + ``launcher_state`` snapshot.
 
 The design uses a minimal, flattened set of files for clarity and easy parsing.
@@ -41,13 +41,7 @@ Best Practices
 
 * Treat files as immutable audit artifacts; do not edit manually.
 * Use ``processed_parameters.json`` as the canonical input for post-acquisition tools.
-* Extend metadata only via ``custom_data`` in the end state.
-
-Extending Metadata
-------------------
-
-Implement ``get_custom_end_state()`` in a subclass returning a dict. Its contents are placed under ``custom_data`` without affecting core keys.
-
+* Treat ``end_state.json`` as a stable artifact.
 
 
 Downstream Consumption

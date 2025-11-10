@@ -71,11 +71,6 @@ Launcher creates a timestamped session folder under ``output_root_folder`` conta
 
 Post-acquisition tools (e.g. ``session_creator``) derive ``session.json`` from these.
 
-Extensibility
--------------
-
-Add custom end state data via subclass ``get_custom_end_state()`` returning a dict; placed under ``custom_data``.
-
 Reference
 ---------
 

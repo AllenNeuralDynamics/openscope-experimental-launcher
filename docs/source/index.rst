@@ -35,7 +35,6 @@ Key Features
 
 🗂️ **Unified Parameters** – All sources merged into ``processed_parameters.json``.
 
-🛠️ **Custom End State** – Extend via ``get_custom_end_state()`` under ``custom_data``.
 
 � **Post-Acquisition Generation** – ``session_creator`` builds standards-compliant ``session.json``.
 

@@ -23,8 +23,7 @@ Configuration Tiers
 
 Default Location:
 
-- Windows: ``C:/RigConfig/rig_config.toml``
-- Linux: ``/opt/rigconfig/rig_config.toml``
+* ``C:/RigConfig/rig_config.toml``
 
 Contains:
 

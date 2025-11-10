@@ -5,7 +5,7 @@ System Requirements
 -------------------
 
 .. warning::
-   This package is **Windows-only** and will not work on Linux or macOS due to its use of Windows-specific APIs and process management features.
+   This package targets **Windows** systems (tested on Windows 10/11) due to use of Windows-specific process management features.
 
 **Required:**
 

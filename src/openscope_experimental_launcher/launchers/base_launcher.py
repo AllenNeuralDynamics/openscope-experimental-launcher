@@ -1027,15 +1027,6 @@ class BaseLauncher:
             experiment_data = {}
             if experiment_notes:
                 experiment_data['experiment_notes'] = experiment_notes
-            # Allow subclasses to inject custom end state data via get_custom_end_state()
-            custom_data = {}
-            if hasattr(self, 'get_custom_end_state') and callable(getattr(self, 'get_custom_end_state')):
-                try:
-                    cd = self.get_custom_end_state()  # type: ignore[attr-defined]
-                    if isinstance(cd, dict):
-                        custom_data = cd
-                except Exception as e:
-                    logging.warning(f"get_custom_end_state failed: {e}")
             data = {
                 "session_uuid": self.session_uuid,
                 "subject_id": self.subject_id,
@@ -1046,7 +1037,6 @@ class BaseLauncher:
                 "version": self._version,
                 "rig_config": rig_config,
                 "experiment_data": experiment_data,
-                "custom_data": custom_data,
             }
             with open(end_state_path, 'w') as f:
                 json.dump(data, f, indent=2)

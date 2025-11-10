@@ -18,8 +18,7 @@ File Location
 
 The rig configuration file is stored at:
 
-- **Windows**: ``C:/RigConfig/rig_config.toml``
-- **Linux**: ``/opt/rigconfig/rig_config.toml``
+* ``C:/RigConfig/rig_config.toml``
 
 .. note::
    The launcher automatically creates this file with sensible defaults on first run.
@@ -53,9 +52,8 @@ When first created, the rig config contains:
    Default base directory for experiments. When experiments don't specify a custom output_root_folder,
    this directory will be used as the base for creating timestamped SessionFolders.
    
-   Defaults to:
-   - Windows: ``C:/experiment_data``
-   - Linux: ``/home/experiment_data``   .. note::
+   Defaults to ``C:/experiment_data``.
+   .. note::
       **Folder System**: The launcher uses a two-tier folder system:
       
       - **output_root_folder**: Base directory (from rig config or parameter override)

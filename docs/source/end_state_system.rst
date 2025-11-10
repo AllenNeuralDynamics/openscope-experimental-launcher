@@ -27,14 +27,9 @@ Example:
          "process_returncode": 0,
          "rig_config": {"rig_id": "behavior_rig", "COM_port": "COM5"},
          "experiment_data": {"experiment_notes": "Good behavioral engagement"},
-         "custom_data": {"custom_field": "value"},
          "version": "<launcher_version>"
      }
 
-Custom Data Injection
----------------------
-
-Subclasses can expose extra fields by implementing ``get_custom_end_state()`` which returns a dict merged into ``custom_data``.
 
 Debug State Schema
 ------------------
@@ -75,31 +70,11 @@ Why Flatten?
 * Reduced nesting ambiguity
 * Clear boundary for launcher vs. custom extension data
 
-Extensibility Guidelines
-------------------------
 
-1. Add new optional keys ONLY under ``custom_data``.
-2. Avoid altering existing top-level keys to keep downstream consumers stable.
-3. Prefer ISO8601 timestamps (``datetime.isoformat()``) for all temporal fields.
-
-Example Custom Launcher
------------------------
-
-.. code-block:: python
-
-     class RewardTrackingLauncher(BaseLauncher):
-             def __init__(self):
-                     super().__init__()
-                     self.total_reward_ul = 0.0
-
-             def get_custom_end_state(self):
-                     return {"total_reward_ul": self.total_reward_ul}
-
-Use these additions for specialized downstream analytics without modifying the base schema.
 
 Best Practices Summary
 ----------------------
 
-* Treat ``end_state.json`` as append-only schema (extend via ``custom_data``)
+* Treat ``end_state.json`` as an append-only schema (stable top-level keys)
 * Never mutate or delete previous experiment metadata files mid-run
 * Keep debug states for crash forensics; do not rely on them for normal analytics
