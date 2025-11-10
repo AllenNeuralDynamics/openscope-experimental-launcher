@@ -1,0 +1,19 @@
+[run]
+branch = True
+source = openscope_experimental_launcher
+omit = 
+    */post_acquisition/*
+    */interfaces/bonsai_interface.py
+    */interfaces/matlab_interface.py
+    */interfaces/python_interface.py
+    */launchers/bonsai_launcher.py
+    */launchers/matlab_launcher.py
+    */launchers/python_launcher.py
+
+[report]
+fail_under = 50
+show_missing = True
+exclude_lines = 
+    if __name__ == '__main__':
+    pragma: no cover
+    raise NotImplementedError
