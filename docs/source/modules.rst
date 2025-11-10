@@ -138,3 +138,118 @@ Potential enhancements (not implemented yet):
 * Declarative dependency graph
 
 This document reflects the current implementation of the pipeline module system.
+
+Detailed JSON Configuration Reference
+------------------------------------
+The parameter JSON file drives how modules are executed. Below is a breakdown using the example file `params/predictive_processing_params_example.json`.
+
+Top-Level Keys (subset shown):
+
+* ``launcher`` – interface type (e.g., ``bonsai``). Chooses the concrete launcher subclass.
+* ``repository_url`` / ``repository_commit_hash`` / ``local_repository_path`` – optional repository cloning + commit checkout.
+* ``script_path`` – acquisition script path (Bonsai workflow, Python script, etc.).
+* ``output_root_folder`` – where the launcher creates a timestamped session folder (e.g., ``C:/BonsaiDataPredictiveProcessing``).
+* ``script_parameters`` – key/value map passed to the acquisition interface. Supports placeholders described below.
+* ``pre_acquisition_pipeline`` / ``post_acquisition_pipeline`` – ordered arrays describing module execution.
+
+Placeholders Supported in ``script_parameters`` and Module Args:
+
+* ``{rig_param:<key>}`` – replaced with the merged parameter value (includes rig config). Example: ``"PortName": "{rig_param:COM_port}"``.
+* ``{subject_id}`` – replaced with subject ID after initialization.
+* ``{session_folder}`` – replaced with the resolved session output directory (in function_args or script_parameters values).
+
+Pipeline Entry Schema
+~~~~~~~~~~~~~~~~~~~~~
+Each element of ``pre_acquisition_pipeline`` or ``post_acquisition_pipeline`` can be either a simple string or a structured object.
+
+1. String form (launcher module shortcut):
+
+.. code-block:: json
+
+     "pre_acquisition_pipeline": ["mouse_weight_pre_prompt"]
+
+     Interpreted as:
+
+.. code-block:: json
+
+     {
+         "module_type": "launcher_module",
+         "module_path": "mouse_weight_pre_prompt",
+         "module_parameters": {}
+     }
+
+2. Object form (explicit):
+
+.. code-block:: json
+
+     {
+         "module_type": "script_module",
+         "module_path": "code/stimulus-control/src/Mindscope/generate_experiment_csv.py",
+         "module_parameters": {
+             "function": "generate_single_session_csv",
+             "function_args": {
+                 "session_type": "short_test",
+                 "seed": 42,
+                 "output_path": "{session_folder}\\predictive_processing_session.csv"
+             }
+         }
+     }
+
+Field Semantics:
+
+* ``module_type`` – ``launcher_module`` (Python file inside launcher package) or ``script_module`` (arbitrary Python file inside cloned repository tree).
+* ``module_path`` – For ``launcher_module``: name without ``.py`` located in ``pre_acquisition/`` or ``post_acquisition/``. For ``script_module``: repository-relative path to the Python script.
+* ``module_parameters`` – Arbitrary dict merged with processed parameters. Special keys:
+    * ``function`` – Name of the function inside the script to call (falls back to ``run_pre_acquisition``/``run_post_acquisition`` or ``run`` if omitted).
+    * ``function_args`` – Dict of keyword arguments passed directly to the target function. Only names matching the function signature are provided. If an ``output_filename`` key is given (legacy pattern) the launcher may derive ``output_path``.
+
+Invocation Rules (Summary):
+
+* When ``function_args`` present: only those keys (after placeholder expansion and path resolution) are passed as kwargs.
+* ``{session_folder}`` inside any arg is expanded before the call.
+* Relative paths ending with ``_path`` or ``_file`` inside ``function_args`` are resolved against the session folder.
+* Return value success criteria: ``None``, ``0`` or ``True`` are treated as success; anything else logs failure.
+
+Example Complete Snippet:
+
+.. code-block:: json
+
+     {
+         "launcher": "bonsai",
+         "script_parameters": {
+             "stimulus_table_path": "{session_folder}\\predictive_processing_session.csv",
+             "PortName": "{rig_param:COM_port}",
+             "RecordCameras": "{rig_param:RecordCameras}",
+             "Subject": "{subject_id}"
+         },
+         "pre_acquisition_pipeline": [
+             {
+                 "module_type": "script_module",
+                 "module_path": "code/stimulus-control/src/Mindscope/generate_experiment_csv.py",
+                 "module_parameters": {
+                     "function": "generate_single_session_csv",
+                     "function_args": {
+                         "session_type": "short_test",
+                         "seed": 42,
+                         "output_path": "{session_folder}\\predictive_processing_session.csv"
+                     }
+                 }
+             }
+         ],
+         "post_acquisition_pipeline": []
+     }
+
+Validation & Failure Behavior
+-----------------------------
+* Unknown ``{rig_param:<key>}`` placeholders raise a ``RuntimeError`` before execution.
+* Missing ``output_session_folder`` during expansion leads to unexpanded ``{session_folder}``. Ensure you run through the launcher lifecycle.
+* Any module failure is logged; pipeline continues unless critical semantics are enforced externally.
+
+Design Tips
+-----------
+* Favor explicit object entries when you need function selection or arguments.
+* Use ``function_args`` for stable, testable contracts; avoid relying on implicit positional parameter passing.
+* Keep paths relative and let the launcher resolve them against the session folder.
+* Prefer placeholder substitution over hard-coded subject identifiers.
+
+See also the example file under ``params/`` for a live reference.
