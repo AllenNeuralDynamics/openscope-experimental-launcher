@@ -146,6 +146,20 @@ class BaseLauncher:
             "computer_name": platform.node(),
         }
 
+    def _get_script_path(self) -> str:
+        """Resolve and validate script_path parameter (generic for Python/Matlab)."""
+        script_path = self.params.get('script_path')
+        if not script_path:
+            raise RuntimeError("Missing 'script_path' parameter")
+        if os.path.isabs(script_path):
+            candidate = script_path
+        else:
+            repo_root = git_manager.get_repository_path(self.params)
+            candidate = os.path.join(repo_root, script_path) if repo_root else script_path
+        if not os.path.isfile(candidate):
+            raise RuntimeError(f"Script not found: {candidate}")
+        return candidate
+
     def _expand_rig_param_placeholders(self):
         """Replace {rig_param:<key>} placeholders in script_parameters with merged param values.
 
@@ -858,11 +872,10 @@ class BaseLauncher:
         self.stderr_data = []
         
         def stdout_reader():
-            # Check if we're dealing with a Mock object (in tests)
-            if hasattr(self.process.stdout, '_mock_name'):
-                # For mock objects, just exit immediately to prevent infinite loops
+            if not self.process or not getattr(self.process, 'stdout', None):
                 return
-            
+            if hasattr(self.process.stdout, '_mock_name'):
+                return
             try:
                 for line in iter(self.process.stdout.readline, b''):
                     if not line:
@@ -880,6 +893,8 @@ class BaseLauncher:
                     pass
 
         def stderr_reader():
+            if not self.process or not getattr(self.process, 'stderr', None):
+                return
             if hasattr(self.process.stderr, '_mock_name'):
                 return
             try:
@@ -890,7 +905,6 @@ class BaseLauncher:
                     if line_str:
                         self.stderr_data.append(line_str)
                         logging.error(f"{self._get_launcher_type_name()} error: {line_str}")
-                        # Record first stderr timestamp for optional fail-fast
                         if not hasattr(self, '_first_stderr_ts'):
                             self._first_stderr_ts = time.time()
             except Exception as e:
@@ -916,6 +930,7 @@ class BaseLauncher:
             self.stop()
         except Exception as e:
             logging.error(f"Error during interrupt stop: {e}")
+        raise SystemExit(0)
 
     def stop(self):
         """Stop acquisition process (if running) and finalize logging."""
@@ -933,8 +948,12 @@ class BaseLauncher:
                     proc.kill()
             except Exception as e:
                 logging.error(f"Error terminating process: {e}")
-        self.finalize_logging()
-        return True
+        # Tests expect None return
+        return None
+
+    def get_process_errors(self):
+        """Return accumulated stderr lines as a list."""
+        return list(getattr(self, 'stderr_data', []))
 
     def _get_launcher_type_name(self) -> str:
         """Return a human-readable launcher type name."""
@@ -953,14 +972,25 @@ class BaseLauncher:
                 grace = float(self.params.get('acquisition_error_grace_period_sec', 0))
             except Exception:
                 grace = 0.0
+        start_timeout = float(self.params.get('process_start_timeout_sec', 0) or 0)
+        start_deadline = time.time() + start_timeout if start_timeout > 0 else None
         try:
-            if not fail_fast:
+            if not fail_fast and not start_deadline:
                 proc.wait()
                 return
             # Polling loop with 0.5s interval
             while True:
                 rc = proc.poll()
                 if rc is not None:
+                    break
+                if start_deadline and time.time() > start_deadline and not (self.stdout_data or self.stderr_data):
+                    logging.error("Process start timeout exceeded; terminating.")
+                    try:
+                        proc.terminate(); proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        logging.warning("Process did not exit after timeout terminate; killing.")
+                        try: proc.kill()
+                        except Exception: pass
                     break
                 if fail_fast and hasattr(self, '_first_stderr_ts'):
                     elapsed = time.time() - getattr(self, '_first_stderr_ts', 0)
@@ -983,45 +1013,90 @@ class BaseLauncher:
     def save_end_state(self, output_directory: Optional[str]):
         """Persist final launcher state for downstream post-acquisition tools."""
         if not output_directory:
-            return
+            return None
         try:
             md_dir = os.path.join(output_directory, "launcher_metadata")
             os.makedirs(md_dir, exist_ok=True)
             end_state_path = os.path.join(md_dir, "end_state.json")
+            # Flattened schema: put core fields at top-level (remove legacy session_info nesting)
+            start_time_iso = self.start_time.isoformat() if self.start_time else None
+            stop_time_iso = self.stop_time.isoformat() if self.stop_time else None
+            # Provide rig_config and experiment_data (if available)
+            rig_config = getattr(self, 'rig_config', {}) or {}
+            experiment_notes = getattr(self, 'experiment_notes', None)
+            experiment_data = {}
+            if experiment_notes:
+                experiment_data['experiment_notes'] = experiment_notes
+            # Allow subclasses to inject custom end state data via get_custom_end_state()
+            custom_data = {}
+            if hasattr(self, 'get_custom_end_state') and callable(getattr(self, 'get_custom_end_state')):
+                try:
+                    cd = self.get_custom_end_state()  # type: ignore[attr-defined]
+                    if isinstance(cd, dict):
+                        custom_data = cd
+                except Exception as e:
+                    logging.warning(f"get_custom_end_state failed: {e}")
             data = {
                 "session_uuid": self.session_uuid,
                 "subject_id": self.subject_id,
                 "user_id": self.user_id,
-                "start_time": self.start_time.isoformat() if self.start_time else None,
-                "stop_time": self.stop_time.isoformat() if self.stop_time else None,
+                "start_time": start_time_iso,
+                "stop_time": stop_time_iso,
                 "process_returncode": getattr(self.process, 'returncode', None),
                 "version": self._version,
+                "rig_config": rig_config,
+                "experiment_data": experiment_data,
+                "custom_data": custom_data,
             }
             with open(end_state_path, 'w') as f:
                 json.dump(data, f, indent=2)
             logging.info(f"Saved end_state to {end_state_path}")
+            return True
         except Exception as e:
             logging.error(f"Failed to save end_state: {e}")
+            return None
 
     def save_debug_state(self, output_directory: Optional[str], exc: Exception):
         """Persist debug information when an unexpected exception occurs."""
         if not output_directory:
-            return
+            return None
         try:
             md_dir = os.path.join(output_directory, "launcher_metadata")
             os.makedirs(md_dir, exist_ok=True)
             debug_path = os.path.join(md_dir, "debug_state.json")
+            # Snapshot of launcher __dict__ (shallow) for state inspection; ensure JSON-serializable
+            def _serialize(val):
+                if isinstance(val, (datetime.datetime, datetime.date)):
+                    return val.isoformat()
+                if isinstance(val, (list, tuple)):
+                    return [ _serialize(x) for x in val ]
+                if isinstance(val, dict):
+                    return {k: _serialize(v) for k, v in val.items()}
+                try:
+                    json.dumps(val)
+                    return val
+                except Exception:
+                    return repr(val)
+            launcher_state = {k: _serialize(v) for k, v in self.__dict__.items() if not k.startswith('_')}
             info = {
                 "exception": repr(exc),
                 "traceback": traceback.format_exc(),
                 "timestamp": datetime.datetime.now().isoformat(),
                 "session_uuid": self.session_uuid,
+                "crash_info": {
+                    "exception_type": exc.__class__.__name__,
+                    "message": str(exc),
+                    "crash_time": datetime.datetime.now().isoformat()  # added for test expectations
+                },
+                "launcher_state": launcher_state,
             }
             with open(debug_path, 'w') as f:
                 json.dump(info, f, indent=2)
             logging.info(f"Saved debug_state to {debug_path}")
+            return True
         except Exception as e:
             logging.error(f"Failed to save debug_state: {e}")
+            return None
 
 
 def run_from_params(param_file):

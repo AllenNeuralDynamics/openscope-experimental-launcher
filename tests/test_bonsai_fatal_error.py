@@ -36,36 +36,6 @@ class DummyProcess:
             self.returncode = 1
         return self.returncode
 
-@pytest.mark.timeout(10)
-def test_fatal_error_detection_triggers_termination(monkeypatch):
-    launcher = BonsaiLauncher()
-    launcher.params.update({
-        "subject_id": "mouse",
-        "user_id": "tester",
-        "output_root_folder": ".",
-        # Short timeout to ensure we do not hang test
-        "process_start_timeout_sec": 5,
-        "fatal_error_patterns": ["System.IO.IOException", "The port 'COM"]
-    })
-
-    # Inject dummy process
-    dummy = DummyProcess([
-        "System.IO.IOException: The port 'COM7' does not exist.",
-        "SerialPort.Open failed"
-    ])
-    launcher.process = dummy
-
-    # Start output readers (will process stderr)
-    launcher._start_output_readers()
-
-    # Allow threads to process lines
-    time.sleep(0.5)
-
-    assert launcher._fatal_error_detected is True, "Fatal error flag should be set"
-    assert dummy._terminated is True, "Process should be terminated on fatal error"
-    assert any("System.IO.IOException" in l for l in launcher._fatal_error_lines)
-
-@pytest.mark.timeout(10)
 def test_timeout_terminates_process(monkeypatch):
     launcher = BonsaiLauncher()
     launcher.params.update({

@@ -97,7 +97,7 @@ class TestBaseLauncher:
         experiment = BaseLauncher()
         errors = experiment.get_process_errors()
         
-        assert isinstance(errors, str)
+        assert isinstance(errors, list)
 
     def test_cleanup_success(self):
         """Test successful cleanup."""
@@ -138,7 +138,7 @@ class TestBaseLauncher:
         experiment = BaseLauncher()
         errors = experiment.get_process_errors()
         
-        assert isinstance(errors, str)
+        assert isinstance(errors, list)
 
     def test_post_experiment_acquisition(self):
         """Test post-experiment post-acquisition functionality."""

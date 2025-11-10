@@ -72,15 +72,17 @@ class SessionCreator:
         try:
             session_start_time = self._get_session_start_time()
             session_end_time = self._get_session_end_time()
-            session_info = self.end_state.get('session_info', {})
-            subject_id = session_info.get('subject_id', self.launcher_metadata.get('subject_id', 'unknown'))
+            # Flattened schema support: subject_id/user_id directly on end_state
+            subject_id = self.end_state.get('subject_id', self.launcher_metadata.get('subject_id', 'unknown'))
+            user_id = self.end_state.get('user_id', self.launcher_metadata.get('user_id', 'unknown'))
+            rig_id = self.end_state.get('rig_config', {}).get('rig_id', self.launcher_metadata.get('rig_id', 'unknown'))
             session = Session(
-                experimenter_full_name=[session_info.get('user_id', 'unknown')],
+                experimenter_full_name=[user_id],
                 session_start_time=session_start_time,
                 session_end_time=session_end_time,
                 subject_id=subject_id,
                 session_type=self._get_session_type(),
-                rig_id=self.end_state.get('parameters', {}).get('rig_id', self.launcher_metadata.get('rig_id', 'unknown')),
+                rig_id=rig_id,
                 notes=self._get_session_notes(),
                 data_streams=self._get_data_streams(session_start_time, session_end_time),
                 mouse_platform_name=self.launcher_metadata.get('mouse_platform_name', 'unknown'),
@@ -95,8 +97,8 @@ class SessionCreator:
             return False
 
     def _get_session_start_time(self) -> datetime:
-        session_info = self.end_state.get('session_info', {})
-        start_time_str = session_info.get('start_time')
+        # Flattened schema only: start_time at top-level (legacy session_info removed)
+        start_time_str = self.end_state.get('start_time')
         if start_time_str:
             try:
                 return datetime.fromisoformat(start_time_str)
@@ -106,8 +108,7 @@ class SessionCreator:
         return datetime.now()
 
     def _get_session_end_time(self) -> datetime:
-        session_info = self.end_state.get('session_info', {})
-        end_time_str = session_info.get('stop_time')
+        end_time_str = self.end_state.get('stop_time')
         if end_time_str:
             try:
                 return datetime.fromisoformat(end_time_str)
@@ -128,18 +129,16 @@ class SessionCreator:
             return []
         streams = []
         try:
-            launcher_info = self.end_state.get('launcher_info', {})
-            launcher_name = launcher_info.get('class_name', 'Unknown')
-            if launcher_name != 'Unknown':
-                launcher_name = f"{launcher_name} Launcher"
-            parameters = self.end_state.get('parameters', {})
+            # Flattened schema: no launcher_info/parameters; derive minimal stream
+            launcher_name = 'Experimental Launcher'
+            parameters = self.launcher_metadata.get('params', {})
             launcher_stream = Stream(
                 stream_start_time=start_time,
                 stream_end_time=end_time,
                 stream_modalities=[StreamModality.BEHAVIOR],
                 software=[Software(
                     name=launcher_name,
-                    version=launcher_info.get('version', 'unknown'),
+                    version=self.launcher_metadata.get('version', 'unknown'),
                     url="https://github.com/AllenInstitute/openscope-experimental-launcher",
                     parameters=parameters
                 )]
