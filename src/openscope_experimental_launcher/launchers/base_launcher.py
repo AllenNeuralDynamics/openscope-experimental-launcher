@@ -161,31 +161,45 @@ class BaseLauncher:
         return candidate
 
     def _expand_rig_param_placeholders(self):
-        """Replace {rig_param:<key>} placeholders in script_parameters with merged param values.
+        """Expand placeholders in script_parameters.
+
+        Supported placeholder patterns:
+        - {rig_param:<key>} -> substituted with self.params[<key>] (from merged params including rig_config)
+        - {subject_id} -> substituted with self.params['subject_id'] (convenience shortcut)
 
         This allows param JSON files to declaratively map rig configuration fields (or any
         top-level param) into workflow script parameters without launcher-specific logic.
 
-        Example:
+        Examples:
             "script_parameters": {"PortName": "{rig_param:COM_port}"}
+            "script_parameters": {"Animal": "{subject_id}"}
 
-        If COM_port exists in params (from rig_config or user overrides), it will be substituted.
-        Unknown keys are logged and replaced with empty string.
+        Unknown rig_param keys raise a RuntimeError to fail fast and surface misconfiguration.
         """
         script_parameters = self.params.get("script_parameters")
         if not script_parameters or not isinstance(script_parameters, dict):
             return
         import re
-        pattern = re.compile(r"\{rig_param:([^}]+)\}")
+        rig_pattern = re.compile(r"\{rig_param:([^}]+)\}")
+        # Simple substitution for {subject_id}
+        subj_value = self.params.get("subject_id", "")
         for name, value in list(script_parameters.items()):
-            if isinstance(value, str) and '{rig_param:' in value:
+            if not isinstance(value, str):
+                continue
+            original = value
+            # Expand {subject_id}
+            if "{subject_id}" in value:
+                value = value.replace("{subject_id}", str(subj_value))
+            # Expand any rig_param placeholders
+            if "{rig_param:" in value:
                 def repl(m):
                     key = m.group(1)
                     if key in self.params:
                         return str(self.params[key])
                     raise RuntimeError(f"rig_param placeholder references unknown key '{key}' for script parameter '{name}'")
-                new_val = pattern.sub(repl, value)
-                script_parameters[name] = new_val
+                value = rig_pattern.sub(repl, value)
+            if value != original:
+                script_parameters[name] = value
         # No return needed; script_parameters mutated in place
     
     def determine_output_session_folder(self) -> Optional[str]:

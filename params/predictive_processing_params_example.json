@@ -6,13 +6,12 @@
     "script_path": "code/stimulus-control/src/Mindscope/generic_oddball_slap2.bonsai",
     "bonsai_exe_path": "code/stimulus-control/bonsai/Bonsai.exe",
     "bonsai_setup_script": "code/stimulus-control/bonsai/setup.cmd",
-    "subject_id": "test_mouse",
-    "user_id": "test_user",
     "output_root_folder": "C:/BonsaiDataPredictiveProcessing", 
     "script_parameters": {
         "stimulus_table_path": "{session_folder}\\predictive_processing_session.csv",
         "PortName": "{rig_param:COM_port}",
-        "RecordCameras": "{rig_param:RecordCameras}"
+        "RecordCameras": "{rig_param:RecordCameras}",
+        "Subject": "{subject_id}"
     },
     "pre_acquisition_pipeline": [
         {
