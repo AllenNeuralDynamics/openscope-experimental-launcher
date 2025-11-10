@@ -74,7 +74,7 @@ Quick Start
           "output_root_folder": "C:/experiment_data",
           "collect_mouse_runtime_data": true,
           "protocol_id": ["protocol_001"],
-          "pre_acquisition_pipeline": ["mouse_weight_pre_prompt", "zmq_ready_publisher"],
+          "pre_acquisition_pipeline": ["mouse_weight_pre_prompt"],
           "post_acquisition_pipeline": ["session_creator", "mouse_weight_post_prompt", "experiment_notes_post_prompt"]
       }
 
@@ -85,11 +85,11 @@ The package uses a modular architecture with clear separation of concerns:
 
 **Core Components:**
 
-- **Launchers** (``src/openscope_experimental_launcher/launchers/``): Interface-specific launcher classes that inherit from ``BaseLauncher``
-- **Interfaces** (``src/openscope_experimental_launcher/interfaces/``): Stateless process creation utilities for each platform
-- **Pre/Post-Acquisition Modules** (``src/openscope_experimental_launcher/pre_acquisition/``, ``post_acquisition/``): Modular pipeline steps for experiment setup and teardown
-- **Utilities** (``src/openscope_experimental_launcher/utils/``): Shared utilities for configuration, Git management, and monitoring
-- **Scripts** (``scripts/``): Project-specific launcher scripts for custom experiments
+* **Launchers** (``launchers/``): Core orchestration via ``BaseLauncher``
+* **Interfaces** (``interfaces/``): Stateless subprocess creation adapters
+* **Pipeline Modules** (``pre_acquisition/`` / ``post_acquisition/``): Ordered tasks (:doc:`modules`)
+* **Utilities** (``utils/``): Configuration, Git, prompting, logging helpers
+* **Scripts** (``scripts/``): Project-specific entry points and analysis helpers
 
 **Design Principles:**
 
@@ -133,6 +133,7 @@ Contents
 
    pre_acquisition
    post_acquisition
+   modules
 
    resource-monitoring
    logging

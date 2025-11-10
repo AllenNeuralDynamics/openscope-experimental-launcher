@@ -6,7 +6,7 @@ Thank you for your interest in contributing! Our goal is to provide a generic, r
 Philosophy
 ----------
 - **Generic Launchers:** The core launchers (for Bonsai, MATLAB, Python, etc.) are designed to be as generic as possible.
-- **Modular Pipelines:** All pre- and post-acquisition steps (e.g., mouse weight prompts, ZMQ signaling, experiment notes) are implemented as standalone modules, not in the launcher core.
+- **Modular Pipelines:** All pre- and post-acquisition steps (e.g., mouse weight prompts, experiment notes) are implemented as standalone modules, not in the launcher core.
 - **Extensibility:** New modules can be added for any experiment-specific or project-specific operation, without modifying the launcher code.
 
 How to Contribute

@@ -18,8 +18,6 @@ How It Works
 Available Pre-Acquisition Modules
 ---------------------------------
 - **mouse_weight_pre_prompt**: Prompts for and records the mouse's weight before the experiment.
-- **zmq_ready_publisher**: Publishes a 'pre_acquisition_ready' message over ZMQ to signal readiness to other systems.
-- **zmq_ready_waiter**: Waits for a 'pre_acquisition_ready' message from another system over ZMQ.
 - **example_pre_acquisition_module**: Template for creating new pre-acquisition modules.
 
 Example Parameter File
@@ -29,16 +27,14 @@ Example Parameter File
     {
         "launcher": "base",
         "pre_acquisition_pipeline": [
-            "mouse_weight_pre_prompt",
-            "zmq_ready_publisher"
+            "mouse_weight_pre_prompt"
         ],
         ...
     }
 
 Custom Parameters
 -----------------
-- Modules can read custom parameters from the param file (e.g., timeouts, wait times).
-- Example: `zmq_ready_publisher_wait` (float, seconds), `zmq_ready_waiter_timeout` (float, seconds).
+Modules can read custom parameters from the param file (e.g., numeric thresholds, wait times specific to your module). Define and document any new keys your module expects inside its docstring.
 
 Best Practices
 --------------
