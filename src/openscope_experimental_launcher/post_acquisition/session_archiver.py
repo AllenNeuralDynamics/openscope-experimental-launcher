@@ -146,9 +146,7 @@ class SessionArchiver:
         retries = 0
         while True:
             try:
-                checksum = self._compute_digest(source)
                 entry_fields: Dict[str, Any] = {
-                    "checksum": checksum,
                     "network_copy": self.enable_network_copy,
                     "backup_move": self.enable_backup_move,
                 }
@@ -160,6 +158,8 @@ class SessionArchiver:
                     checksum = self._verify_checksum(source, dest_path)
                     entry_fields["checksum"] = checksum
                     entry_fields["network_path"] = str(dest_path)
+                else:
+                    entry_fields["checksum"] = self._compute_digest(source)
 
                 if self.enable_backup_move:
                     if backup_path is None:

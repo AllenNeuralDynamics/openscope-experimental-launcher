@@ -22,6 +22,7 @@ How It Works
 Available Post-Acquisition Modules
 ----------------------------------
 
+- **session_archiver**: Copies session artifacts to a network location with checksum verification, moves originals to a backup folder, and records transfer status in a manifest for safe retries.
 - **session_creator**: Creates standardized ``session.json`` files from experiment data using the AIND data schema.
 - **stimulus_table_predictive_processing**: Converts Predictive Processing stimulus tables to a standardized format for downstream analysis.
 - **session_enhancer_bonsai**: Adds Bonsai-specific metadata and enrichment to session files.
@@ -31,6 +32,33 @@ Available Post-Acquisition Modules
 - **experiment_notes_post_prompt**: Prompts for and records experiment notes after the experiment.
 - **example_post_acquisition_module**: Template for creating new post-acquisition modules.
 
+Session Archiver
+----------------
+
+The ``session_archiver`` module automates reliable transfer of session output to centralized storage while preserving a local safety copy. When the module starts it:
+
+- Prompts the operator to confirm the network destination path and the backup directory. Defaults come from the parameter file and accept ``y/1/true`` to proceed.
+- Asks whether to copy data to the network share and whether to move originals into the backup directory. Both default to **Yes** so operators can quickly acknowledge the transfer.
+- Copies each matching file (``include_patterns`` / ``exclude_patterns``) to the network path using a temporary file, verifies checksums, then moves the original file to the backup folder.
+- Records the status for every file in ``session_archiver_manifest.json`` (stored in the backup directory by default) so interrupted runs can resume without re-copying successful entries.
+
+Required parameters:
+
+.. code-block:: json
+
+    {
+        "post_acquisition_pipeline": [
+            "session_archiver"
+        ],
+        "session_dir": "C:/data/sessions/{session_uuid}",
+        "network_dir": "//server/openscope/archive/{session_uuid}",
+        "backup_dir": "D:/archive_backups/{session_uuid}"
+    }
+
+Optional parameters include ``include_patterns``, ``exclude_patterns``, ``dry_run``, ``skip_completed``, ``max_retries``, ``checksum_algo``, and ``remove_empty_dirs``. All parameters support launcher placeholder expansion (for example ``{session_uuid}``).
+
+Non-interactive environments can pass a custom ``prompt_func`` override via the launcher so the module uses pre-approved values. This is useful for automated test runs where operator confirmation is not possible.
+
 Example Parameter File
 ----------------------
 
@@ -39,6 +67,7 @@ Example Parameter File
     {
         "launcher": "base",
         "post_acquisition_pipeline": [
+            "session_archiver",
             "session_creator",
             "mouse_weight_post_prompt",
             "experiment_notes_post_prompt"
