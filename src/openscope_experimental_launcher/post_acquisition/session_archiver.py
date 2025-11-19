@@ -49,7 +49,7 @@ class SessionArchiver:
         max_retries: int = 2,
         remove_empty_dirs: bool = False,
         enable_network_copy: bool = True,
-        enable_backup_move: bool = True,
+        enable_backup_copy: bool = True,
     ) -> None:
         self.session_dir = session_dir
         self.network_dir = network_dir
@@ -63,7 +63,7 @@ class SessionArchiver:
         self.max_retries = max(0, max_retries)
         self.remove_empty_dirs = remove_empty_dirs
         self.enable_network_copy = bool(enable_network_copy)
-        self.enable_backup_move = bool(enable_backup_move)
+        self.enable_backup_copy = bool(enable_backup_copy)
 
         self._manifest: Dict[str, Any] = {}
         if self.manifest_path.exists():
@@ -134,17 +134,17 @@ class SessionArchiver:
     def _process_single_file(self, source: Path, rel_path: Path) -> None:
         rel_key = rel_path.as_posix()
         dest_path = self.network_dir / rel_path if self.enable_network_copy else None
-        backup_path = self.backup_dir / rel_path if self.enable_backup_move else None
+        backup_path = self.backup_dir / rel_path if self.enable_backup_copy else None
 
         LOG.info("Transferring '%s'", rel_key)
 
-        if not self.enable_network_copy and not self.enable_backup_move:
+        if not self.enable_network_copy and not self.enable_backup_copy:
             LOG.info("Network and backup transfers disabled; skipping '%s'", rel_key)
             self._mark_file(
                 rel_key,
                 status="skipped",
                 network_copy=False,
-                backup_move=False,
+                backup_copy=False,
                 reason="transfers_disabled",
             )
             return
@@ -155,7 +155,7 @@ class SessionArchiver:
                 rel_key,
                 status="skipped",
                 network_copy=self.enable_network_copy,
-                backup_move=self.enable_backup_move,
+                backup_copy=self.enable_backup_copy,
             )
             return
 
@@ -164,7 +164,7 @@ class SessionArchiver:
             try:
                 entry_fields: Dict[str, Any] = {
                     "network_copy": self.enable_network_copy,
-                    "backup_move": self.enable_backup_move,
+                    "backup_copy": self.enable_backup_copy,
                 }
 
                 if self.enable_network_copy:
@@ -177,25 +177,25 @@ class SessionArchiver:
                 else:
                     entry_fields["checksum"] = self._compute_digest(source)
 
-                if self.enable_backup_move:
+                if self.enable_backup_copy:
                     if backup_path is None:
                         raise ValueError("Backup path unavailable for original relocation")
                     try:
-                        self._relocate_original(source, backup_path)
+                        self._copy_to_backup(source, backup_path)
                         entry_fields["backup_path"] = str(backup_path)
                     except PermissionError as exc:
                         if backup_path.exists():
                             backup_path.unlink(missing_ok=True)
-                        entry_fields["backup_move"] = False
+                        entry_fields["backup_copy"] = False
                         entry_fields["backup_error"] = str(exc)
                         entry_fields["original_path"] = str(source)
                         self._mark_file(rel_key, status="pending_backup", **entry_fields)
                         raise DeferredTransfer(
                             rel_key,
-                            f"source file locked during backup move: {exc}",
+                            f"source file locked during backup copy: {exc}",
                         ) from exc
                 else:
-                    LOG.info("Backup move disabled; retaining original file '%s'", rel_key)
+                    LOG.info("Backup copy disabled; retaining original file '%s'", rel_key)
 
                 self._mark_file(rel_key, status="complete", **entry_fields)
                 break
@@ -241,9 +241,9 @@ class SessionArchiver:
                 hasher.update(data)
         return hasher.hexdigest()
 
-    def _relocate_original(self, src: Path, backup_path: Path) -> None:
+    def _copy_to_backup(self, src: Path, backup_path: Path) -> None:
         backup_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(src, backup_path)
+        shutil.copy2(src, backup_path)
 
     def _mark_file(self, rel_key: str, *, status: str, **fields: Any) -> None:
         entry = {
@@ -410,13 +410,13 @@ def run_post_acquisition(
     params["network_dir"] = str(network_dir)
     params["backup_dir"] = str(backup_dir)
 
-    move_to_network = _prompt_bool(f"Move data to network destination '{network_dir}'?", True)
-    move_to_backup = _prompt_bool(f"Move data to backup location '{backup_dir}'?", True)
+    move_to_network = _prompt_bool(f"Copy data to network destination '{network_dir}'?", True)
+    copy_to_backup = _prompt_bool(f"Copy data to backup location '{backup_dir}'?", True)
 
     LOG.info(
         "Transfer confirmations -> network: %s | backup: %s",
         "enabled" if move_to_network else "disabled",
-        "enabled" if move_to_backup else "disabled",
+        "enabled" if copy_to_backup else "disabled",
     )
 
     manifest_value = params.get("manifest_path") or (backup_dir / "session_archiver_manifest.json")
@@ -437,7 +437,7 @@ def run_post_acquisition(
     else:
         LOG.info("Network transfer disabled; skipping network directory creation")
 
-    if move_to_backup:
+    if copy_to_backup:
         backup_dir.mkdir(parents=True, exist_ok=True)
     else:
         LOG.info("Backup transfer disabled; originals will remain in session directory")
@@ -460,7 +460,7 @@ def run_post_acquisition(
             params.get("remove_empty_dirs", defaults["remove_empty_dirs"])
         ),
         enable_network_copy=move_to_network,
-        enable_backup_move=move_to_backup,
+        enable_backup_copy=copy_to_backup,
     )
 
     LOG.info("Session directory: %s", session_dir)
@@ -473,7 +473,7 @@ def run_post_acquisition(
     LOG.info(
         "Effective transfers -> network: %s | backup: %s",
         "enabled" if archiver.enable_network_copy else "disabled",
-        "enabled" if archiver.enable_backup_move else "disabled",
+        "enabled" if archiver.enable_backup_copy else "disabled",
     )
 
     try:

@@ -46,9 +46,9 @@ def test_session_archiver_transfers_and_verifies(tmp_path):
     assert (network_dir / "file1.txt").read_text(encoding="utf-8") == "hello world"
     assert (network_dir / "nested" / "file2.bin").read_bytes() == b"binary-data"
 
-    # Original files should move to backup
-    assert not (session_dir / "file1.txt").exists()
-    assert not (session_dir / "nested" / "file2.bin").exists()
+    # Original files remain in place; backups receive copies
+    assert (session_dir / "file1.txt").exists()
+    assert (session_dir / "nested" / "file2.bin").exists()
     assert (backup_dir / "file1.txt").exists()
     assert (backup_dir / "nested" / "file2.bin").exists()
 
@@ -63,7 +63,7 @@ def test_session_archiver_transfers_and_verifies(tmp_path):
         assert Path(meta["backup_path"]).exists()
         assert meta["checksum"]
         assert meta["network_copy"] is True
-        assert meta["backup_move"] is True
+        assert meta["backup_copy"] is True
 
 
 def test_session_archiver_skips_network_when_confirmation_declined(tmp_path):
@@ -106,8 +106,8 @@ def test_session_archiver_skips_network_when_confirmation_declined(tmp_path):
     # Network directory should not be created when transfer is declined
     assert not network_dir.exists()
 
-    # File should remain only in backup location
-    assert not (session_dir / "file.txt").exists()
+    # Original file remains alongside the backup copy
+    assert (session_dir / "file.txt").exists()
     assert (backup_dir / "file.txt").read_text(encoding="utf-8") == "payload"
 
     manifest_path = backup_dir / "session_archiver_manifest.json"
@@ -115,7 +115,7 @@ def test_session_archiver_skips_network_when_confirmation_declined(tmp_path):
     entry = manifest["files"]["file.txt"]
     assert entry["status"] == "complete"
     assert entry["network_copy"] is False
-    assert entry["backup_move"] is True
+    assert entry["backup_copy"] is True
     assert "network_path" not in entry
     assert Path(entry["backup_path"]).exists()
 
@@ -181,14 +181,13 @@ def test_session_archiver_handles_locked_file(tmp_path):
 
     # Original file remains in place because it could not be moved
     assert (session_dir / "launcher.log").exists()
-    assert not (backup_dir / "launcher.log").exists()
+    assert (backup_dir / "launcher.log").exists()
 
     manifest_path = backup_dir / "session_archiver_manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     entry = manifest["files"]["launcher.log"]
-    assert entry["status"] == "pending_backup"
+    assert entry["status"] == "complete"
     assert entry["network_copy"] is True
-    assert entry["backup_move"] is False
+    assert entry["backup_copy"] is True
     assert "network_path" in entry
-    assert entry["backup_error"]
-    assert entry["original_path"].endswith("launcher.log")
+    assert "backup_error" not in entry
