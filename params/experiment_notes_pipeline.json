@@ -1,0 +1,15 @@
+{
+  "launcher": "base",
+  "subject_id": "notes_demo_mouse",
+  "user_id": "notes_tester",
+  "output_root_folder": "./test_sessions",
+  "pre_acquisition_pipeline": [
+    "experiment_notes_editor"
+  ],
+  "post_acquisition_pipeline": [
+    "experiment_notes_finalize"
+  ],
+  "experiment_notes_launch_editor": true,
+  "experiment_notes_filename": "notes/experiment_notes.txt",
+  "experiment_notes_confirm_prompt": "Confirm experiment notes are saved; press Enter to finish."
+}
