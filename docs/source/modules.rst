@@ -46,6 +46,31 @@ Recommended Pattern:
        # Perform setup, write artifacts
        return 0
 
+Module Types
+------------
+Pipeline entries support two implementations, allowing teams to keep shared utilities inside the launcher package while
+storing project-specific logic alongside the main experiment repository.
+
+``launcher_module``
+    *Location:* ``src/openscope_experimental_launcher/pre_acquisition`` or ``post_acquisition`` inside this repository.
+    *Usage:* Reference by module name (without ``.py``). Ideal for reusable prompts, archivers, or shared infrastructure.
+    *Deployment:* Ships with the launcher; updated via normal launcher releases. Best for functionality needed across rigs or
+    projects.
+
+``script_module``
+    *Location:* Any Python file that lives in the cloned workflow repository referenced by ``repository_url`` /
+    ``local_repository_path``. ``module_path`` is written relative to that repo root (see
+    ``params/predictive_processing_params_example.json`` for a full example).
+    *Usage:* Keeps bespoke preprocessing/post-processing code versioned alongside the acquisition script (for example, a
+    stimulus table generator that belongs in the workflow repo). The launcher loads the file at runtime and calls the
+    function requested in ``module_parameters``.
+    *Deployment:* Update the workflow repository to change behavior; the launcher simply imports whatever commit was
+    checked out.
+
+Both types receive the same merged parameter dictionary, including ``output_session_folder`` and placeholder-expanded values.
+Choose ``script_module`` when the code naturally belongs with the experiment repository so it evolves in lock step with the
+workflow, and keep broadly useful utilities as ``launcher_module`` so they are available to every project.
+
 Session Folder Injection
 ------------------------
 The launcher injects `output_session_folder` into the merged parameters before any module runs. Modules should prefer this key over constructing paths manually. If `output_session_folder` is absent, treat it as an error.
