@@ -87,12 +87,51 @@ Best Practices
 * Use timestamped outputs where appropriate.
 * Avoid long blocking operations; offload heavy analysis to asynchronous processes if needed.
 
-Common Examples
----------------
-* Mouse weight prompts (pre/post) writing `mouse_weight.csv`.
-* Notes collection module writing `experiment_notes.txt`.
-* Session creation module generating `session.json`.
-* Post-run analysis launching repository scripts.
+Built-In Modules
+----------------
+The launcher ships with several reusable modules. These lists double as a quick feature catalog and an index into the
+source tree under ``src/openscope_experimental_launcher``.
+
+.. _pre-modules:
+
+Pre-Acquisition Modules
+~~~~~~~~~~~~~~~~~~~~~~~
+
+- **experiment_notes_editor**: Creates an experiment-notes file inside the active session folder and can launch an editor
+    (``notepad.exe`` by default) so operators can start typing immediately. Key parameters:
+
+    - ``experiment_notes_filename`` (default ``"experiment_notes.txt"``) — accepts placeholders such as ``{session_folder}``;
+        relative paths are resolved beneath the session directory.
+    - ``experiment_notes_launch_editor`` (default ``true``) — disable to skip opening an external editor.
+    - ``experiment_notes_editor_command`` / ``experiment_notes_editor_args`` — override the executable and arguments.
+    - ``experiment_notes_encoding`` (default ``"utf-8"``) — encoding used when the file is first created.
+
+- **mouse_weight_pre_prompt**: Prompts the operator for the animal's weight before acquisition and appends the entry to
+    ``mouse_weight.csv`` in the session directory.
+- **example_pre_acquisition_module**: Minimal template illustrating logging, parameter loading, and return codes.
+
+.. _post-modules:
+
+Post-Acquisition Modules
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+- **experiment_notes_finalize**: Completes the notes workflow by ensuring the notes file exists (creating it if needed) and
+    prompting the operator to confirm everything is saved. Key parameters:
+
+    - ``experiment_notes_filename`` (default ``"experiment_notes.txt"``) — same placeholder behavior as the editor module.
+    - ``experiment_notes_confirm_prompt`` — custom confirmation message for interactive runs.
+
+- **session_archiver**: Transfers session artifacts to a network path, maintains a local backup, and records results in a
+    manifest for resumable copies. Important parameters include ``network_dir``, ``backup_dir``, ``include_patterns``,
+    ``exclude_patterns``, ``skip_completed``, ``checksum_algo``, and ``max_retries``; all support placeholder expansion.
+- **session_creator**: Builds standards-compliant ``session.json`` metadata, typically using AIND schema helpers.
+- **stimulus_table_predictive_processing**: Normalizes Predictive Processing stimulus tables for downstream analysis.
+- **session_enhancer_bonsai**, **session_enhancer_predictive_processing**, **session_enhancer_slap2**: Enrich session metadata
+    with workflow-specific fields after acquisition.
+- **mouse_weight_post_prompt**: Mirrors the pre prompt to capture the animal's weight after the run.
+- **experiment_notes_post_prompt**: Legacy notes prompt retained for compatibility; the ``experiment_notes_editor`` /
+    ``experiment_notes_finalize`` pair is now the recommended workflow.
+- **example_post_acquisition_module**: Template for building new post-acquisition steps.
 
 Extending the Pipeline
 ----------------------

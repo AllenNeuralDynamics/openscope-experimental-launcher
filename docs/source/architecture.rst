@@ -140,4 +140,4 @@ To add a pre- or post-acquisition step, simply add the module name to the approp
 
 Each module is a Python file in `src/openscope_experimental_launcher/pre_acquisition/` or `post_acquisition/`, and must accept a `param_file` argument and return 0 for success, 1 for failure.
 
-For more, see the :doc:`pre_acquisition` and :doc:`post_acquisition` pages, and the :doc:`contributing` guide.
+For more, see the :ref:`pre-modules` and :ref:`post-modules` sections of :doc:`modules`, and the :doc:`contributing` guide.
