@@ -194,15 +194,6 @@ Cross-Cutting Concerns
 * Resource Use: heavy CPU tasks can distort acquisition timing; prefer post-acquisition pipeline for analysis.
 * Ordering: modules execute strictly in array order; maintain dependencies via sequence.
 
-Future Extensions
------------------
-Potential enhancements (not implemented yet):
-* Module retry semantics
-* Parallel post-acquisition execution
-* Declarative dependency graph
-
-This document reflects the current implementation of the pipeline module system.
-
 Detailed JSON Configuration Reference
 ------------------------------------
 The parameter JSON file drives how modules are executed. Below is a breakdown using the example file `params/predictive_processing_params_example.json`.
