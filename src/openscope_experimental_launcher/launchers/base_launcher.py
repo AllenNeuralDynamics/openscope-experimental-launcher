@@ -22,6 +22,13 @@ import importlib
 import importlib.util
 import traceback
 
+
+class _PlaceholderDict(dict):
+    """Format-friendly dict that leaves unknown keys untouched."""
+
+    def __missing__(self, key: str) -> str:  # pragma: no cover - defensive formatting
+        return "{" + key + "}"
+
 from typing import Dict, Optional, Any
 
 # Import AIND data schema utilities for standardized folder naming
@@ -201,6 +208,53 @@ class BaseLauncher:
             if value != original:
                 script_parameters[name] = value
         # No return needed; script_parameters mutated in place
+
+    def _build_placeholder_context(self, params: Dict[str, Any]) -> Dict[str, str]:
+        """Collect simple parameter values plus launcher metadata for string formatting."""
+        context: Dict[str, str] = {}
+        for key, value in params.items():
+            if isinstance(value, (str, int, float)):
+                context[key] = str(value)
+        if self.subject_id:
+            context.setdefault("subject_id", str(self.subject_id))
+        if self.user_id:
+            context.setdefault("user_id", str(self.user_id))
+        if self.session_uuid:
+            context.setdefault("session_uuid", str(self.session_uuid))
+        if self.output_session_folder:
+            context.setdefault("output_session_folder", str(self.output_session_folder))
+            context.setdefault("session_folder", str(self.output_session_folder))
+            context.setdefault("session_dir", str(self.output_session_folder))
+        rig_id = self.rig_config.get("rig_id") if isinstance(self.rig_config, dict) else None
+        if rig_id:
+            context.setdefault("rig_id", str(rig_id))
+        return context
+
+    def _expand_parameter_placeholders(self, params: Dict[str, Any]) -> None:
+        """Recursively substitute placeholder strings in parameter structures."""
+
+        def _expand(value: Any, context: Dict[str, str]) -> Any:
+            if isinstance(value, str):
+                expanded = os.path.expandvars(value)
+                try:
+                    expanded = expanded.format_map(_PlaceholderDict(context))
+                except Exception:
+                    pass
+                return expanded
+            if isinstance(value, dict):
+                return {k: _expand(v, context) for k, v in value.items()}
+            if isinstance(value, list):
+                return [_expand(item, context) for item in value]
+            if isinstance(value, tuple):
+                return tuple(_expand(item, context) for item in value)
+            return value
+
+        context = self._build_placeholder_context(params)
+        for key in list(params.keys()):
+            expanded = _expand(params[key], context)
+            params[key] = expanded
+            if isinstance(expanded, (str, int, float)):
+                context[key] = str(expanded)
     
     def determine_output_session_folder(self) -> Optional[str]:
         """
@@ -447,6 +501,12 @@ class BaseLauncher:
             params = param_utils.load_parameters(param_file=processed_params_path)
         else:
             params = param_utils.load_parameters(param_file=param_file)
+
+        if self.session_uuid:
+            params.setdefault("session_uuid", self.session_uuid)
+        if self.output_session_folder:
+            params.setdefault("output_session_folder", self.output_session_folder)
+        self._expand_parameter_placeholders(params)
 
         pipeline = params.get(pipeline_key, [])
         repo_path = git_manager.get_repository_path(params)
@@ -731,6 +791,11 @@ class BaseLauncher:
             output_session_folder = self.determine_output_session_folder()
             self.output_session_folder = output_session_folder
             self.params["output_session_folder"] = output_session_folder
+            if self.session_uuid:
+                self.params["session_uuid"] = self.session_uuid
+
+            # Resolve placeholders now that session metadata is available
+            self._expand_parameter_placeholders(self.params)
 
             # Set up logging and metadata
             if output_session_folder:

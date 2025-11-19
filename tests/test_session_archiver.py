@@ -1,0 +1,117 @@
+import json
+from pathlib import Path
+
+from openscope_experimental_launcher.post_acquisition import session_archiver
+
+
+def _default_prompt(prompt, default):
+    return default
+
+
+def test_session_archiver_transfers_and_verifies(tmp_path):
+    session_dir = tmp_path / "session"
+    network_dir = tmp_path / "network"
+    backup_dir = tmp_path / "backup"
+    session_dir.mkdir()
+
+    # Create test files including a nested path
+    (session_dir / "file1.txt").write_text("hello world", encoding="utf-8")
+    nested_dir = session_dir / "nested"
+    nested_dir.mkdir()
+    (nested_dir / "file2.bin").write_bytes(b"binary-data")
+
+    params = {
+        "session_dir": str(session_dir),
+        "network_dir": str(network_dir),
+        "backup_dir": str(backup_dir),
+        "session_uuid": "session-test",
+        "include_patterns": ["*.txt", "nested/*"],
+        "exclude_patterns": ["*.ignore"],
+        "checksum_algo": "sha256",
+        "dry_run": False,
+        "max_retries": 0,
+    }
+    param_file = tmp_path / "params.json"
+    param_file.write_text(json.dumps(params), encoding="utf-8")
+
+    exit_code = session_archiver.run_post_acquisition(
+        str(param_file), overrides={"prompt_func": _default_prompt}
+    )
+    assert exit_code == 0
+
+    # Files should be copied to the network directory
+    assert (network_dir / "file1.txt").read_text(encoding="utf-8") == "hello world"
+    assert (network_dir / "nested" / "file2.bin").read_bytes() == b"binary-data"
+
+    # Original files should move to backup
+    assert not (session_dir / "file1.txt").exists()
+    assert not (session_dir / "nested" / "file2.bin").exists()
+    assert (backup_dir / "file1.txt").exists()
+    assert (backup_dir / "nested" / "file2.bin").exists()
+
+    # Manifest should record successful transfers
+    manifest_path = backup_dir / "session_archiver_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    rel_paths = {"file1.txt", "nested/file2.bin"}
+    assert set(manifest["files"].keys()) == rel_paths
+    for meta in manifest["files"].values():
+        assert meta["status"] == "complete"
+        assert Path(meta["network_path"]).exists()
+        assert Path(meta["backup_path"]).exists()
+        assert meta["checksum"]
+        assert meta["network_copy"] is True
+        assert meta["backup_move"] is True
+
+
+def test_session_archiver_skips_network_when_confirmation_declined(tmp_path):
+    session_dir = tmp_path / "session"
+    network_dir = tmp_path / "network"
+    backup_dir = tmp_path / "backup"
+    session_dir.mkdir()
+
+    (session_dir / "file.txt").write_text("payload", encoding="utf-8")
+
+    params = {
+        "session_dir": str(session_dir),
+        "network_dir": str(network_dir),
+        "backup_dir": str(backup_dir),
+        "session_uuid": "session-test",
+    }
+    param_file = tmp_path / "params.json"
+    param_file.write_text(json.dumps(params), encoding="utf-8")
+
+    responses = iter(
+        [
+            str(network_dir),
+            str(backup_dir),
+            "no",  # disable network transfer
+            "yes",  # keep backup transfer enabled
+        ]
+    )
+
+    def prompt_stub(prompt, default):
+        try:
+            return next(responses)
+        except StopIteration:
+            return default
+
+    exit_code = session_archiver.run_post_acquisition(
+        str(param_file), overrides={"prompt_func": prompt_stub}
+    )
+    assert exit_code == 0
+
+    # Network directory should not be created when transfer is declined
+    assert not network_dir.exists()
+
+    # File should remain only in backup location
+    assert not (session_dir / "file.txt").exists()
+    assert (backup_dir / "file.txt").read_text(encoding="utf-8") == "payload"
+
+    manifest_path = backup_dir / "session_archiver_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    entry = manifest["files"]["file.txt"]
+    assert entry["status"] == "complete"
+    assert entry["network_copy"] is False
+    assert entry["backup_move"] is True
+    assert "network_path" not in entry
+    assert Path(entry["backup_path"]).exists()
