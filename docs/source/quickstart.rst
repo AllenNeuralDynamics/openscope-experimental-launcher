@@ -65,7 +65,7 @@ The repository ships with ``params/experiment_notes_pipeline.json`` which demons
        "experiment_notes_filename": "notes/experiment_notes.txt"
     }
 
-When launched, the editor creates the notes file under the session folder (via ``{session_folder}`` expansion) and opens Notepad so the operator can start typing immediately. The post step pauses at the end of the session until the operator confirms the notes are saved.
+When launched, the editor creates the notes file under the session folder (via ``{session_folder}`` expansion) and opens your configured editor so the operator can start typing immediately. The post step pauses at the end of the session until the operator confirms the notes are saved. See :ref:`pre-modules` and :ref:`post-modules` for a full parameter reference.
 
 Outputs
 -------

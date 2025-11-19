@@ -16,7 +16,9 @@ Core Keys
    Prompted if missing.
 
 ``pre_acquisition_pipeline`` / ``post_acquisition_pipeline`` (optional)
-   Ordered lists of module names.
+   Ordered pipeline definitions. Entries can be simple launcher-module names or structured objects containing
+   ``module_type``, ``module_path``, and ``module_parameters``. See :ref:`Pipeline Entry Schema <pipeline-entry-schema>`
+   in :doc:`modules` for details.
 
 Placeholders
 ------------

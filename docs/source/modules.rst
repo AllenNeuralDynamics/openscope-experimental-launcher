@@ -216,11 +216,7 @@ Top-Level Keys (subset shown):
 * ``script_parameters`` – key/value map passed to the acquisition interface. Supports placeholders described below.
 * ``pre_acquisition_pipeline`` / ``post_acquisition_pipeline`` – ordered arrays describing module execution.
 
-Placeholders Supported in ``script_parameters`` and Module Args:
-
-* ``{rig_param:<key>}`` – replaced with the merged parameter value (includes rig config). Example: ``"PortName": "{rig_param:COM_port}"``.
-* ``{subject_id}`` – replaced with subject ID after initialization.
-* ``{session_folder}`` – replaced with the resolved session output directory (in function_args or script_parameters values).
+.. _pipeline-entry-schema:
 
 Pipeline Entry Schema
 ~~~~~~~~~~~~~~~~~~~~~
@@ -259,20 +255,8 @@ Each element of ``pre_acquisition_pipeline`` or ``post_acquisition_pipeline`` ca
          }
      }
 
-Field Semantics:
-
-* ``module_type`` – ``launcher_module`` (Python file inside launcher package) or ``script_module`` (arbitrary Python file inside cloned repository tree).
-* ``module_path`` – For ``launcher_module``: name without ``.py`` located in ``pre_acquisition/`` or ``post_acquisition/``. For ``script_module``: repository-relative path to the Python script.
-* ``module_parameters`` – Arbitrary dict merged with processed parameters. Special keys:
-    * ``function`` – Name of the function inside the script to call (falls back to ``run_pre_acquisition``/``run_post_acquisition`` or ``run`` if omitted).
-    * ``function_args`` – Dict of keyword arguments passed directly to the target function. Only names matching the function signature are provided. If an ``output_filename`` key is given (legacy pattern) the launcher may derive ``output_path``.
-
-Invocation Rules (Summary):
-
-* When ``function_args`` present: only those keys (after placeholder expansion and path resolution) are passed as kwargs.
-* ``{session_folder}`` inside any arg is expanded before the call.
-* Relative paths ending with ``_path`` or ``_file`` inside ``function_args`` are resolved against the session folder.
-* Return value success criteria: ``None``, ``0`` or ``True`` are treated as success; anything else logs failure.
+Field semantics and placeholder expansion rules are summarized in :doc:`parameter_files`; refer there for a comprehensive
+reference and additional examples.
 
 Example Complete Snippet:
 

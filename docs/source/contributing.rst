@@ -13,11 +13,11 @@ How to Contribute
 -----------------
 1. **Fork the repository and create a branch.**
 2. **Add or improve a module:**
-   - Place pre-acquisition modules in ``src/openscope_experimental_launcher/pre_acquisition/``.
-   - Place post-acquisition modules in ``src/openscope_experimental_launcher/post_acquisition/``.
-   - Each module should accept a ``param_file`` argument and return 0 for success, 1 for failure.
+   - **Launcher modules** live in ``src/openscope_experimental_launcher/pre_acquisition`` or ``post_acquisition`` and typically expose ``run_pre_acquisition`` / ``run_post_acquisition`` (or ``run``) returning ``0`` on success.
+   - **Script modules** stay with the workflow repository checked out via ``repository_url``; reference them using the structured ``module_type: "script_module"`` entry in your parameter file so they evolve alongside the main experiment code.
 3. **Register your module in your parameter file:**
-   - Add the module name to the ``pre_acquisition_pipeline`` or ``post_acquisition_pipeline`` list in your JSON param file.
+   - For launcher modules, add the name (without ``.py``) to ``pre_acquisition_pipeline`` or ``post_acquisition_pipeline``.
+   - For script modules, add an object with ``module_type``, ``module_path`` (relative to the repo root), and optional ``module_parameters`` / ``function_args``. See :doc:`modules` for the full schema.
 4. **Write or update tests.**
 5. **Submit a pull request.**
 
@@ -26,7 +26,7 @@ Example: Adding a Pre-Acquisition Module
 .. code-block:: python
 
    # src/openscope_experimental_launcher/pre_acquisition/my_custom_module.py
-   def main(param_file):
+    def run_pre_acquisition(param_file):
        # Your logic here
        return 0  # success
 
@@ -35,7 +35,19 @@ Example: Using Your Module in a Pipeline
 .. code-block:: json
 
    {
-     "pre_acquisition_pipeline": ["my_custom_module"],
+       "pre_acquisition_pipeline": [
+          "my_custom_module",
+          {
+             "module_type": "script_module",
+             "module_path": "code/custom_repo/pipeline/post_process.py",
+             "module_parameters": {
+                "function": "prepare_metadata",
+                "function_args": {
+                   "output_path": "{session_folder}/derived/metadata.json"
+                }
+             }
+          }
+       ],
      ...
    }
 
