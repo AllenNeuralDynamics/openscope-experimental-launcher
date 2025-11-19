@@ -17,9 +17,20 @@ How It Works
 
 Available Pre-Acquisition Modules
 ---------------------------------
-- **experiment_notes_editor**: Creates an experiment-notes file in the session directory and optionally launches a text editor (Notepad by default) so notes can be captured throughout the run. Designed to pair with the ``experiment_notes_finalize`` post-acquisition module.
+- **experiment_notes_editor**: Creates an experiment-notes file in the session directory and can launch a text editor (Notepad by default) so notes stay open during acquisition. Designed to pair with the ``experiment_notes_finalize`` post-acquisition module.
 - **mouse_weight_pre_prompt**: Prompts for and records the mouse's weight before the experiment.
 - **example_pre_acquisition_module**: Template for creating new pre-acquisition modules.
+
+Experiment Notes Editor Parameters
+----------------------------------
+The notes editor module respects the same placeholder expansion as the launcher, so you can reference ``{session_folder}`` to keep files scoped to the active run. Common parameters include:
+
+- ``experiment_notes_filename`` (default ``"experiment_notes.txt"``): relative paths are resolved under the session directory after placeholder expansion. Example: ``"notes/experiment_notes.txt"``.
+- ``experiment_notes_launch_editor`` (default ``true``): disable if you only need the file pre-created.
+- ``experiment_notes_editor_command`` (default ``"notepad.exe"``) and ``experiment_notes_editor_args``: override to launch your preferred editor.
+- ``experiment_notes_encoding`` (default ``"utf-8"``): encoding used when creating the initial notes file.
+
+The module writes a simple header with a UTC timestamp the first time the notes file is created. Subsequent runs reuse the existing file.
 
 Example Parameter File
 ----------------------
