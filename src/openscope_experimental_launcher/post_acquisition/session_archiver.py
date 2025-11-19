@@ -22,6 +22,15 @@ from openscope_experimental_launcher.utils import param_utils
 LOG = logging.getLogger(__name__)
 
 
+class DeferredTransfer(RuntimeError):
+    """Raised when a file cannot complete transfer but should be retried later."""
+
+    def __init__(self, rel_key: str, message: str) -> None:
+        super().__init__(message)
+        self.rel_key = rel_key
+        self.message = message
+
+
 class SessionArchiver:
     """Move session output to a network path with verification."""
 
@@ -67,9 +76,9 @@ class SessionArchiver:
                 "backup_dir": str(self.backup_dir),
                 "files": {},
             }
-
         self.successful = 0
         self.failed = 0
+        self.deferred = 0
 
     def run(self) -> None:
         for file_path in self._iter_session_files():
@@ -83,6 +92,13 @@ class SessionArchiver:
             try:
                 self._process_single_file(file_path, rel_path)
                 self.successful += 1
+            except DeferredTransfer as exc:
+                self.deferred += 1
+                LOG.warning(
+                    "Deferred cleanup for '%s': %s",
+                    exc.rel_key,
+                    exc.message,
+                )
             except Exception as exc:  # noqa: BLE001
                 self.failed += 1
                 LOG.error("Failed to archive '%s': %s", rel_key, exc, exc_info=True)
@@ -164,13 +180,27 @@ class SessionArchiver:
                 if self.enable_backup_move:
                     if backup_path is None:
                         raise ValueError("Backup path unavailable for original relocation")
-                    self._relocate_original(source, backup_path)
-                    entry_fields["backup_path"] = str(backup_path)
+                    try:
+                        self._relocate_original(source, backup_path)
+                        entry_fields["backup_path"] = str(backup_path)
+                    except PermissionError as exc:
+                        if backup_path.exists():
+                            backup_path.unlink(missing_ok=True)
+                        entry_fields["backup_move"] = False
+                        entry_fields["backup_error"] = str(exc)
+                        entry_fields["original_path"] = str(source)
+                        self._mark_file(rel_key, status="pending_backup", **entry_fields)
+                        raise DeferredTransfer(
+                            rel_key,
+                            f"source file locked during backup move: {exc}",
+                        ) from exc
                 else:
                     LOG.info("Backup move disabled; retaining original file '%s'", rel_key)
 
                 self._mark_file(rel_key, status="complete", **entry_fields)
                 break
+            except DeferredTransfer:
+                raise
             except Exception:  # noqa: BLE001
                 retries += 1
                 if retries > self.max_retries:
@@ -274,7 +304,7 @@ def run_post_acquisition(
     param_file: Union[str, Dict[str, Any]],
     overrides: Optional[Dict[str, Any]] = None,
 ) -> int:
-    required_fields = ["session_dir", "network_dir", "backup_dir"]
+    required_fields = ["network_dir", "backup_dir"]
     defaults = {
         "include_patterns": ["*"],
         "exclude_patterns": [],
@@ -285,7 +315,6 @@ def run_post_acquisition(
         "remove_empty_dirs": False,
     }
     help_texts = {
-        "session_dir": "Path to the session output folder to archive",
         "network_dir": "Network destination where files will be copied",
         "backup_dir": "Local directory where originals are moved after verification",
     }
@@ -457,6 +486,9 @@ def run_post_acquisition(
         return 2
 
     LOG.info(
-        "Archive complete. Success: %s, Failed: %s", archiver.successful, archiver.failed
+        "Archive complete. Success: %s, Deferred: %s, Failed: %s",
+        archiver.successful,
+        archiver.deferred,
+        archiver.failed,
     )
     return 0 if archiver.failed == 0 else 3

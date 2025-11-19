@@ -1,5 +1,8 @@
 import json
+import os
 from pathlib import Path
+
+import pytest
 
 from openscope_experimental_launcher.post_acquisition import session_archiver
 
@@ -115,3 +118,77 @@ def test_session_archiver_skips_network_when_confirmation_declined(tmp_path):
     assert entry["backup_move"] is True
     assert "network_path" not in entry
     assert Path(entry["backup_path"]).exists()
+
+
+def test_session_archiver_handles_locked_file(tmp_path):
+    if os.name != "nt":
+        pytest.skip("Windows-specific locking behavior")
+    win32file = pytest.importorskip("win32file")
+    win32con = pytest.importorskip("win32con")
+
+    session_dir = tmp_path / "session"
+    network_dir = tmp_path / "network"
+    backup_dir = tmp_path / "backup"
+    session_dir.mkdir()
+
+    locked_file = session_dir / "launcher.log"
+    locked_file.write_text("log data", encoding="utf-8")
+    handle = win32file.CreateFile(
+        str(locked_file),
+        win32con.GENERIC_READ | win32con.GENERIC_WRITE,
+        win32con.FILE_SHARE_READ,
+        None,
+        win32con.OPEN_EXISTING,
+        win32con.FILE_ATTRIBUTE_NORMAL,
+        None,
+    )
+
+    params = {
+        "session_dir": str(session_dir),
+        "network_dir": str(network_dir),
+        "backup_dir": str(backup_dir),
+        "session_uuid": "session-test",
+    }
+    param_file = tmp_path / "params.json"
+    param_file.write_text(json.dumps(params), encoding="utf-8")
+
+    responses = iter(
+        [
+            str(network_dir),
+            str(backup_dir),
+            "yes",
+            "yes",
+        ]
+    )
+
+    def prompt_stub(prompt, default):
+        try:
+            return next(responses)
+        except StopIteration:
+            return default
+
+    try:
+        exit_code = session_archiver.run_post_acquisition(
+            str(param_file), overrides={"prompt_func": prompt_stub}
+        )
+    finally:
+        win32file.CloseHandle(handle)
+
+    assert exit_code == 0
+
+    # The network copy should succeed even though the original is locked
+    assert (network_dir / "launcher.log").read_text(encoding="utf-8") == "log data"
+
+    # Original file remains in place because it could not be moved
+    assert (session_dir / "launcher.log").exists()
+    assert not (backup_dir / "launcher.log").exists()
+
+    manifest_path = backup_dir / "session_archiver_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    entry = manifest["files"]["launcher.log"]
+    assert entry["status"] == "pending_backup"
+    assert entry["network_copy"] is True
+    assert entry["backup_move"] is False
+    assert "network_path" in entry
+    assert entry["backup_error"]
+    assert entry["original_path"].endswith("launcher.log")

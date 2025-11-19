@@ -22,12 +22,79 @@ import importlib
 import importlib.util
 import traceback
 
+if os.name == "nt":  # pragma: no cover - Windows-specific imports
+    try:
+        import msvcrt
+        import pywintypes
+        import win32con
+        import win32file
+    except ImportError:  # pragma: no cover - fallback if pywin32 missing
+        msvcrt = None
+        pywintypes = None
+        win32con = None
+        win32file = None
+
 
 class _PlaceholderDict(dict):
     """Format-friendly dict that leaves unknown keys untouched."""
 
     def __missing__(self, key: str) -> str:  # pragma: no cover - defensive formatting
         return "{" + key + "}"
+
+
+class SharedFileHandler(logging.FileHandler):
+    """File handler that keeps the log file shareable on Windows."""
+
+    @staticmethod
+    def _shared_supported() -> bool:
+        return os.name == "nt" and all((msvcrt, win32con, win32file))
+
+    def _open(self):
+        if not self._shared_supported():  # pragma: no cover - non-Windows path
+            return super()._open()
+
+        share_flags = (
+            win32con.FILE_SHARE_READ
+            | win32con.FILE_SHARE_WRITE
+            | win32con.FILE_SHARE_DELETE
+        )
+        creation_disposition = win32con.OPEN_ALWAYS if "a" in self.mode else win32con.CREATE_ALWAYS
+
+        try:
+            handle = win32file.CreateFile(
+                self.baseFilename,
+                win32con.GENERIC_WRITE,
+                share_flags,
+                None,
+                creation_disposition,
+                win32con.FILE_ATTRIBUTE_NORMAL,
+                None,
+            )
+        except Exception:  # pragma: no cover - fallback when pywin32 unavailable
+            return super()._open()
+
+        raw_handle = None
+        fd = None
+        try:
+            if "a" in self.mode:
+                win32file.SetFilePointer(handle, 0, win32con.FILE_END)
+            raw_handle = handle.Detach()
+            fd = msvcrt.open_osfhandle(raw_handle, os.O_APPEND | os.O_WRONLY)
+            return os.fdopen(
+                fd,
+                self.mode,
+                buffering=-1,
+                encoding=self.encoding,
+                errors=getattr(self, "errors", None),
+            )
+        except Exception:
+            if fd is not None:
+                os.close(fd)
+            if raw_handle is not None:
+                win32file.CloseHandle(raw_handle)
+            else:
+                handle.Close()
+            raise
 
 from typing import Dict, Optional, Any
 
@@ -393,7 +460,7 @@ class BaseLauncher:
             os.makedirs(launcher_metadata_dir, exist_ok=True)
             output_log_path = os.path.join(launcher_metadata_dir, log_filename)
             
-            output_handler = logging.FileHandler(output_log_path)
+            output_handler = SharedFileHandler(output_log_path, encoding="utf-8")
             output_handler.setLevel(logging.DEBUG)
             output_handler.setFormatter(log_format)
             root_logger.addHandler(output_handler)
@@ -409,7 +476,7 @@ class BaseLauncher:
                 
                 centralized_log_path = os.path.join(centralized_dir, log_filename)
                 
-                centralized_handler = logging.FileHandler(centralized_log_path)
+                centralized_handler = SharedFileHandler(centralized_log_path, encoding="utf-8")
                 centralized_handler.setLevel(logging.DEBUG)  # Slightly higher level for centralized
                 centralized_handler.setFormatter(log_format)
                 root_logger.addHandler(centralized_handler)

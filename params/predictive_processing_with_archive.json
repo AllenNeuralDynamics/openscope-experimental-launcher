@@ -36,12 +36,6 @@
             "module_parameters": {
                 "network_dir": "\\\\fileserver\\openscope_archive\\{subject_id}\\{session_uuid}",
                 "backup_dir": "{output_root_folder}\\archive_backups\\{session_uuid}",
-                "include_patterns": [
-                    "**"
-                ],
-                "exclude_patterns": [
-                    "launcher_metadata/*"
-                ],
                 "max_retries": 3
             }
         }
