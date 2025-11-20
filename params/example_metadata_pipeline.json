@@ -1,0 +1,32 @@
+{
+  "launcher": "base",
+  "output_root_folder": "./test_sessions",
+  "metadata_service_base_url": "http://aind-metadata-service",
+  "metadata_service_timeout": 10,
+  "pre_acquisition_pipeline": [
+    {
+      "module_type": "launcher_module",
+      "module_path": "metadata_subject_fetch",
+      "module_parameters": {
+        "metadata_subject_id": "{subject_id}"
+      }
+    },
+    {
+      "module_type": "launcher_module",
+      "module_path": "metadata_procedures_fetch",
+      "module_parameters": {
+        "metadata_subject_id": "{subject_id}",
+        "metadata_procedures_timeout": 60
+      }
+    },
+    {
+      "module_type": "launcher_module",
+      "module_path": "metadata_project_validator",
+      "module_parameters": {
+        "metadata_project_name": "Ophys Platform - "
+      }
+    }
+  ],
+  "post_acquisition_pipeline": [
+  ]
+}

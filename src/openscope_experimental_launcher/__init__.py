@@ -5,7 +5,15 @@ A Python package for launching OpenScope experiments with modular architecture,
 supporting Bonsai, MATLAB, and Python workflows.
 """
 
-__version__ = "0.1.0"
+try:
+    from ._version import version as __version__
+except ImportError:  # pragma: no cover - fallback for editable installs
+    from importlib import metadata
+
+    try:
+        __version__ = metadata.version("openscope-experimental-launcher")
+    except metadata.PackageNotFoundError:  # pragma: no cover - local source tree
+        __version__ = "0.0.0"
 
 # Import main launcher classes for easy access
 from .launchers.base_launcher import BaseLauncher

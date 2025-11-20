@@ -123,7 +123,8 @@ Pre-Acquisition Modules
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 - **experiment_notes_editor**: Creates an experiment-notes file inside the active session folder and can launch an editor
-    (``notepad.exe`` by default) so operators can start typing immediately. Key parameters:
+    (``notepad.exe`` by default) so operators can start typing immediately. Supply options via ``module_parameters`` inside the
+    pipeline entry to keep settings scoped to this module. Key parameters:
 
     - ``experiment_notes_filename`` (default ``"experiment_notes.txt"``) — accepts placeholders such as ``{session_folder}``;
         relative paths are resolved beneath the session directory.
@@ -133,7 +134,20 @@ Pre-Acquisition Modules
 
 - **mouse_weight_pre_prompt**: Prompts the operator for the animal's weight before acquisition and appends the entry to
     ``mouse_weight.csv`` in the session directory.
+- **metadata_subject_fetch**: Validates the active ``subject_id`` (or ``metadata_subject_id`` override) via
+    ``GET /api/v2/subject/{subject_id}``. Writes the response to ``subject.json`` inside the session directory. Returns a warning
+    (but continues) when the service responds with HTTP 400 so teams can review validation errors while proceeding with the run.
+- **metadata_procedures_fetch**: Requests ``GET /api/v2/procedures/{subject_id}`` and stores the resulting JSON as
+    ``procedures.json``. Waits up to 45 seconds by default (override with ``metadata_procedures_timeout``) before treating the call
+    as failed. Empty responses are considered errors.
+- **metadata_project_validator**: Fetches the available project list from ``GET /api/v2/project_names``. If the configured project
+    name is missing, the module logs the options and interactively prompts the operator to choose one (up to five attempts) before
+    persisting the selection to ``project.json``. HTTP 400 responses are recorded as warnings so payload details can be reviewed later.
 - **example_pre_acquisition_module**: Minimal template illustrating logging, parameter loading, and return codes.
+
+.. note::
+   The metadata modules expect ``metadata_service_base_url`` (and optional ``metadata_service_timeout``) to be present in the
+   merged parameters. You can set these once near the top of your parameter file or inside each ``module_parameters`` block.
 
 .. _post-modules:
 
@@ -141,14 +155,20 @@ Post-Acquisition Modules
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 - **experiment_notes_finalize**: Completes the notes workflow by ensuring the notes file exists (creating it if needed) and
-    prompting the operator to confirm everything is saved. Key parameters:
+        prompting the operator to confirm everything is saved. Provide overrides through ``module_parameters`` so they stay coupled
+        with this post step. Key parameters:
 
     - ``experiment_notes_filename`` (default ``"experiment_notes.txt"``) — same placeholder behavior as the editor module.
     - ``experiment_notes_confirm_prompt`` — custom confirmation message for interactive runs.
+        - ``experiment_notes_preview`` (default ``true``) — controls whether the module reads the notes file and displays the contents
+            in the log before prompting for confirmation.
+        - ``experiment_notes_preview_limit`` — optional integer cap on the number of characters shown during preview; omit or set to a
+            non-positive value to display the full file.
 
 - **session_archiver**: Transfers session artifacts to a network path, maintains a local backup, and records results in a
-    manifest for resumable copies. Important parameters include ``network_dir``, ``backup_dir``, ``include_patterns``,
-    ``exclude_patterns``, ``skip_completed``, ``checksum_algo``, and ``max_retries``; all support placeholder expansion.
+    manifest for resumable copies. Logs aggregate transfer throughput (MB/s) to help benchmark archive performance. Key
+    parameters include ``network_dir``, ``backup_dir``, ``include_patterns``, ``exclude_patterns``, ``skip_completed``,
+    ``checksum_algo``, and ``max_retries``; all support placeholder expansion.
 - **session_creator**: Builds standards-compliant ``session.json`` metadata, typically using AIND schema helpers.
 - **stimulus_table_predictive_processing**: Normalizes Predictive Processing stimulus tables for downstream analysis.
 - **session_enhancer_bonsai**, **session_enhancer_predictive_processing**, **session_enhancer_slap2**: Enrich session metadata

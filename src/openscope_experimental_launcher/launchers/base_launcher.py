@@ -596,7 +596,13 @@ class BaseLauncher:
                     logging.warning(f"Module {mod_name} has no callable entry point; skipping.")
                     return True
                 result = func(param_file) if func.__code__.co_argcount == 1 else func(merged_params)
-                return result in (None, 0, True)
+                if result is None:
+                    return True
+                if isinstance(result, bool):
+                    return result
+                if isinstance(result, (int, float)):
+                    return result == 0
+                return True
             except Exception as e:
                 logging.error(f"Launcher module error {mod_name}: {e}")
                 return False

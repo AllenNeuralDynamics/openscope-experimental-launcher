@@ -59,6 +59,29 @@ def run_post_acquisition(param_file: Any = None, overrides: Optional[Mapping[str
             notes_path.parent.mkdir(parents=True, exist_ok=True)
             notes_path.touch()
 
+        preview_enabled = params.get("experiment_notes_preview", True)
+        preview_limit = params.get("experiment_notes_preview_limit")
+        if preview_enabled:
+            encoding = params.get("experiment_notes_encoding", "utf-8")
+            try:
+                raw_content = notes_path.read_text(encoding=encoding)
+            except Exception as exc:  # noqa: BLE001
+                LOG.warning("Unable to read experiment notes for preview: %s", exc)
+            else:
+                content = raw_content
+                truncated = False
+                if isinstance(preview_limit, int) and preview_limit > 0 and len(content) > preview_limit:
+                    content = content[:preview_limit]
+                    truncated = True
+                divider = "-" * 60
+                display = content if content else "[File is empty]"
+                LOG.info("%s\nExperiment notes preview (%s):\n%s\n%s", divider, notes_path, display, divider)
+                if truncated:
+                    LOG.info(
+                        "Preview truncated to first %s characters; adjust experiment_notes_preview_limit to see more.",
+                        preview_limit,
+                    )
+
         prompt = params.get("experiment_notes_confirm_prompt", _DEFAULT_CONFIRM_PROMPT)
         param_utils.get_user_input(prompt, "")
 

@@ -58,12 +58,28 @@ The repository ships with ``params/experiment_notes_pipeline.json`` which demons
 
 .. code-block:: json
 
-    {
-       "pre_acquisition_pipeline": ["experiment_notes_editor"],
-       "post_acquisition_pipeline": ["experiment_notes_finalize"],
-       "experiment_notes_launch_editor": true,
-       "experiment_notes_filename": "notes/experiment_notes.txt"
-    }
+      {
+         "pre_acquisition_pipeline": [
+            {
+               "module_type": "launcher_module",
+               "module_path": "experiment_notes_editor",
+               "module_parameters": {
+                  "experiment_notes_launch_editor": true,
+                  "experiment_notes_filename": "notes/experiment_notes.txt"
+               }
+            }
+         ],
+         "post_acquisition_pipeline": [
+            {
+               "module_type": "launcher_module",
+               "module_path": "experiment_notes_finalize",
+               "module_parameters": {
+                  "experiment_notes_filename": "notes/experiment_notes.txt",
+                  "experiment_notes_confirm_prompt": "Confirm experiment notes are saved; press Enter to finish."
+               }
+            }
+         ]
+      }
 
 When launched, the editor creates the notes file under the session folder (via ``{session_folder}`` expansion) and opens your configured editor so the operator can start typing immediately. The post step pauses at the end of the session until the operator confirms the notes are saved. See :ref:`pre-modules` and :ref:`post-modules` for a full parameter reference.
 

@@ -56,8 +56,8 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.setuptools.dynamic]
-version = {attr = "openscope_experimental_launcher.__version__"}
+[tool.setuptools_scm]
+write_to = "src/openscope_experimental_launcher/_version.py"
 
 [tool.black]
 line-length = 79

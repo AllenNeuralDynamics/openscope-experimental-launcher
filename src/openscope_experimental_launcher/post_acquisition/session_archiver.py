@@ -81,6 +81,8 @@ class SessionArchiver:
         self.deferred = 0
 
     def run(self) -> None:
+        start_time = datetime.now(timezone.utc)
+        bytes_transferred = 0
         for file_path in self._iter_session_files():
             rel_path = file_path.relative_to(self.session_dir)
             rel_key = rel_path.as_posix()
@@ -90,7 +92,8 @@ class SessionArchiver:
                 continue
 
             try:
-                self._process_single_file(file_path, rel_path)
+                transferred = self._process_single_file(file_path, rel_path)
+                bytes_transferred += transferred
                 self.successful += 1
             except DeferredTransfer as exc:
                 self.deferred += 1
@@ -106,6 +109,9 @@ class SessionArchiver:
 
         if self.remove_empty_dirs and not self.dry_run:
             self._prune_empty_directories()
+
+        elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
+        self._log_transfer_summary(bytes_transferred, elapsed)
 
     @staticmethod
     def _normalize_patterns(patterns: Iterable[str] | None, *, default: Optional[str] = None) -> list[str]:
@@ -131,7 +137,7 @@ class SessionArchiver:
             return True
         return any(fnmatch(rel, pattern) or fnmatch(path.name, pattern) for pattern in self.include_patterns)
 
-    def _process_single_file(self, source: Path, rel_path: Path) -> None:
+    def _process_single_file(self, source: Path, rel_path: Path) -> int:
         rel_key = rel_path.as_posix()
         dest_path = self.network_dir / rel_path if self.enable_network_copy else None
         backup_path = self.backup_dir / rel_path if self.enable_backup_copy else None
@@ -147,7 +153,7 @@ class SessionArchiver:
                 backup_copy=False,
                 reason="transfers_disabled",
             )
-            return
+            return 0
 
         if self.dry_run:
             LOG.info("Dry run enabled; skipping copy and move for '%s'", rel_key)
@@ -157,9 +163,10 @@ class SessionArchiver:
                 network_copy=self.enable_network_copy,
                 backup_copy=self.enable_backup_copy,
             )
-            return
+            return 0
 
         retries = 0
+        file_size = source.stat().st_size if source.exists() else 0
         while True:
             try:
                 entry_fields: Dict[str, Any] = {
@@ -212,6 +219,26 @@ class SessionArchiver:
                     self.max_retries,
                     exc_info=True,
                 )
+        return file_size if self.enable_network_copy else 0
+
+    def _log_transfer_summary(self, bytes_transferred: int, elapsed_seconds: float) -> None:
+        if bytes_transferred <= 0:
+            LOG.info("Transfer summary: no data transferred.")
+            return
+        if elapsed_seconds <= 0:
+            LOG.info(
+                "Transfer summary: %.2f MB transferred (elapsed time too small to compute rate)",
+                bytes_transferred / (1024 * 1024),
+            )
+            return
+        mb_transferred = bytes_transferred / (1024 * 1024)
+        mb_per_second = mb_transferred / elapsed_seconds
+        LOG.info(
+            "Transfer summary: %.2f MB moved in %.2f s (%.2f MB/s)",
+            mb_transferred,
+            elapsed_seconds,
+            mb_per_second,
+        )
 
     def _copy_with_temp(self, src: Path, dest: Path) -> None:
         dest.parent.mkdir(parents=True, exist_ok=True)
