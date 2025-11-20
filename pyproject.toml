@@ -34,6 +34,7 @@ dependencies = [
     'psutil',
     'pywin32; sys_platform == "win32"',  # Only install on Windows
     'PyYAML',
+    'requests',
     'toml'
 ]
 
