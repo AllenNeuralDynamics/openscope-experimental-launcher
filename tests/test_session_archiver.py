@@ -53,7 +53,7 @@ def test_session_archiver_transfers_and_verifies(tmp_path):
     assert (backup_dir / "nested" / "file2.bin").exists()
 
     # Manifest should record successful transfers
-    manifest_path = backup_dir / "session_archiver_manifest.json"
+    manifest_path = session_dir / "launcher_metadata" / "session_archiver_manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     rel_paths = {"file1.txt", "nested/file2.bin"}
     assert set(manifest["files"].keys()) == rel_paths
@@ -110,7 +110,7 @@ def test_session_archiver_skips_network_when_confirmation_declined(tmp_path):
     assert (session_dir / "file.txt").exists()
     assert (backup_dir / "file.txt").read_text(encoding="utf-8") == "payload"
 
-    manifest_path = backup_dir / "session_archiver_manifest.json"
+    manifest_path = session_dir / "launcher_metadata" / "session_archiver_manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     entry = manifest["files"]["file.txt"]
     assert entry["status"] == "complete"
@@ -183,7 +183,7 @@ def test_session_archiver_handles_locked_file(tmp_path):
     assert (session_dir / "launcher.log").exists()
     assert (backup_dir / "launcher.log").exists()
 
-    manifest_path = backup_dir / "session_archiver_manifest.json"
+    manifest_path = session_dir / "launcher_metadata" / "session_archiver_manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     entry = manifest["files"]["launcher.log"]
     assert entry["status"] == "complete"

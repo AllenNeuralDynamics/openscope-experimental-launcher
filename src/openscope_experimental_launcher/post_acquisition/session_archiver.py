@@ -446,7 +446,8 @@ def run_post_acquisition(
         "enabled" if copy_to_backup else "disabled",
     )
 
-    manifest_value = params.get("manifest_path") or (backup_dir / "session_archiver_manifest.json")
+    default_manifest = session_dir / "launcher_metadata" / "session_archiver_manifest.json"
+    manifest_value = params.get("manifest_path") or default_manifest
     manifest_path = Path(manifest_value).expanduser()
 
     LOG.info("Starting session archiver")
