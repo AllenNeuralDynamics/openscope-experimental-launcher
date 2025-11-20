@@ -5,55 +5,49 @@
 ![Platform](https://img.shields.io/badge/platform-Windows-blue?logo=windows)
 [![Documentation](https://img.shields.io/badge/docs-latest-blue)](https://allenneuraldynamics.github.io/openscope-experimental-launcher/)
 
-Minimal, testable experiment orchestration for OpenScope: parameter merge (rig config + JSON + runtime prompts), subprocess launch, resource logging, and flattened metadata output (`end_state.json`, `debug_state.json`, `processed_parameters.json`).
+Windows-first orchestration for Allen Institute OpenScope experiments. The launcher merges rig configuration with JSON parameters, guides operators through prompts, executes Bonsai/MATLAB/Python workflows, and records a flattened metadata trail for downstream processing.
 
-## Quick Start
+## Highlights
+
+- **Single source of truth**: merge rig TOML, parameter JSON, and runtime prompts into `processed_parameters.json` before execution.
+- **Metadata aware**: optional pre-acquisition modules call the Metadata Service to confirm subject, procedures, and project context.
+- **Modular pipeline**: compose pre/post acquisition steps (notes workflow, session archiver, resource monitors) without changing launcher code.
+- **Integrity logging**: every run emits `end_state.json`, optional debug traces, and post-acquisition archives with checksum verification and transfer speed metrics.
+
+## Install
 
 ```bash
 pip install -e .
-python run_launcher.py --param_file params/example_minimalist_params.json
 ```
 
-To run a pipeline module directly:
+Requirements: Python 3.8+, Windows 10 or 11, rig configuration TOML, and a parameter JSON file.
 
-```bash
-python run_module.py --module_type post_acquisition --module_name session_creator --param_file params/example_minimalist_params.json
-```
+## Run a Session
 
-## Rig Parameter Placeholders
+1. Edit or copy `params/example_minimalist_params.json` and point to your script, output root, and subject information.
+2. Launch:
 
-Inject rig config values into `script_parameters`:
+   ```bash
+   python run_launcher.py --param_file params/example_minimalist_params.json
+   ```
 
-```
-{rig_param:<key>}
-```
+3. Follow interactive prompts; the launcher writes results to `launcher_metadata/` inside the session folder.
 
-Example snippet:
-```json
-{
-	"script_parameters": {
-		"PortName": "{rig_param:COM_port}",
-		"RecordCameras": "{rig_param:RecordCameras}"
-	}
-}
-```
+## Common Pipelines
 
-Missing keys -> warning + empty string substitution.
+- **Metadata validation**: `params/example_metadata_pipeline.json` fetches subject data, procedures (with timeout override), and confirms project selection before acquisition.
+- **Experiment notes**: `params/experiment_notes_pipeline.json` previews operator notes pre-run and blocks on confirmation post-run.
+- **Archiving**: post-acquisition `session_archiver` copies data to backup destinations, verifies checksums, and logs transfer throughput.
 
-## Metadata Outputs (Flattened)
+Use `python run_module.py --module_type <phase> --module_name <module> --param_file <file>` to dry-run a module in isolation.
 
-- `end_state.json`: `{subject_id, user_id, session_uuid, start_time, stop_time, process_returncode, rig_config, experiment_data, custom_data}`
-- `debug_state.json`: crash snapshot with `crash_info` and `launcher_state`.
-- `processed_parameters.json`: unified parameters after prompting + rig merge.
+## Documentation
 
-## Full Documentation
+Full guides live at the [documentation site](https://allenneuraldynamics.github.io/openscope-experimental-launcher/) and in `docs/`:
 
-See the comprehensive docs site or `docs/` folder for:
-
-- Parameter & rig config reference
-- Placeholder expansion details
-- Post-acquisition tools (session_creator)
-- Extending launcher via `get_custom_end_state()`
+- Configuring parameter files and rig placeholders
+- Metadata service integrations and module reference
+- Extending launchers and customizing end-state payloads
 
 ## License
 

@@ -1,22 +1,38 @@
 Quick Start Guide
 =================
 
-Minimal steps to launch an experiment with the OpenScope Experimental Launcher.
+Launch a basic OpenScope experiment, then layer in optional metadata validation and post-acquisition tooling.
+
+Prerequisites
+-------------
+
+* Windows 10 or 11 with Python 3.8 or newer
+* Rig configuration ``.toml`` describing hardware defaults
+* Experiment parameter ``.json`` (start with ``params/example_minimalist_params.json``)
+
+Install
+-------
+
+.. code-block:: bash
+
+   pip install -e .
 
 Configuration Layers
 --------------------
 
-1. **Rig Config (TOML)** – static hardware + defaults.
-2. **Parameter File (JSON)** – experiment-specific settings.
-3. **Runtime Prompts** – fill / override missing required fields interactively.
+1. **Rig Config (TOML)** – shared hardware + default values.
+2. **Parameter File (JSON)** – experiment-specific overrides.
+3. **Runtime Prompts** – final confirmation during launch.
 
-Precedence: Runtime Prompts > Parameter File > Rig Config.
+Precedence order is runtime prompt > parameter file > rig config. Rig values can be referenced inside ``script_parameters`` using ``{rig_param:KEY}``.
 
-Example Minimal Parameter File
-------------------------------
+Prepare Parameters
+------------------
+
+Adjust the minimal example or copy a template:
 
 .. code-block:: json
-   :caption: example_params.json
+   :caption: params/example_minimalist_params.json
 
    {
      "subject_id": "mouse_001",
@@ -25,78 +41,44 @@ Example Minimal Parameter File
      "output_root_folder": "D:/OpenScopeData"
    }
 
-Run the Launcher
+Launch a Session
 ----------------
 
 .. code-block:: bash
 
    python run_launcher.py --param_file params/example_minimalist_params.json
 
-Placeholders
-------------
+Follow the prompts; a session folder is created with ``launcher_metadata/processed_parameters.json`` and ``launcher_metadata/end_state.json``.
 
-Use rig config values inside ``script_parameters`` via:
-
-``{rig_param:COM_port}`` → replaced at initialization.
-
-Pipeline Modules
-----------------
-
-Add ordered module names to your parameter file:
-
-.. code-block:: json
-
-   {
-     "pre_acquisition_pipeline": ["mouse_weight_pre_prompt"],
-     "post_acquisition_pipeline": ["session_creator"]
-   }
-
-Notes Workflow Example
+Add Modules (Optional)
 ----------------------
 
-The repository ships with ``params/experiment_notes_pipeline.json`` which demonstrates the paired notes modules:
+Extend the workflow by listing modules in your parameter file:
 
-.. code-block:: json
+* **Metadata service checks** – see ``params/example_metadata_pipeline.json`` for subject, procedures, and project validation prior to acquisition.
+* **Experiment notes workflow** – ``params/experiment_notes_pipeline.json`` previews notes before the run and requires confirmation after the run.
+* **Session archiver** – add ``session_archiver`` to ``post_acquisition_pipeline`` to copy data to backup storage with checksum and throughput logging.
 
-      {
-         "pre_acquisition_pipeline": [
-            {
-               "module_type": "launcher_module",
-               "module_path": "experiment_notes_editor",
-               "module_parameters": {
-                  "experiment_notes_launch_editor": true,
-                  "experiment_notes_filename": "notes/experiment_notes.txt"
-               }
-            }
-         ],
-         "post_acquisition_pipeline": [
-            {
-               "module_type": "launcher_module",
-               "module_path": "experiment_notes_finalize",
-               "module_parameters": {
-                  "experiment_notes_filename": "notes/experiment_notes.txt",
-                  "experiment_notes_confirm_prompt": "Confirm experiment notes are saved; press Enter to finish."
-               }
-            }
-         ]
-      }
+You can exercise a module independently via:
 
-When launched, the editor creates the notes file under the session folder (via ``{session_folder}`` expansion) and opens your configured editor so the operator can start typing immediately. The post step pauses at the end of the session until the operator confirms the notes are saved. See :ref:`pre-modules` and :ref:`post-modules` for a full parameter reference.
+.. code-block:: bash
+
+   python run_module.py --module_type post_acquisition --module_name session_archiver --param_file params/example_metadata_pipeline.json
 
 Outputs
 -------
 
-Session folder will contain ``launcher_metadata/`` with:
+Every run produces:
 
-* processed_parameters.json
-* end_state.json (flattened)
-* debug_state.json (if crash)
+* ``launcher_metadata/processed_parameters.json`` – merged config and prompts
+* ``launcher_metadata/end_state.json`` – flattened end-state summary
+* ``launcher_metadata/debug_state.json`` when a crash occurs
 
-Post-acquisition ``session_creator`` can build ``session.json`` later.
+Post-acquisition modules may add artifacts such as ``session.json`` or archived data manifests.
 
 Next Steps
 ----------
 
-* See :doc:`parameter_files` for full schema.
-* See :doc:`rig_config` for rig TOML details.
-* See :doc:`end_state_system` for metadata formats.
+* :doc:`parameter_files` – full parameter schema and module references
+* :doc:`rig_config` – rig TOML structure and placeholder usage
+* :doc:`modules` – metadata integrations, notes workflow, session archiver, and more
