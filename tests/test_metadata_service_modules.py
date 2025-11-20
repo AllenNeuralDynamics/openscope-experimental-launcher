@@ -25,7 +25,6 @@ class _DummyResponse:
 def base_params(tmp_path):
     return {
         "output_session_folder": str(tmp_path),
-        "metadata_service_base_url": "https://metadata.example.org",
     }
 
 
@@ -39,10 +38,12 @@ def test_metadata_subject_fetch_success(monkeypatch, base_params):
     monkeypatch.setattr(metadata_api, "requests", type("R", (), {"get": staticmethod(fake_get)}))
 
     params = dict(base_params)
+    params["metadata_service_base_url"] = "https://metadata.example.org"
     params["subject_id"] = "SUBJ-1"
 
     exit_code = metadata_subject_fetch.run_pre_acquisition(params)
     assert exit_code == 0
+    assert results["url"].startswith("https://metadata.example.org")
     assert results["url"].endswith("/api/v2/subject/SUBJ-1")
     output_path = Path(base_params["output_session_folder"]) / "subject.json"
     assert json.loads(output_path.read_text(encoding="utf-8"))["subject_id"] == "SUBJ-1"
@@ -223,3 +224,22 @@ def test_metadata_procedures_fetch_timeout_override(monkeypatch, base_params):
     exit_code = metadata_procedures_fetch.run_pre_acquisition(params)
     assert exit_code == 0
     assert captured["timeout"] == 25
+
+
+def test_metadata_subject_fetch_uses_default_base_url(monkeypatch, base_params):
+    results = {}
+
+    def fake_get(url, params=None, headers=None, timeout=None):  # noqa: D401
+        results["url"] = url
+        return _DummyResponse(json_data={"subject_id": "SUBJ-1"})
+
+    monkeypatch.setattr(metadata_api, "requests", type("R", (), {"get": staticmethod(fake_get)}))
+    monkeypatch.setattr(metadata_api, "DEFAULT_BASE_URL", "https://fallback.example.org")
+
+    params = dict(base_params)
+    params["subject_id"] = "SUBJ-1"
+
+    exit_code = metadata_subject_fetch.run_pre_acquisition(params)
+    assert exit_code == 0
+    assert results["url"].startswith("https://fallback.example.org")
+    assert results["url"].endswith("/api/v2/subject/SUBJ-1")

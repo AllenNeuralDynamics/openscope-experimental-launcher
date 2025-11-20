@@ -1,7 +1,6 @@
 {
   "launcher": "base",
   "output_root_folder": "./test_sessions",
-  "metadata_service_base_url": "http://aind-metadata-service",
   "metadata_service_timeout": 10,
   "pre_acquisition_pipeline": [
     {
@@ -23,7 +22,7 @@
       "module_type": "launcher_module",
       "module_path": "metadata_project_validator",
       "module_parameters": {
-        "metadata_project_name": "Ophys Platform - "
+        "metadata_project_name": "Ophys Platform - SLAP2"
       }
     }
   ],

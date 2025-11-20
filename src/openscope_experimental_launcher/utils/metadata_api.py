@@ -3,11 +3,18 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Mapping, Optional
+
+try:  # pragma: no cover - optional dependency fallback handled at runtime
+    import requests  # type: ignore[import-not-found]
+except ModuleNotFoundError as exc:  # pragma: no cover - environment without requests
+    requests = None  # type: ignore[assignment]
+    _REQUESTS_IMPORT_ERROR = exc
+else:  # pragma: no cover - import success path simple
+    _REQUESTS_IMPORT_ERROR = None
 from urllib.parse import urljoin
 
-import requests
-
 DEFAULT_TIMEOUT = 10.0
+DEFAULT_BASE_URL = "http://aind-metadata-service"
 
 
 class MetadataServiceError(RuntimeError):
@@ -50,6 +57,10 @@ def fetch_json(
     timeout: float = DEFAULT_TIMEOUT,
 ) -> Any:
     """Fetch JSON from the metadata service."""
+    if requests is None:
+        raise MetadataServiceError(
+            "The 'requests' package is required for metadata service calls; install it via project dependencies."
+        ) from _REQUESTS_IMPORT_ERROR
     url = build_url(base_url, relative_path)
     logging.debug("Requesting metadata service endpoint %s", url)
     try:
@@ -89,9 +100,11 @@ def resolve_base_url(params: Mapping[str, Any]) -> str:
     for key in ("metadata_service_base_url", "metadata_api_base_url"):
         if params.get(key):
             return str(params[key])
-    raise MetadataServiceError(
-        "metadata_service_base_url parameter is required; set it in module_parameters or top-level params"
+    logging.debug(
+        "No metadata base URL provided; using default '%s'",
+        DEFAULT_BASE_URL,
     )
+    return DEFAULT_BASE_URL
 
 
 def resolve_timeout(params: Mapping[str, Any]) -> float:

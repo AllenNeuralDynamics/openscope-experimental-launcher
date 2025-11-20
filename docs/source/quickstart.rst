@@ -55,7 +55,7 @@ Add Modules (Optional)
 
 Extend the workflow by listing modules in your parameter file:
 
-* **Metadata service checks** – see ``params/example_metadata_pipeline.json`` for subject, procedures, and project validation prior to acquisition.
+* **Metadata service checks** – see ``params/example_metadata_pipeline.json`` for subject, procedures, and project validation prior to acquisition. Modules default to the in-rig host ``http://aind-metadata-service``; override via ``metadata_service_base_url`` when your deployment uses a different metadata host.
 * **Experiment notes workflow** – ``params/experiment_notes_pipeline.json`` previews notes before the run and requires confirmation after the run.
 * **Session archiver** – add ``session_archiver`` to ``post_acquisition_pipeline`` to copy data to backup storage with checksum and throughput logging.
 

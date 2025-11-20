@@ -35,7 +35,7 @@ Requirements: Python 3.8+, Windows 10 or 11, rig configuration TOML, and a param
 
 ## Common Pipelines
 
-- **Metadata validation**: `params/example_metadata_pipeline.json` fetches subject data, procedures (with timeout override), and confirms project selection before acquisition.
+- **Metadata validation**: `params/example_metadata_pipeline.json` fetches subject data, procedures (with timeout override), and confirms project selection before acquisition—override `metadata_service_base_url` only if your deployment uses a different metadata host.
 - **Experiment notes**: `params/experiment_notes_pipeline.json` previews operator notes pre-run and blocks on confirmation post-run.
 - **Archiving**: post-acquisition `session_archiver` copies data to backup destinations, verifies checksums, and logs transfer throughput.
 

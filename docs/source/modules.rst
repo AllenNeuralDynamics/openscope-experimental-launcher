@@ -146,8 +146,9 @@ Pre-Acquisition Modules
 - **example_pre_acquisition_module**: Minimal template illustrating logging, parameter loading, and return codes.
 
 .. note::
-   The metadata modules expect ``metadata_service_base_url`` (and optional ``metadata_service_timeout``) to be present in the
-   merged parameters. You can set these once near the top of your parameter file or inside each ``module_parameters`` block.
+    Metadata modules fall back to the in-network service URL ``http://aind-metadata-service``. Override by setting
+    ``metadata_service_base_url`` / ``metadata_api_base_url`` in your parameter file when you need a different host. The
+    optional ``metadata_service_timeout`` parameter still adjusts request timeouts.
 
 .. _post-modules:
 
