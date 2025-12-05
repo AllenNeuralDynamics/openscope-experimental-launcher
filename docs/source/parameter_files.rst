@@ -45,6 +45,38 @@ Basic Example
        "post_acquisition_pipeline": ["session_creator"]
     }
 
+MATLAB Shared Engine Example
+----------------------------
+
+The launcher connects to an already shared MATLAB Engine session. A minimal
+parameter file looks like:
+
+.. code-block:: json
+    :caption: params/matlab_local_test_params.json
+
+    {
+       "launcher": "matlab",
+       "subject_id": "test_mouse_local",
+       "user_id": "local_operator",
+       "output_root_folder": "C:/OpenScopeLocalSessions",
+       "matlab_engine_name": "openscope_launcher",
+       "matlab_entrypoint": "aind_launcher",
+       "matlab_entrypoint_args": [
+          "execute",
+          "sample_matlab_entrypoint"
+       ],
+       "matlab_pass_session_folder": true,
+       "matlab_enable_resume": true
+    }
+
+Before launching, start MATLAB, add the launchers directory to the path, and
+share the engine:
+
+.. code-block:: matlab
+
+    addpath('C:/BonsaiDataPredictiveProcessing/openscope-experimental-launcher/src/openscope_experimental_launcher/launchers')
+    aind_launcher('openscope_launcher')
+
 Git Repository Support (Optional)
 ---------------------------------
 

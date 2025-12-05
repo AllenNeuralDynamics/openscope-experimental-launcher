@@ -42,6 +42,25 @@ Adapters encapsulate only process spawning. Example adapter-based customization 
 
    WorkflowLauncher().run("workflow_params.json")
 
+MATLAB Shared Engine Adapter
+----------------------------
+
+The MATLAB launcher connects to a *shared* MATLAB Engine session rather than
+starting ``matlab.exe`` directly. This enables operator-controlled resume
+flows:
+
+* In MATLAB, call ``aind_launcher('openscope_launcher')`` (or your preferred
+    ``matlab_engine_name``) to share the engine and display the OpenScope UI.
+* Python connects using the parameters described in
+    :doc:`matlab_launcher`, forwards ``matlab_entrypoint_args`` and injects the
+    session folder when configured.
+* If the engine disconnects mid-run, the launcher attempts to reconnect and
+    resumes only after the operator confirms via the MATLAB UI.
+
+For quick smoke testing, ``params/matlab_local_test_params.json`` exercises
+the workflow with ``sample_matlab_entrypoint.m`` which writes a heartbeat file
+to the session directory.
+
 Custom Process Creation
 -----------------------
 

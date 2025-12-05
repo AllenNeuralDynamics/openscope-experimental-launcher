@@ -129,6 +129,7 @@ Contents
 
    rig_launchers
    launcher-configuration
+   matlab_launcher
    end_state_system
 
    pre_acquisition

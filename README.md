@@ -41,6 +41,12 @@ Requirements: Python 3.8+, Windows 10 or 11, rig configuration TOML, and a param
 
 Use `python run_module.py --module_type <phase> --module_name <module> --param_file <file>` to dry-run a module in isolation.
 
+## MATLAB Launcher
+
+MATLAB workflows run via a shared MATLAB Engine session. A sample configuration
+(`params/matlab_local_test_params.json`) and helper entry point are provided—see
+`docs/matlab_launcher` for setup.
+
 ## Documentation
 
 Full guides live at the [documentation site](https://allenneuraldynamics.github.io/openscope-experimental-launcher/) and in `docs/`:

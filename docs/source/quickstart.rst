@@ -82,3 +82,4 @@ Next Steps
 * :doc:`parameter_files` – full parameter schema and module references
 * :doc:`rig_config` – rig TOML structure and placeholder usage
 * :doc:`modules` – metadata integrations, notes workflow, session archiver, and more
+* :doc:`matlab_launcher` – configure the shared-engine MATLAB workflow

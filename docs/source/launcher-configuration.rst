@@ -36,30 +36,53 @@ These parameters control the core behavior of the launcher and are accepted in t
 | local_repository_path     | string    | Local directory to clone/use the repository. Optional.              |
 +---------------------------+-----------+---------------------------------------------------------------------+
 
-Optional Interface-Specific Parameters
--------------------------------------
-The following keys apply only when launching a specific external environment. Include only those you need; unused keys are ignored.
+Optional Interface Parameters
+-----------------------------
+The following keys apply only when launching a specific external environment.
+Include only those you need; unused keys are ignored.
 
-+----------------------+-----------+-----------------------------------------------+
-| Parameter            | Type      | Applies To / Description                      |
-+======================+===========+===============================================+
-| workflow_path        | string    | Bonsai: path to ``.bonsai`` workflow file.    |
-+----------------------+-----------+-----------------------------------------------+
-| bonsai_executable    | string    | Bonsai: override Bonsai executable path.      |
-+----------------------+-----------+-----------------------------------------------+
-| bonsai_args          | list      | Bonsai: extra CLI args.                       |
-+----------------------+-----------+-----------------------------------------------+
-| python_executable    | string    | Python: interpreter path override.            |
-+----------------------+-----------+-----------------------------------------------+
-| python_args          | list      | Python: extra CLI args.                       |
-+----------------------+-----------+-----------------------------------------------+
-| matlab_executable    | string    | MATLAB: executable path override.             |
-+----------------------+-----------+-----------------------------------------------+
-| matlab_args          | list      | MATLAB: extra CLI args.                       |
-+----------------------+-----------+-----------------------------------------------+
+Bonsai
+~~~~~~
+
+* ``workflow_path`` – path to the ``.bonsai`` workflow file.
+* ``bonsai_executable`` – override Bonsai executable path.
+* ``bonsai_args`` – additional CLI arguments passed to Bonsai.
+
+Python
+~~~~~~
+
+* ``python_executable`` – interpreter path override.
+* ``python_args`` – extra CLI arguments supplied before the script path.
+
+MATLAB (Shared Engine)
+~~~~~~~~~~~~~~~~~~~~~~
+
+* ``matlab_engine_name`` – shared engine name (default
+  ``"openscope_launcher"``).
+* ``matlab_entrypoint`` / ``matlab_function`` – MATLAB function to call.
+* ``matlab_entrypoint_args`` – positional arguments forwarded to MATLAB.
+* ``matlab_entrypoint_kwargs`` – dictionary of name/value pairs appended to
+  the argument list.
+* ``matlab_entrypoint_nargout`` – number of expected outputs (default ``0``).
+* ``matlab_pass_session_folder`` – include the session folder in the argument
+  list (default ``true``).
+* ``matlab_session_folder_position`` – insertion position for the session
+  folder (``"prepend"``/``"append"``/``"ignore"`` or integer index).
+* ``matlab_enable_resume`` – enable automatic resume attempts when the engine
+  drops (default ``true``).
+* ``matlab_resume_keyword`` – keyword used when appending the resume flag.
+* ``matlab_engine_connect_timeout_sec`` – timeout waiting for the engine to
+  appear (seconds).
+* ``matlab_engine_connect_poll_interval_sec`` – polling interval during
+  engine connection attempts (seconds).
+* ``matlab_cancel_timeout_sec`` – timeout waiting for MATLAB to acknowledge a
+  cancellation request (seconds).
+* ``matlab_keep_engine_alive`` – leave the engine running after the launcher
+  finishes (default ``true``).
 
 .. note::
-  These interface parameters are optional and may be superseded by a custom ``_create_process`` implementation in a subclass or adapter.
+  These interface parameters are optional and may be superseded by a custom
+  ``_create_process`` implementation in a subclass or adapter.
 
 Example Parameter File
 ---------------------
