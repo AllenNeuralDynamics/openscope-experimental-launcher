@@ -1,0 +1,22 @@
+{
+    "launcher": "matlab",
+    "subject_id": "test_mouse_local",
+    "user_id": "local_operator",
+    "output_root_folder": "C:\\OpenScopeLocalSessions",
+    "matlab_engine_name": "openscope_launcher",
+    "matlab_entrypoint": "aind_launcher",
+    "matlab_entrypoint_args": [
+        "execute",
+        "sample_matlab_entrypoint"
+    ],
+    "matlab_pass_session_folder": true,
+    "matlab_enable_resume": true,
+    "matlab_resume_keyword": "resume",
+    "matlab_engine_connect_timeout_sec": 180,
+    "matlab_engine_connect_poll_interval_sec": 1,
+    "matlab_cancel_timeout_sec": 20,
+    "matlab_keep_engine_alive": true,
+    "pre_acquisition_pipeline": [],
+    "post_acquisition_pipeline": [],
+    "description": "Example configuration for exercising the MATLAB shared-engine launcher locally."
+}
