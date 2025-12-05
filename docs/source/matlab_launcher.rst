@@ -8,14 +8,18 @@ if MATLAB restarts and gives the experimenter control through a small UI.
 Prerequisites
 -------------
 
-* MATLAB R2020b or newer with the **MATLAB Engine for Python** installed into
-  the same Python environment that runs ``run_launcher.py``. From a MATLAB
-  command prompt:
+* MATLAB R2020b or newer with the ``matlabengine`` Python package installed in
+  the environment that runs ``run_launcher.py``. Install via ``pip``:
 
-  .. code-block:: matlab
+   .. code-block:: bash
 
-     cd(fullfile(matlabroot, 'extern', 'engines', 'python'))
-     system('python setup.py install')
+     pip install openscope-experimental-launcher[matlab]
+
+  or, if you only need the engine package:
+
+  .. code-block:: bash
+
+     pip install matlabengine
 
 * The launcher package on the MATLAB path so helper utilities (for example
   ``aind_launcher``) are available. A simple approach during development is:
@@ -119,8 +123,8 @@ explicitly confirm that MATLAB should continue.
 Troubleshooting
 ---------------
 
-* **No module named ``matlab.engine``** – install the MATLAB Engine for Python
-  into the active Python environment.
+* **No module named ``matlab.engine``** – ensure ``pip install matlabengine``
+   was run inside the same Python environment used for the launcher.
 * **Engine connection times out** – verify the MATLAB session called
   ``aind_launcher('engine_name')`` and that the name matches
   ``matlab_engine_name`` in the parameter file.

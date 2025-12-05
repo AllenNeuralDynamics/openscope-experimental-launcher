@@ -54,6 +54,10 @@ dev = [
     'pytest-xdist'
 ]
 
+matlab = [
+    'matlabengine'
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
