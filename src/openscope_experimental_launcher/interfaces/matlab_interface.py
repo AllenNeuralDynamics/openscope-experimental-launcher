@@ -369,6 +369,13 @@ class MatlabEngineProcess:
         resume_flag = self._attempt > 1
         call_args = self._request.build_call_args(resume_flag)
 
+        phase = "Resuming" if resume_flag else "Starting"
+        status_message = (
+            f"{phase} MATLAB entry point '{self._request.entry_point}' (attempt {self._attempt})"
+        )
+
+        helper_info = self._initialise_helper(engine, status_message)
+
         try:  # pragma: no cover - relies on MATLAB runtime
             self._future = _dispatch_matlab_feval(
                 engine,
@@ -386,12 +393,132 @@ class MatlabEngineProcess:
                 f"Failed to invoke MATLAB entry point '{self._request.entry_point}': {exc}"
             ) from exc
 
-        phase = "Resuming" if resume_flag else "Starting"
-        message = (
-            f"{phase} MATLAB entry point '{self._request.entry_point}' (attempt {self._attempt})"
-        )
-        logging.info(message)
-        self._stdout_queue.put(message)
+        logging.info(status_message)
+        self._stdout_queue.put(status_message)
+        self._log_helper_metadata(helper_info)
+
+    def _initialise_helper(self, engine: Any, status_message: str) -> Optional[Any]:
+        helper_info: Optional[Any] = None
+
+        def _call_status_updater() -> None:
+            if not status_message:
+                return
+            try:
+                feval_func("aind_launcher", "helper_set_status", status_message, nargout=0)
+            except Exception:
+                try:
+                    escaped = status_message.replace("'", "''")
+                    evaluation(
+                        f"aind_launcher('helper_set_status', '{escaped}')",
+                        nargout=0,
+                    )
+                except Exception:
+                    pass
+
+        feval_func = getattr(engine, "feval", None)
+        evaluation = getattr(engine, "eval", None)
+
+        try:
+            if callable(feval_func):
+                try:
+                    helper_info = feval_func(
+                        "aind_launcher", "helper_register", nargout=1
+                    )
+                except Exception:
+                    helper_info = None
+
+                try:
+                    feval_func("aind_launcher", "helper_set_python_start_time", nargout=0)
+                except Exception:
+                    pass
+
+                _call_status_updater()
+                return helper_info
+
+            if callable(evaluation):
+                try:
+                    helper_info = evaluation(
+                        "aind_launcher('helper_register')", nargout=1
+                    )
+                except Exception:
+                    helper_info = None
+
+                try:
+                    evaluation(
+                        "aind_launcher('helper_set_python_start_time')", nargout=0
+                    )
+                except Exception:
+                    pass
+
+                _call_status_updater()
+
+        except Exception:  # pragma: no cover - best-effort helper initialisation
+            pass
+
+        return helper_info
+
+    def _log_helper_metadata(self, helper_info: Optional[Any]) -> None:
+        if helper_info is None:
+            return
+
+        def _normalise_matlab_value(value: Any) -> Optional[Any]:
+            if value is None:
+                return None
+            if isinstance(value, (list, tuple)) and len(value) == 1:
+                return _normalise_matlab_value(value[0])
+            tolist = getattr(value, "tolist", None)
+            if callable(tolist):
+                try:
+                    items = tolist()
+                except Exception:
+                    items = None
+                if isinstance(items, list) and items:
+                    if len(items) == 1:
+                        return _normalise_matlab_value(items[0])
+                    return items
+            if isinstance(value, bytes):
+                try:
+                    return value.decode("utf-8", errors="ignore")
+                except Exception:
+                    return value.decode(errors="ignore")
+            return value
+
+        def _extract_field(info: Any, *field_names: str) -> Optional[Any]:
+            for field in field_names:
+                for accessor in (
+                    lambda obj=info, key=field: obj[key],
+                    lambda obj=info, key=field: obj[0][key],
+                    lambda obj=info, key=field: getattr(obj, key, None),
+                ):
+                    try:
+                        value = accessor()
+                    except Exception:
+                        continue
+                    value = _normalise_matlab_value(value)
+                    if value is not None:
+                        return value
+            return None
+
+        def _log_helper_detail(label: str, value: Optional[Any]) -> None:
+            if value is None:
+                return
+            text = value if isinstance(value, str) else str(value)
+            if not text:
+                return
+            detail_message = f"MATLAB {label}: {text}"
+            logging.info(detail_message)
+            self._stdout_queue.put(detail_message)
+
+        launcher_version = _extract_field(helper_info, "launcher_version", "version")
+        timestamp = _extract_field(helper_info, "timestamp")
+
+        if launcher_version is None:
+            logging.debug("Unexpected MATLAB helper metadata: %r", helper_info)
+
+        _log_helper_detail("launcher version", launcher_version)
+
+        if timestamp is not None:
+            _log_helper_detail("helper timestamp", timestamp)
 
     def _monitor_future(self) -> None:  # pragma: no cover - relies on MATLAB runtime
         matlab_engine = _ensure_matlab_engine()

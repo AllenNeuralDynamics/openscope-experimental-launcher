@@ -53,6 +53,9 @@ dev = [
     'pytest-asyncio',
     'pytest-xdist'
 ]
+matlab = [
+    'matlabengine'
+]
 
 matlab = [
     'matlabengine'
