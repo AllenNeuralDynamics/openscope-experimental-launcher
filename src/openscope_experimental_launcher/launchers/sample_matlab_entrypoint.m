@@ -22,15 +22,15 @@ while idx <= numel(varargin) - 1
     idx = idx + 1;
 end
 
-fprintf('[OpenScope] sample_matlab_entrypoint running in %s\n', sessionFolder);
+fprintf('[SLAP2] sample_matlab_entrypoint running in %s\n', sessionFolder);
 if resumeMode
-    fprintf('[OpenScope] Resume flag detected; continuing previous session.\n');
+    fprintf('[SLAP2] Resume flag detected; continuing previous session.\n');
 else
-    fprintf('[OpenScope] Fresh acquisition attempt.\n');
+    fprintf('[SLAP2] Fresh acquisition attempt.\n');
 end
 
 if ~isempty(varargin)
-    fprintf('[OpenScope] Additional arguments:\n');
+    fprintf('[SLAP2] Additional arguments:\n');
     disp(varargin);
 end
 
@@ -50,5 +50,5 @@ else
 end
 
 pause(1);
-fprintf('[OpenScope] sample_matlab_entrypoint complete.\n');
+fprintf('[SLAP2] sample_matlab_entrypoint complete.\n');
 end

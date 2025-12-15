@@ -61,6 +61,14 @@ When first created, the rig config contains:
       
       Your experiment processes receive the full output_session_folder path.
 
+**rig_description_path**
+   Optional path to the canonical ``rigDescription`` JSON file for this rig. When provided, include it
+   in experiment parameter files via ``script_parameters`` (for example,
+   ``"script_parameters": {"rig_description_path": "C:/RigConfig/currentRigDescription.json"}``), and the
+   MATLAB launcher forwards it automatically so the SLAP2 UI pre-selects the rig description and enables
+   the Start button without extra clicks. If omitted, the UI falls back to manual selection (a legacy
+   ``matlab_rig_description_path`` field is still honored for backward compatibility).
+
 Adding Custom Settings
 ----------------------
 

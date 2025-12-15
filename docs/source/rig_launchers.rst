@@ -49,7 +49,7 @@ The MATLAB launcher connects to a *shared* MATLAB Engine session rather than
 starting ``matlab.exe`` directly. This enables operator-controlled resume
 flows:
 
-* In MATLAB, call ``aind_launcher('openscope_launcher')`` (or your preferred
+* In MATLAB, call ``slap2_launcher('slap2_launcher')`` (or your preferred
     ``matlab_engine_name``) to share the engine and display the OpenScope UI.
 * Python connects using the parameters described in
     :doc:`matlab_launcher`, forwards ``matlab_entrypoint_args`` and injects the

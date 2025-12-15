@@ -58,19 +58,15 @@ MATLAB (Shared Engine)
 ~~~~~~~~~~~~~~~~~~~~~~
 
 * ``matlab_engine_name`` – shared engine name (default
-  ``"openscope_launcher"``).
+  ``"slap2_launcher"``).
 * ``matlab_entrypoint`` / ``matlab_function`` – MATLAB function to call.
-* ``matlab_entrypoint_args`` – positional arguments forwarded to MATLAB.
-* ``matlab_entrypoint_kwargs`` – dictionary of name/value pairs appended to
-  the argument list.
+* ``matlab_entrypoint_args`` – positional arguments forwarded to MATLAB; the
+  launcher automatically appends the session folder.
+* ``script_parameters`` – optional dictionary of name/value pairs appended to
+  the MATLAB argument list (recommended place to pass rig paths).
+* ``matlab_entrypoint_kwargs`` – dictionary of name/value pairs appended after
+  ``script_parameters`` when additional overrides are required.
 * ``matlab_entrypoint_nargout`` – number of expected outputs (default ``0``).
-* ``matlab_pass_session_folder`` – include the session folder in the argument
-  list (default ``true``).
-* ``matlab_session_folder_position`` – insertion position for the session
-  folder (``"prepend"``/``"append"``/``"ignore"`` or integer index).
-* ``matlab_enable_resume`` – enable automatic resume attempts when the engine
-  drops (default ``true``).
-* ``matlab_resume_keyword`` – keyword used when appending the resume flag.
 * ``matlab_engine_connect_timeout_sec`` – timeout waiting for the engine to
   appear (seconds).
 * ``matlab_engine_connect_poll_interval_sec`` – polling interval during
@@ -79,6 +75,11 @@ MATLAB (Shared Engine)
   cancellation request (seconds).
 * ``matlab_keep_engine_alive`` – leave the engine running after the launcher
   finishes (default ``true``).
+
+Session folder injection and resume signalling happen automatically. Legacy
+keys such as ``matlab_pass_session_folder``, ``matlab_session_folder_position``,
+``matlab_enable_resume``, and ``matlab_resume_keyword`` remain supported for
+backward compatibility but should be omitted from new files.
 
 .. note::
   These interface parameters are optional and may be superseded by a custom

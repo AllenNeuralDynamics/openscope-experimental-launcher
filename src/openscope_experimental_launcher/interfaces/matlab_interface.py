@@ -15,6 +15,7 @@ import queue
 import subprocess
 import threading
 import time
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
@@ -97,7 +98,7 @@ def build_launch_request(params: Dict[str, Any], session_folder: Optional[str]) 
     if not setup_matlab_environment(params):
         return None
 
-    engine_name = str(params.get("matlab_engine_name", "openscope_launcher"))
+    engine_name = str(params.get("matlab_engine_name", "slap2_launcher"))
 
     entry_point: Optional[str] = params.get("matlab_entrypoint") or params.get("matlab_function")
     if not entry_point:
@@ -191,11 +192,33 @@ def _build_entrypoint_args(params: Dict[str, Any], session_folder: Optional[str]
                 args.append(insertion_value)
 
     kwargs = params.get("matlab_entrypoint_kwargs", {})
-    if kwargs:
-        if not isinstance(kwargs, dict):
-            raise TypeError("'matlab_entrypoint_kwargs' must be a dictionary when provided")
+    if kwargs and not isinstance(kwargs, dict):
+        raise TypeError("'matlab_entrypoint_kwargs' must be a dictionary when provided")
+
+    script_parameters = params.get("script_parameters", {})
+    if script_parameters and not isinstance(script_parameters, dict):
+        raise TypeError("'script_parameters' must be a dictionary when launching MATLAB workflows")
+
+    ordered_kwargs: "OrderedDict[str, Any]" = OrderedDict()
+
+    if isinstance(script_parameters, dict):
+        for key, value in script_parameters.items():
+            if key is None:
+                continue
+            ordered_kwargs[str(key)] = value
+
+    if isinstance(kwargs, dict):
         for key, value in kwargs.items():
-            args.extend([key, value])
+            ordered_kwargs[str(key)] = value
+
+    rig_description_path = (
+        params.get("matlab_rig_description_path") or params.get("rig_description_path")
+    )
+    if rig_description_path and "rig_description_path" not in ordered_kwargs:
+        ordered_kwargs["rig_description_path"] = str(rig_description_path)
+
+    for key, value in ordered_kwargs.items():
+        args.extend([key, value])
 
     return args
 
@@ -374,7 +397,15 @@ class MatlabEngineProcess:
             f"{phase} MATLAB entry point '{self._request.entry_point}' (attempt {self._attempt})"
         )
 
-        helper_info = self._initialise_helper(engine, status_message)
+        try:
+            helper_info = self._initialise_helper(engine, status_message)
+        except Exception as exc:
+            self._attempt -= 1
+            self._engine = None
+            error_message = str(exc)
+            logging.error(error_message)
+            self._stderr_queue.put(error_message)
+            raise
 
         try:  # pragma: no cover - relies on MATLAB runtime
             self._future = _dispatch_matlab_feval(
@@ -404,12 +435,12 @@ class MatlabEngineProcess:
             if not status_message:
                 return
             try:
-                feval_func("aind_launcher", "helper_set_status", status_message, nargout=0)
+                feval_func("slap2_launcher", "helper_set_status", status_message, nargout=0)
             except Exception:
                 try:
                     escaped = status_message.replace("'", "''")
                     evaluation(
-                        f"aind_launcher('helper_set_status', '{escaped}')",
+                        f"slap2_launcher('helper_set_status', '{escaped}')",
                         nargout=0,
                     )
                 except Exception:
@@ -418,44 +449,47 @@ class MatlabEngineProcess:
         feval_func = getattr(engine, "feval", None)
         evaluation = getattr(engine, "eval", None)
 
-        try:
-            if callable(feval_func):
-                try:
-                    helper_info = feval_func(
-                        "aind_launcher", "helper_register", nargout=1
-                    )
-                except Exception:
-                    helper_info = None
+        ui_error_message = (
+            "MATLAB launcher UI is not available. Launch MATLAB, run 'slap2_launcher', "
+            "and ensure the shared UI is open before starting the Python launcher."
+        )
 
-                try:
-                    feval_func("aind_launcher", "helper_set_python_start_time", nargout=0)
-                except Exception:
-                    pass
+        if callable(feval_func):
+            try:
+                helper_info = feval_func(
+                    "slap2_launcher", "helper_register", nargout=1
+                )
+            except Exception as exc:
+                raise RuntimeError(ui_error_message) from exc
 
-                _call_status_updater()
-                return helper_info
+            try:
+                feval_func("slap2_launcher", "helper_set_python_start_time", nargout=0)
+            except Exception:
+                pass
 
-            if callable(evaluation):
-                try:
-                    helper_info = evaluation(
-                        "aind_launcher('helper_register')", nargout=1
-                    )
-                except Exception:
-                    helper_info = None
+            _call_status_updater()
+            return helper_info
 
-                try:
-                    evaluation(
-                        "aind_launcher('helper_set_python_start_time')", nargout=0
-                    )
-                except Exception:
-                    pass
+        if callable(evaluation):
+            try:
+                helper_info = evaluation(
+                    "slap2_launcher('helper_register')", nargout=1
+                )
+            except Exception as exc:
+                raise RuntimeError(ui_error_message) from exc
 
-                _call_status_updater()
+            try:
+                evaluation(
+                    "slap2_launcher('helper_set_python_start_time')", nargout=0
+                )
+            except Exception:
+                pass
 
-        except Exception:  # pragma: no cover - best-effort helper initialisation
-            pass
+            _call_status_updater()
 
         return helper_info
+
+        raise RuntimeError(ui_error_message)
 
     def _log_helper_metadata(self, helper_info: Optional[Any]) -> None:
         if helper_info is None:
@@ -510,12 +544,20 @@ class MatlabEngineProcess:
             self._stdout_queue.put(detail_message)
 
         launcher_version = _extract_field(helper_info, "launcher_version", "version")
+        rig_source = _extract_field(
+            helper_info,
+            "rig_description_source",
+            "rig_description_path",
+        )
+        rig_target = _extract_field(helper_info, "rig_description_target")
         timestamp = _extract_field(helper_info, "timestamp")
 
         if launcher_version is None:
             logging.debug("Unexpected MATLAB helper metadata: %r", helper_info)
 
         _log_helper_detail("launcher version", launcher_version)
+        _log_helper_detail("rig description source", rig_source)
+        _log_helper_detail("rig description copy", rig_target)
 
         if timestamp is not None:
             _log_helper_detail("helper timestamp", timestamp)

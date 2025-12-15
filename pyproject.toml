@@ -57,10 +57,6 @@ matlab = [
     'matlabengine'
 ]
 
-matlab = [
-    'matlabengine'
-]
-
 [tool.setuptools.packages.find]
 where = ["src"]
 
