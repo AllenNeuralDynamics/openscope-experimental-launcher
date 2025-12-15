@@ -664,6 +664,31 @@ class MatlabEngineProcess:
     def close_streams(self) -> None:
         self._finalize_streams()
 
+    def _wait_for_engine_recovery(self) -> Optional[Any]:
+        """Keep attempting to reconnect to the shared engine until available."""
+
+        poll_interval = max(0.1, float(self._request.connect_poll_sec or 1.0))
+        attempt = 0
+
+        while not self._terminated:
+            attempt += 1
+            try:
+                return self._engine_connector()
+            except Exception as exc:  # pragma: no cover - depends on MATLAB runtime
+                message = (
+                    "MATLAB engine '%s' unavailable while recovering from a crash (%s). "
+                    "Waiting for MATLAB to restart so the Python launcher can reconnect..."
+                )
+                logging.error(message, self._request.engine_name, exc)
+                self._stderr_queue.put(
+                    f"MATLAB engine '{self._request.engine_name}' unavailable during resume: {exc}"
+                )
+                if self._terminated:
+                    break
+                time.sleep(poll_interval)
+
+        return None
+
     def _finalize_streams(self) -> None:
         if self._streams_closed:
             return
@@ -698,17 +723,16 @@ class MatlabEngineProcess:
             self._attempt + 1,
         )
 
-        try:
-            new_engine = self._engine_connector()
-        except Exception as connect_exc:
-            logging.error(
-                "Failed to reconnect to MATLAB engine '%s': %s",
-                self._request.engine_name,
-                connect_exc,
-            )
-            self._stderr_queue.put(
-                f"Failed to reconnect to MATLAB engine: {connect_exc}"
-            )
+        new_engine = self._wait_for_engine_recovery()
+
+        if new_engine is None:
+            if self._terminated:
+                logging.info("Resume aborted after reconnection attempts due to termination request.")
+            else:
+                logging.error(
+                    "Could not reconnect to MATLAB engine '%s'; giving up on resume",
+                    self._request.engine_name,
+                )
             return False
 
         if self._terminated:

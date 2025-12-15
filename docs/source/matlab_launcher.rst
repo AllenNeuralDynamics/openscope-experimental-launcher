@@ -89,6 +89,9 @@ Most workflows only need a handful of parameters:
    such as ``matlab_pass_session_folder``, ``matlab_session_folder_position``,
    ``matlab_enable_resume``, and ``matlab_resume_keyword`` are still accepted
    for backward compatibility but should be omitted from new parameter files.
+   If MATLAB crashes or the SLAP2 UI is closed, the Python launcher now stays
+   alive, logs the failure, and keeps trying to reconnect so you can relaunch
+   MATLAB and re-share the engine without restarting Python.
 
 Local Smoke Test
 ----------------
