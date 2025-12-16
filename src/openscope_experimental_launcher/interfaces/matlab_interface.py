@@ -105,6 +105,8 @@ def build_launch_request(params: Dict[str, Any], session_folder: Optional[str]) 
         script_path = params.get("script_path")
         if script_path:
             entry_point = os.path.splitext(os.path.basename(script_path))[0]
+    if not entry_point:
+        entry_point = "slap2_launcher"
 
     if not entry_point:
         logging.error(
@@ -114,7 +116,7 @@ def build_launch_request(params: Dict[str, Any], session_folder: Optional[str]) 
         return None
 
     try:
-        args = _build_entrypoint_args(params, session_folder)
+        args = _build_entrypoint_args(params, session_folder, entry_point)
     except Exception as exc:
         logging.error("Invalid MATLAB entry point arguments: %s", exc)
         return None
@@ -159,20 +161,23 @@ def build_launch_request(params: Dict[str, Any], session_folder: Optional[str]) 
     return request
 
 
-def _build_entrypoint_args(params: Dict[str, Any], session_folder: Optional[str]) -> List[Any]:
+def _build_entrypoint_args(
+    params: Dict[str, Any],
+    session_folder: Optional[str],
+    entry_point: Optional[str],
+) -> List[Any]:
     """Compose the MATLAB entry-point positional arguments list."""
 
-    raw_args = params.get("matlab_entrypoint_args", [])
+    raw_args = params.get("matlab_entrypoint_args", None)
+
     if raw_args is None:
-        raw_args = []
-
-    if isinstance(raw_args, tuple):
-        raw_args = list(raw_args)
-
-    if not isinstance(raw_args, list):
-        raise TypeError("'matlab_entrypoint_args' must be a list when provided")
-
-    args: List[Any] = list(raw_args)
+        args = _default_entrypoint_args(entry_point)
+    else:
+        if isinstance(raw_args, tuple):
+            raw_args = list(raw_args)
+        if not isinstance(raw_args, list):
+            raise TypeError("'matlab_entrypoint_args' must be a list when provided")
+        args = list(raw_args)
 
     include_session = params.get("matlab_pass_session_folder", True)
     if include_session and session_folder:
@@ -221,6 +226,16 @@ def _build_entrypoint_args(params: Dict[str, Any], session_folder: Optional[str]
         args.extend([key, value])
 
     return args
+
+
+def _default_entrypoint_args(entry_point: Optional[str]) -> List[Any]:
+    if not entry_point:
+        return []
+
+    if str(entry_point).lower() == "slap2_launcher":
+        return ["execute"]
+
+    return []
 
 
 def connect_shared_engine(request: MatlabLaunchRequest) -> Any:

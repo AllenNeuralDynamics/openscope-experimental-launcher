@@ -59,9 +59,11 @@ MATLAB (Shared Engine)
 
 * ``matlab_engine_name`` – shared engine name (default
   ``"slap2_launcher"``).
-* ``matlab_entrypoint`` / ``matlab_function`` – MATLAB function to call.
-* ``matlab_entrypoint_args`` – positional arguments forwarded to MATLAB; the
-  launcher automatically appends the session folder.
+* ``matlab_entrypoint`` / ``matlab_function`` – MATLAB function to call
+  (defaults to ``"slap2_launcher"`` so it can be omitted).
+* ``matlab_entrypoint_args`` – optional positional overrides; SLAP2 launches
+  can omit this because the Python launcher automatically issues
+  ``slap2_launcher('execute', ...)``.
 * ``script_parameters`` – optional dictionary of name/value pairs appended to
   the MATLAB argument list (recommended place to pass rig paths).
 * ``matlab_entrypoint_kwargs`` – dictionary of name/value pairs appended after

@@ -121,17 +121,10 @@ end
 end
 
 
-function slap2_launcher_execute(acquisitionFunction, varargin)
-%SLAP2_LAUNCHER_EXECUTE Run a MATLAB acquisition entry point for SLAP2.
-%   This helper is invoked from Python after the engine connection is
-%   established.  It executes the supplied MATLAB function (either a handle
-%   or name) and holds at start/stop prompts so the user can control when
-%   MATLAB begins and ends the acquisition.  Additional arguments are
-%   forwarded directly to the acquisition function.
-
-if nargin < 1 || isempty(acquisitionFunction)
-    error('Acquisition function handle or name is required.');
-end
+function slap2_launcher_execute(varargin)
+%SLAP2_LAUNCHER_EXECUTE Run the SLAP2 acquisition entry point.
+%   Invoked from Python after the engine connection is established. Holds
+%   at the UI start/stop prompts so the user can gate the acquisition.
 
 assignin('base', 'SLAP2_LAUNCHER_VERSION', slap2_launcher_version());
 
@@ -143,8 +136,6 @@ fig = slap2_launcher_get_ui();
 if ~isempty(rigDescriptionPath)
     slap2_launcher_set_rig_path(fig, rigDescriptionPath);
 end
-
-slap2_launcher_store_acquisition(fig, []);
 
 sessionFolder = '';
 if ~isempty(varargin)
@@ -166,8 +157,6 @@ end
 originalDir = pwd;
 restoreDir = onCleanup(@() cd(originalDir)); %#ok<NASGU>
 
-acquisitionHandle = slap2_launcher_resolve_function(acquisitionFunction);
-slap2_launcher_store_acquisition(fig, acquisitionHandle, varargin);
 slap2_launcher_prepare_start_controls(fig, resumeMode);
 
 slap2_launcher_wait_for_flag(fig, 'SLAP2_LAUNCHER_START_CONFIRMED', ...
@@ -185,10 +174,10 @@ if ~isempty(sessionFolder)
     end
 end
 
-slap2_launcher_update_status(fig, sprintf('Running %s ...', slap2_launcher_function_label(acquisitionFunction)));
+slap2_launcher_update_status(fig, 'Running slap2 ...');
 
 try
-    feval(acquisitionHandle, varargin{:});
+    slap2(varargin{:});
 catch err
     slap2_launcher_update_status(fig, ['Error: ' err.message]);
     slap2_launcher_reset_start_controls(fig, resumeMode);
@@ -304,8 +293,6 @@ if isempty(storedFig) || ~isvalid(storedFig)
         'RigCopyTarget', '', ...
         'ResumeMode', false, ...
         'StartStopState', 'idle', ...
-        'AcquisitionHandle', [], ...
-        'AcquisitionArgs', {{}}, ...
         'UpdateTimer', []);
 
     slap2_launcher_start_timer(storedFig);
@@ -596,27 +583,6 @@ slap2_launcher_refresh_session_display(fig);
 slap2_launcher_update_status(fig, sprintf('Session folder set to: %s', sessionFolder));
 slap2_launcher_refresh_info(fig);
 slap2_launcher_update_start_ready_state(fig);
-end
-
-function slap2_launcher_store_acquisition(fig, handle, args)
-%SLAP2_LAUNCHER_STORE_ACQUISITION Persist the pending acquisition handle/args.
-
-if nargin < 3
-    args = {};
-end
-
-if isempty(fig) || ~isvalid(fig)
-    return;
-end
-
-data = fig.UserData;
-data.AcquisitionHandle = handle;
-if iscell(args)
-    data.AcquisitionArgs = args;
-else
-    data.AcquisitionArgs = {args}; %#ok<CCAT>
-end
-fig.UserData = data;
 end
 
 function slap2_launcher_prepare_start_controls(fig, resumeMode)
@@ -1316,41 +1282,6 @@ if ~launcherOnPath
 end
 
 pathEnsured = true;
-end
-
-
-function handle = slap2_launcher_resolve_function(acquisitionFunction)
-%SLAP2_LAUNCHER_RESOLVE_FUNCTION Resolve a function handle or name.
-
-if isa(acquisitionFunction, 'function_handle')
-    handle = acquisitionFunction;
-elseif ischar(acquisitionFunction) || isstring(acquisitionFunction)
-    funcName = char(acquisitionFunction);
-    slap2_launcher_ensure_launcher_path();
-    if exist(funcName, 'file') ~= 2 && exist(funcName, 'builtin') ~= 5 %#ok<EXIST>
-        rehash('path');
-    end
-    if exist(funcName, 'file') ~= 2 && exist(funcName, 'builtin') ~= 5 %#ok<EXIST>
-        error('SLAP2:MatlabLauncher:MissingAcquisitionFunction', ...
-            'Acquisition function "%s" is not on the MATLAB path.', funcName);
-    end
-    handle = str2func(funcName);
-else
-    error('Acquisition function must be a function handle or name.');
-end
-end
-
-
-function label = slap2_launcher_function_label(acquisitionFunction)
-%SLAP2_LAUNCHER_FUNCTION_LABEL Return a display label for status updates.
-
-if isa(acquisitionFunction, 'function_handle')
-    label = func2str(acquisitionFunction);
-elseif ischar(acquisitionFunction) || isstring(acquisitionFunction)
-    label = char(acquisitionFunction);
-else
-    label = 'acquisition function';
-end
 end
 
 

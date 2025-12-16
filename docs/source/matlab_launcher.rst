@@ -52,12 +52,17 @@ Most workflows only need a handful of parameters:
 
 ``matlab_entrypoint`` / ``matlab_function`` (string)
    MATLAB function to call. ``matlab_function`` is accepted for legacy
-   parameter files; ``matlab_entrypoint`` is preferred.
+   parameter files; ``matlab_entrypoint`` is preferred. Defaults to
+   ``"slap2_launcher"`` when omitted.
 
 ``matlab_entrypoint_args`` (list)
-   Positional arguments forwarded to the MATLAB function. The launcher always
-   appends the session folder automatically so MATLAB can save into the correct
-   location.
+   Positional arguments forwarded to the MATLAB function. When the entry point
+   is ``slap2_launcher``, the Python launcher automatically prepends
+   ``"execute"`` (which tells MATLAB to start the acquisition flow) and then
+   injects the session folder, so most SLAP2 workflows can omit this field.
+   The ``"execute"`` branch inside ``slap2_launcher`` always runs the bundled
+   ``slap2`` acquisition function; there is no configuration knob for swapping
+   to a different MATLAB function.
 
 ``script_parameters`` (object)
    Arbitrary name/value pairs appended after ``matlab_entrypoint_args``. Use

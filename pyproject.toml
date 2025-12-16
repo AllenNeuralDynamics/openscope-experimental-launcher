@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
+requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -25,7 +25,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Medical Science Apps."
 ]
 readme = "README.md"
-dynamic = ["version"]
+version = "0.2.1.dev1"
 
 dependencies = [
     'pandas',
@@ -60,8 +60,6 @@ matlab = [
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.setuptools_scm]
-write_to = "src/openscope_experimental_launcher/_version.py"
 
 [tool.black]
 line-length = 79

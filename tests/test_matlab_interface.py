@@ -58,3 +58,13 @@ def test_wait_for_engine_recovery_honors_termination(monkeypatch):
 
     assert engine is None
     assert process._stderr_queue.qsize() == 1
+
+
+def test_default_entrypoint_args_inject_execute_for_slap2():
+    args = matlab_interface._build_entrypoint_args({}, None, "slap2_launcher")
+    assert args == ["execute"]
+
+
+def test_default_entrypoint_args_skip_for_custom_entrypoint():
+    args = matlab_interface._build_entrypoint_args({}, None, "custom_launcher")
+    assert args == []

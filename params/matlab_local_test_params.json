@@ -5,10 +5,6 @@
     "output_root_folder": "C:\\OpenScopeLocalSessions",
     "matlab_engine_name": "slap2_launcher",
     "matlab_entrypoint": "slap2_launcher",
-    "matlab_entrypoint_args": [
-        "execute",
-        "sample_matlab_entrypoint"
-    ],
     "script_parameters": {
         "rig_description_path": "C:\\RigConfig\\currentRigDescription.json"
     },

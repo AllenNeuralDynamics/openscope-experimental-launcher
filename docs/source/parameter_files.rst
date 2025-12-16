@@ -59,12 +59,8 @@ parameter file looks like:
        "subject_id": "test_mouse_local",
        "user_id": "local_operator",
        "output_root_folder": "C:/OpenScopeLocalSessions",
-       "matlab_engine_name": "slap2_launcher",
-       "matlab_entrypoint": "slap2_launcher",
-       "matlab_entrypoint_args": [
-          "execute",
-          "sample_matlab_entrypoint"
-       ],
+      "matlab_engine_name": "slap2_launcher",
+      "matlab_entrypoint": "slap2_launcher",
        "script_parameters": {
           "rig_description_path": "C:/RigConfig/currentRigDescription.json"
        }
@@ -95,10 +91,14 @@ Script Parameters
 
 Arbitrary key-value pairs passed to the underlying process. Booleans preserved; launcher performs placeholder expansion before invocation.
 
-For MATLAB workflows these values become name/value arguments appended to
+For MATLAB workflows these values become name/value arguments appended after
+the session folder. The launcher automatically sends ``slap2_launcher('execute',
+<session_folder>, ...)`` so you usually do not need to provide
 ``matlab_entrypoint_args``. Supply rig-dependent information (for example,
 ``{"rig_description_path": "{rig_param:rig_description_path}"}``) so the
 SLAP2 UI can pre-select the correct rig without additional prompts.
+Inside MATLAB the ``execute`` helper always calls the built-in ``slap2``
+function, so no additional acquisition-function parameter is required.
 
 Session Output
 --------------

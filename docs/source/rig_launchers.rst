@@ -52,8 +52,10 @@ flows:
 * In MATLAB, call ``slap2_launcher('slap2_launcher')`` (or your preferred
     ``matlab_engine_name``) to share the engine and display the OpenScope UI.
 * Python connects using the parameters described in
-    :doc:`matlab_launcher`, forwards ``matlab_entrypoint_args`` and injects the
-    session folder when configured.
+    :doc:`matlab_launcher`, invokes the configured entry point (defaulting to
+    ``slap2_launcher``) by issuing ``slap2_launcher('execute', ...)`` which in
+    turn always calls the shipped ``slap2`` acquisition function. The Python
+    side also injects the session folder when configured.
 * If the engine disconnects mid-run, the launcher attempts to reconnect and
     resumes only after the operator confirms via the MATLAB UI.
 
