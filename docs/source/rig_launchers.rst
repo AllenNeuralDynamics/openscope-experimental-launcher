@@ -63,6 +63,12 @@ flows:
     manual runs that still log metadata and copy rig files into the session
     folder.
 
+Regardless of where the previous attempt stopped, every resume requires the
+operator to press **Start/Resume SLAP2 acquisition** again before signaling
+completion. This forces SLAP2 to relaunch, reinitialize microscope hardware,
+and only then allows the **End SLAP2 acquisition** confirmation that releases
+Python to continue.
+
 For quick smoke testing, ``params/matlab_local_test_params.json`` exercises
 the workflow with ``sample_matlab_entrypoint.m`` which writes a heartbeat file
 to the session directory.

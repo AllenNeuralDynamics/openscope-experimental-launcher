@@ -130,10 +130,33 @@ session folder. The same file demonstrates ``script_parameters`` to forward
 
       python run_launcher.py --param_file params/matlab_local_test_params.json
 
-The MATLAB UI exposes **Resume Acquisition** and **Signal Acquisition
-Complete** buttons. Resume mode is triggered automatically when the Python
-launcher reconnects to a shared engine after a failure and ensures operators
-explicitly confirm that MATLAB should continue.
+The MATLAB UI exposes **Resume SLAP2 acquisition** (same control as the start
+button) and **End SLAP2 acquisition** buttons. Resume mode is triggered
+automatically when the Python launcher reconnects to a shared engine after a
+failure and ensures operators explicitly confirm that MATLAB should continue.
+
+Crash Recovery Flow
+^^^^^^^^^^^^^^^^^^^
+
+If the MATLAB UI closes or the engine drops mid-run, Python logs that it is
+waiting for the operator to resume and repeatedly attempts to reconnect. To
+resume safely:
+
+1. Relaunch MATLAB if needed and run ``slap2_launcher('slap2_launcher')`` so
+   the shared UI window opens again (or re-share the engine name configured in
+   your params file).
+2. Confirm the rig description and session folder selections. The primary
+   button now reads **Resume SLAP2 acquisition**, indicating SLAP2 will be
+   relaunched.
+3. Press **Resume SLAP2 acquisition** to re-run ``slap2``. This step is
+   required even if the prior run had already reached the completion prompt,
+   because the microscope hardware must be restarted.
+4. After the re-run finishes, press **End SLAP2 acquisition** so Python can
+   leave the ``uiwait`` loop and finish post-acquisition modules.
+
+Python keeps polling for the shared engine throughout this process and only
+proceeds once the operator presses End. This guarantees that every resume
+performs a full SLAP2 restart before metadata is finalized.
 
 Troubleshooting
 ---------------
