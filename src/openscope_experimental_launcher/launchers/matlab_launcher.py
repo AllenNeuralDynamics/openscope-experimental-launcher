@@ -47,9 +47,6 @@ class MatlabLauncher(BaseLauncher):
 
         result = super().stop()
         try:
-            keep_alive = True
-            if self._matlab_request is not None:
-                keep_alive = self._matlab_request.keep_engine_alive
             process_engine = None
             if getattr(self, "process", None) is not None:
                 resume_attempts = getattr(self.process, "resume_attempts", 0)
@@ -63,8 +60,7 @@ class MatlabLauncher(BaseLauncher):
                 self._matlab_engine = process_engine
             matlab_interface.cleanup_engine(
                 self._matlab_engine,
-                getattr(self, "process", None),
-                keep_engine_alive=keep_alive,
+                getattr(self, "process", None)
             )
         finally:
             self._matlab_engine = None

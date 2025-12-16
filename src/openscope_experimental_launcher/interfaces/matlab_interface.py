@@ -82,6 +82,7 @@ class MatlabLaunchRequest:
     cancel_timeout_sec: float = 15.0
     enable_resume: bool = False
     resume_keyword: str = "resume"
+    resume_stage_keyword: str = "resume_stage"
 
     def build_call_args(self, is_resume_attempt: bool) -> List[Any]:
         """Create the MATLAB argument list for an acquisition attempt."""
@@ -383,6 +384,7 @@ class MatlabEngineProcess:
         self._attempt = 0
         self._engine: Optional[Any] = None
         self._future: Optional[Any] = None
+        self._resume_stage_hint: str = "start"
 
         self._start_call(engine)
 
@@ -406,6 +408,8 @@ class MatlabEngineProcess:
         self._attempt += 1
         resume_flag = self._attempt > 1
         call_args = self._request.build_call_args(resume_flag)
+        if resume_flag:
+            call_args.extend([self._request.resume_stage_keyword, self._resume_stage_hint])
 
         phase = "Resuming" if resume_flag else "Starting"
         status_message = (
@@ -442,6 +446,9 @@ class MatlabEngineProcess:
         logging.info(status_message)
         self._stdout_queue.put(status_message)
         self._log_helper_metadata(helper_info)
+
+        # Reset hint after dispatch; failures will update it again.
+        self._resume_stage_hint = "start"
 
     def _initialise_helper(self, engine: Any, status_message: str) -> Optional[Any]:
         helper_info: Optional[Any] = None
@@ -609,6 +616,10 @@ class MatlabEngineProcess:
                 self.returncode = -1
                 break
             except matlab_execution_error as exc:  # pragma: no cover - MATLAB specific
+                if self._request.enable_resume and self._is_resume_eligible_matlab_error(exc):
+                    self._resume_stage_hint = self._determine_resume_stage(exc)
+                    if self._attempt_resume(exc):
+                        continue
                 self.returncode = 1
                 self._stderr_queue.put(str(exc))
                 break
@@ -631,15 +642,38 @@ class MatlabEngineProcess:
                         )
                         resumable = any(token in message for token in resume_tokens)
 
-                if resumable and self._attempt_resume(exc):
-                    continue
-
+                if resumable:
+                    self._resume_stage_hint = self._determine_resume_stage(exc)
+                    if self._attempt_resume(exc):
+                        continue
                 self.returncode = 1
                 self._stderr_queue.put(str(exc))
                 break
 
         self._finalize_streams()
         self._done.set()
+
+    def _determine_resume_stage(self, exc: Exception) -> str:
+        """Infer whether the next resume attempt should wait for completion."""
+
+        if exc is None:
+            return "start"
+
+        message = str(exc).lower()
+        if not message:
+            return "start"
+
+        completion_tokens = (
+            "slap2_launcher_completed",
+            "slap2_launcher_wait_for_flag(fig, 'slap2_launcher_completed",
+            '"slap2_launcher_completed"',
+            "completionnotconfirmed",
+        )
+
+        if any(token in message for token in completion_tokens):
+            return "completion"
+
+        return "start"
 
     def poll(self) -> Optional[int]:
         return self.returncode if self._done.is_set() else None
@@ -720,17 +754,35 @@ class MatlabEngineProcess:
         self._stdout_queue.put(None)
         self._stderr_queue.put(None)
 
+    def _release_current_engine(self) -> None:
+        """Disconnect the cached engine handle so a new connection can be made."""
+
+        engine = self._engine
+        self._engine = None
+        if engine is None:
+            return
+
+        quit_fn = getattr(engine, "quit", None)
+        if callable(quit_fn):
+            try:
+                quit_fn()
+            except Exception:
+                pass
+
+
     def _attempt_resume(self, exc: Exception) -> bool:
         logging.error(
-            "MATLAB engine failure detected on attempt %d: %s",
+            "MATLAB launcher failure detected on attempt %d: %s",
             self._attempt,
             exc,
         )
-        self._stderr_queue.put(f"MATLAB engine failure detected: {exc}")
+        self._stderr_queue.put(f"MATLAB launcher failure detected: {exc}")
 
         if self._terminated:
             logging.info("Resume skipped because termination was requested.")
             return False
+
+        self._release_current_engine()
 
         logging.info(
             "Waiting for MATLAB engine '%s' to become available for resume attempt %d",
@@ -738,49 +790,105 @@ class MatlabEngineProcess:
             self._attempt + 1,
         )
 
-        new_engine = self._wait_for_engine_recovery()
+        ui_retry_delay = max(1.0, float(self._request.connect_poll_sec or 1.0))
 
-        if new_engine is None:
+        while not self._terminated:
+            new_engine = self._wait_for_engine_recovery()
+
+            if new_engine is None:
+                if self._terminated:
+                    logging.info("Resume aborted after reconnection attempts due to termination request.")
+                else:
+                    logging.error(
+                        "Could not reconnect to MATLAB engine '%s'; giving up on resume",
+                        self._request.engine_name,
+                    )
+                return False
+
             if self._terminated:
-                logging.info("Resume aborted after reconnection attempts due to termination request.")
-            else:
-                logging.error(
-                    "Could not reconnect to MATLAB engine '%s'; giving up on resume",
+                logging.info("Resume aborted after reconnection due to termination request.")
+                try:
+                    quit_fn = getattr(new_engine, "quit", None)
+                    if callable(quit_fn):
+                        quit_fn()
+                except Exception:
+                    pass
+                return False
+
+            try:
+                self._start_call(new_engine)
+                logging.info(
+                    "Resume attempt %d dispatched on MATLAB engine '%s'",
+                    self._attempt,
                     self._request.engine_name,
                 )
+                self._stderr_queue.put(
+                    f"MATLAB resume attempt {self._attempt} dispatched after reconnection"
+                )
+                return True
+            except Exception as start_exc:
+                ui_unavailable = self._is_ui_unavailable_error(start_exc)
+                logging.error("Failed to restart MATLAB entry point: %s", start_exc)
+                self._stderr_queue.put(f"Failed to restart MATLAB entry point: {start_exc}")
+
+                if ui_unavailable and not self._terminated:
+                    logging.info(
+                        "MATLAB launcher UI not available; waiting for relaunch before retrying resume attempt %d",
+                        self._attempt + 1,
+                    )
+                    self._stderr_queue.put(
+                        "MATLAB launcher UI not available; waiting for relaunch before retrying resume."
+                    )
+                    new_engine = None
+                    time.sleep(ui_retry_delay)
+                    continue
+
+                try:
+                    quit_fn = getattr(new_engine, "quit", None)
+                    if callable(quit_fn):
+                        quit_fn()
+                except Exception:
+                    pass
+                return False
+
+        return False
+
+    def _is_resume_eligible_matlab_error(self, exc: Exception) -> bool:
+        """Determine whether a MATLAB-side error should trigger resume logic."""
+
+        if exc is None:
             return False
 
-        if self._terminated:
-            logging.info("Resume aborted after reconnection due to termination request.")
-            try:
-                disconnect = getattr(new_engine, "disconnect", None)
-                if callable(disconnect):
-                    disconnect()
-            except Exception:
-                pass
+        message = str(exc).lower()
+        if not message:
             return False
 
-        try:
-            self._start_call(new_engine)
-            logging.info(
-                "Resume attempt %d dispatched on MATLAB engine '%s'",
-                self._attempt,
-                self._request.engine_name,
-            )
-            self._stderr_queue.put(
-                f"MATLAB resume attempt {self._attempt} dispatched after reconnection"
-            )
-            return True
-        except Exception as start_exc:
-            logging.error("Failed to restart MATLAB entry point: %s", start_exc)
-            try:
-                disconnect = getattr(new_engine, "disconnect", None)
-                if callable(disconnect):
-                    disconnect()
-            except Exception:
-                pass
-            self._stderr_queue.put(f"Failed to restart MATLAB entry point: {start_exc}")
+        resume_tokens = (
+            "slap2:matlablauncher:uiunavailable",
+            "launcher ui was closed",
+            "slap2_launcher_raise_ui_unavailable",
+            "completionnotconfirmed",
+        )
+
+        return any(token in message for token in resume_tokens)
+
+    def _is_ui_unavailable_error(self, exc: Exception) -> bool:
+        """Detect helper registration errors when the UI is not running."""
+
+        if exc is None:
             return False
+
+        message = str(exc).lower()
+        if not message:
+            return False
+
+        ui_tokens = (
+            "matlab launcher ui is not available",
+            "slap2 matlab launcher ui is not running",
+            "helper_register",
+        )
+
+        return any(token in message for token in ui_tokens)
 
 
 def start_matlab_function(
@@ -861,9 +969,8 @@ def _dispatch_matlab_feval(
 
 def cleanup_engine(
     engine: Optional[Any],
-    process: Optional[MatlabEngineProcess],
-    keep_engine_alive: bool = True,
-) -> None:
+    process: Optional[MatlabEngineProcess]
+    ) -> None:
     """Release engine resources after the launcher completes."""
 
     if process is not None:
@@ -872,25 +979,16 @@ def cleanup_engine(
     if engine is None:
         return
 
-    try:  # pragma: no cover - relies on MATLAB runtime
-        if keep_engine_alive:
-            release = _resolve_engine_method(engine, ("close", "disconnect"))
-            if release is not None:
-                release()
-        else:
-            quit_fn = getattr(engine, "quit", None)
-            if callable(quit_fn):
-                quit_fn()
-            else:
-                release = _resolve_engine_method(engine, ("close", "disconnect"))
-                if release is not None:
-                    release()
+    try:  
+        quit_fn = getattr(engine, "quit", None)
+        if callable(quit_fn):
+            quit_fn()
     except Exception as exc:
         logging.debug("Error while releasing MATLAB engine: %s", exc)
 
 
 def _resolve_engine_method(engine: Any, candidates: List[str]) -> Optional[Callable[[], Any]]:
-    """Return the first callable method found on the engine from ``candidates``."""
+    """Return the first callable engine method listed in candidates."""
 
     for name in candidates:
         method = getattr(engine, name, None)

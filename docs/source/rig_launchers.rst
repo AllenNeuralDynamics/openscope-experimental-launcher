@@ -57,7 +57,11 @@ flows:
     turn always calls the shipped ``slap2`` acquisition function. The Python
     side also injects the session folder when configured.
 * If the engine disconnects mid-run, the launcher attempts to reconnect and
-    resumes only after the operator confirms via the MATLAB UI.
+    resumes only after the operator confirms via the MATLAB UI. When no Python
+    launcher is attached, selecting a rig description and session folder inside
+    the UI automatically enables **Start SLAP2 acquisition**, allowing fully
+    manual runs that still log metadata and copy rig files into the session
+    folder.
 
 For quick smoke testing, ``params/matlab_local_test_params.json`` exercises
 the workflow with ``sample_matlab_entrypoint.m`` which writes a heartbeat file

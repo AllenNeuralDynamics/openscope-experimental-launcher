@@ -115,6 +115,7 @@ slap2_launcher_update_metadata(fig, ...
     'pythonstart', []);
 slap2_launcher_update_status(fig, sprintf('Waiting for Python launcher (engine: %s)...', engineName));
 assignin('base', 'SLAP2_LAUNCHER_COMPLETED', false);
+slap2_launcher_set_pending_stage('start');
 if nargout > 0
     varargout = slap2_launcher_prepare_outputs(nargout);
 end
@@ -129,8 +130,10 @@ function slap2_launcher_execute(varargin)
 assignin('base', 'SLAP2_LAUNCHER_VERSION', slap2_launcher_version());
 
 fig = slap2_launcher_get_ui();
+slap2_launcher_set_python_control(fig, true);
 
 [resumeMode, varargin] = slap2_launcher_extract_resume_flag(varargin);
+[resumeStage, varargin] = slap2_launcher_extract_resume_stage(varargin);
 [rigDescriptionPath, varargin] = slap2_launcher_extract_named_arg(varargin, 'rig_description_path');
 
 if ~isempty(rigDescriptionPath)
@@ -159,6 +162,18 @@ restoreDir = onCleanup(@() cd(originalDir)); %#ok<NASGU>
 
 slap2_launcher_prepare_start_controls(fig, resumeMode);
 
+if resumeMode
+    if strcmpi(resumeStage, 'completion')
+        resumeStatus = [
+            'MATLAB reconnected after a crash. Press "Resume SLAP2 acquisition" ', ...
+            'to relaunch slap2, then press "End SLAP2 acquisition" when complete.'
+        ];
+    else
+        resumeStatus = 'MATLAB reconnected. Press "Resume SLAP2 acquisition" to continue.';
+    end
+    slap2_launcher_update_status(fig, resumeStatus);
+end
+
 slap2_launcher_wait_for_flag(fig, 'SLAP2_LAUNCHER_START_CONFIRMED', ...
     'SLAP2:MatlabLauncher:StartNotConfirmed', ...
     'Start SLAP2 acquisition was not confirmed before continuing.');
@@ -174,6 +189,7 @@ if ~isempty(sessionFolder)
     end
 end
 
+slap2_launcher_set_python_control(fig, false);
 slap2_launcher_update_status(fig, 'Running slap2 ...');
 
 try
@@ -191,9 +207,9 @@ slap2_launcher_wait_for_flag(fig, 'SLAP2_LAUNCHER_COMPLETED', ...
     'SLAP2:MatlabLauncher:CompletionNotConfirmed', ...
     'End SLAP2 acquisition was not confirmed before continuing.');
 
+slap2_launcher_set_python_control(fig, false);
 slap2_launcher_close_ui(fig);
 end
-
 
 function fig = slap2_launcher_get_ui(existingOnly)
 %SLAP2_LAUNCHER_GET_UI Create or return the shared UI figure.
@@ -292,7 +308,9 @@ if isempty(storedFig) || ~isvalid(storedFig)
         'RigCopyCompleted', false, ...
         'RigCopyTarget', '', ...
         'ResumeMode', false, ...
-        'StartStopState', 'idle', ...
+        'StartStopState', 'start', ...
+        'ControlledByPython', false, ...
+        'ManualCompletionPending', false, ...
         'UpdateTimer', []);
 
     slap2_launcher_start_timer(storedFig);
@@ -303,6 +321,8 @@ if isempty(storedFig) || ~isvalid(storedFig)
     else
         slap2_launcher_refresh_rig_display(storedFig);
     end
+
+    slap2_launcher_prepare_manual_controls(storedFig);
 end
 
 fig = storedFig;
@@ -425,6 +445,7 @@ end
 
 slap2_launcher_handle_rig_copy(fig);
 slap2_launcher_update_start_ready_state(fig);
+slap2_launcher_sync_manual_start_state(fig);
 end
 
 function slap2_launcher_select_rig_description(fig)
@@ -486,6 +507,7 @@ end
 slap2_launcher_refresh_rig_display(fig);
 slap2_launcher_handle_rig_copy(fig);
 slap2_launcher_update_start_ready_state(fig);
+slap2_launcher_sync_manual_start_state(fig);
 end
 
 function slap2_launcher_refresh_rig_display(fig)
@@ -580,7 +602,6 @@ slap2_launcher_update_metadata(fig, 'session', sessionFolder);
 assignin('base', 'SLAP2_SESSION_FOLDER', sessionFolder);
 assignin('base', 'SLAP2_LAUNCHER_COMPLETED', false);
 slap2_launcher_refresh_session_display(fig);
-slap2_launcher_update_status(fig, sprintf('Session folder set to: %s', sessionFolder));
 slap2_launcher_refresh_info(fig);
 slap2_launcher_update_start_ready_state(fig);
 end
@@ -612,6 +633,7 @@ end
 fig.UserData = data;
 assignin('base', 'SLAP2_LAUNCHER_START_CONFIRMED', false);
 assignin('base', 'SLAP2_LAUNCHER_COMPLETED', false);
+slap2_launcher_set_pending_stage('start');
 slap2_launcher_update_start_ready_state(fig, sprintf('Press "%s" to launch the acquisition.', startText));
 end
 
@@ -644,12 +666,96 @@ switch state
             slap2_launcher_update_status(fig, 'Select a rig description before starting SLAP2.');
             return;
         end
-        slap2_launcher_signal_start(fig);
+        if slap2_launcher_is_python_controlled(fig) && strcmpi(state, 'start')
+            slap2_launcher_signal_start(fig);
+        elseif slap2_launcher_is_python_controlled(fig)
+            slap2_launcher_update_status(fig, 'Waiting for Python to request start.');
+        else
+            slap2_launcher_run_manual_acquisition(fig);
+        end
     case 'stop'
         slap2_launcher_signal_complete(fig);
     otherwise
         % Ignore presses while running or after completion.
 end
+end
+
+
+function slap2_launcher_run_manual_acquisition(fig)
+%SLAP2_LAUNCHER_RUN_MANUAL_ACQUISITION Execute SLAP2 directly from MATLAB.
+
+if isempty(fig) || ~isvalid(fig)
+    return;
+end
+
+sessionFolder = slap2_launcher_current_session_folder(fig);
+rigPath = slap2_launcher_current_rig_path(fig);
+
+slap2_launcher_prepare_manual_run_state(fig);
+slap2_launcher_set_manual_completion_pending(fig, false);
+
+if ~isempty(rigPath)
+    slap2_launcher_set_rig_path(fig, rigPath);
+end
+
+if ~isempty(sessionFolder)
+    assignin('base', 'SLAP2_SESSION_FOLDER', sessionFolder);
+end
+
+originalDir = pwd;
+restoreDir = onCleanup(@() cd(originalDir)); %#ok<NASGU>
+
+if ~isempty(sessionFolder)
+    try
+        cd(sessionFolder);
+    catch dirErr
+        warning('SLAP2:MatlabLauncher:ChangeDirFailed', ...
+            'Failed to change directory to session folder "%s": %s', sessionFolder, dirErr.message);
+    end
+end
+
+slap2_launcher_update_status(fig, 'Running slap2 ...');
+
+try
+    slap2();
+catch err
+    slap2_launcher_update_status(fig, ['Error: ' err.message]);
+    slap2_launcher_reset_manual_run_state(fig);
+    rethrow(err);
+end
+
+slap2_launcher_update_status(fig, 'Acquisition complete. Press "End SLAP2 acquisition" when ready to continue.');
+slap2_launcher_prepare_for_completion(fig);
+slap2_launcher_set_manual_completion_pending(fig, true);
+end
+
+
+function slap2_launcher_prepare_manual_controls(fig)
+%SLAP2_LAUNCHER_PREPARE_MANUAL_CONTROLS Configure start button for manual mode.
+
+if isempty(fig) || ~isvalid(fig)
+    return;
+end
+
+if slap2_launcher_is_python_controlled(fig)
+    return;
+end
+
+data = fig.UserData;
+data.StartStopState = 'start';
+if isfield(data, 'StartStopButton') && isvalid(data.StartStopButton)
+    data.StartStopButton.Text = 'Start SLAP2 acquisition';
+    data.StartStopButton.Enable = 'off';
+end
+fig.UserData = data;
+
+assignin('base', 'SLAP2_LAUNCHER_START_CONFIRMED', false);
+assignin('base', 'SLAP2_LAUNCHER_COMPLETED', false);
+
+slap2_launcher_update_start_ready_state(fig, ...
+    'Select a session folder and rig description before starting SLAP2.');
+slap2_launcher_sync_manual_start_state(fig);
+slap2_launcher_restore_pending_stage(fig);
 end
 
 function slap2_launcher_signal_start(fig)
@@ -693,26 +799,164 @@ end
 fig.UserData = data;
 end
 
+
+function slap2_launcher_set_python_control(fig, tf)
+%SLAP2_LAUNCHER_SET_PYTHON_CONTROL Track whether Python owns the UI state.
+
+if isempty(fig) || ~isvalid(fig)
+    return;
+end
+
+data = fig.UserData;
+data.ControlledByPython = logical(tf);
+fig.UserData = data;
+end
+
+
+function slap2_launcher_prepare_manual_run_state(fig)
+%SLAP2_LAUNCHER_PREPARE_MANUAL_RUN_STATE Update UI state for manual execution.
+
+if isempty(fig) || ~isvalid(fig)
+    return;
+end
+
+data = fig.UserData;
+data.StartStopState = 'running';
+if isfield(data, 'StartStopButton') && isvalid(data.StartStopButton)
+    data.StartStopButton.Text = 'SLAP2 acquisition running...';
+    data.StartStopButton.Enable = 'off';
+end
+fig.UserData = data;
+drawnow limitrate;
+end
+
+
+function slap2_launcher_reset_manual_run_state(fig)
+%SLAP2_LAUNCHER_RESET_MANUAL_RUN_STATE Restore start-ready state in manual mode.
+
+if isempty(fig) || ~isvalid(fig)
+    return;
+end
+
+data = fig.UserData;
+data.StartStopState = 'start';
+if isfield(data, 'StartStopButton') && isvalid(data.StartStopButton)
+    data.StartStopButton.Text = 'Start SLAP2 acquisition';
+    data.StartStopButton.Enable = 'off';
+end
+fig.UserData = data;
+
+slap2_launcher_update_start_ready_state(fig);
+end
+
+
+function slap2_launcher_set_manual_completion_pending(fig, tf)
+%SLAP2_LAUNCHER_SET_MANUAL_COMPLETION_PENDING Track manual completion prompts.
+
+if isempty(fig) || ~isvalid(fig)
+    return;
+end
+
+data = fig.UserData;
+data.ManualCompletionPending = logical(tf);
+fig.UserData = data;
+end
+
+
+function tf = slap2_launcher_manual_completion_pending(fig)
+%SLAP2_LAUNCHER_MANUAL_COMPLETION_PENDING Return manual completion flag.
+
+tf = false;
+if isempty(fig) || ~isvalid(fig)
+    return;
+end
+
+data = fig.UserData;
+if isfield(data, 'ManualCompletionPending') && ~isempty(data.ManualCompletionPending)
+    tf = logical(data.ManualCompletionPending);
+end
+end
+
+
+function slap2_launcher_sync_manual_start_state(fig)
+%SLAP2_LAUNCHER_SYNC_MANUAL_START_STATE Ensure start button usable headless.
+
+if isempty(fig) || ~isvalid(fig)
+    return;
+end
+
+if slap2_launcher_is_python_controlled(fig)
+    return;
+end
+
+data = fig.UserData;
+if ~isfield(data, 'StartStopState') || strcmpi(data.StartStopState, 'idle')
+    data.StartStopState = 'start';
+    fig.UserData = data;
+end
+
+slap2_launcher_update_start_ready_state(fig);
+end
+
+
+function slap2_launcher_restore_pending_stage(fig)
+%SLAP2_LAUNCHER_RESTORE_PENDING_STAGE Reapply pending completion prompts.
+
+if isempty(fig) || ~isvalid(fig)
+    return;
+end
+
+stage = slap2_launcher_get_pending_stage();
+if strcmpi(stage, 'completion')
+    slap2_launcher_prepare_for_completion(fig);
+    if ~slap2_launcher_is_python_controlled(fig)
+        slap2_launcher_update_status(fig, ...
+            'Python launcher needs confirmation. Press "End SLAP2 acquisition" to resume.');
+    end
+end
+end
+
+
 function slap2_launcher_wait_for_flag(fig, flagName, errorId, errorMessage)
 %SLAP2_LAUNCHER_WAIT_FOR_FLAG Block until the specified launcher flag is true.
 
 while true
-    if isempty(fig) || ~isvalid(fig)
-        error(errorId, errorMessage);
-    end
+    slap2_launcher_assert_ui_available(fig, flagName);
 
     uiwait(fig);
 
     if slap2_launcher_get_flag(flagName)
-        break;
+        return;
     end
 
     if isempty(fig) || ~isvalid(fig)
-        error(errorId, errorMessage);
+        slap2_launcher_raise_ui_unavailable(flagName);
     end
 
     error(errorId, errorMessage);
 end
+end
+
+
+function slap2_launcher_assert_ui_available(fig, flagName)
+%SLAP2_LAUNCHER_ASSERT_UI_AVAILABLE Throw if the launcher UI was destroyed.
+
+if isempty(fig) || ~isvalid(fig)
+    slap2_launcher_raise_ui_unavailable(flagName);
+end
+end
+
+
+function slap2_launcher_raise_ui_unavailable(flagName)
+%SLAP2_LAUNCHER_RAISE_UI_UNAVAILABLE Signal that the UI closed unexpectedly.
+
+if nargin < 1 || isempty(flagName)
+    flagName = 'launcher state';
+end
+
+error('SLAP2:MatlabLauncher:UIUnavailable', ...
+    ['The SLAP2 launcher UI was closed while waiting for "' char(flagName) '" confirmation. ' ...
+     'Restart MATLAB, run slap2_launcher again, and allow Python to resume.']);
 end
 
 function flagValue = slap2_launcher_get_flag(flagName)
@@ -737,6 +981,20 @@ end
 data = fig.UserData;
 if isfield(data, 'SessionFolder') && ~isempty(data.SessionFolder)
     folder = char(data.SessionFolder);
+end
+end
+
+function path = slap2_launcher_current_rig_path(fig)
+%SLAP2_LAUNCHER_CURRENT_RIG_PATH Return the selected rig description path.
+
+path = '';
+if isempty(fig) || ~isvalid(fig)
+    return;
+end
+
+data = fig.UserData;
+if isfield(data, 'RigPath') && ~isempty(data.RigPath)
+    path = char(data.RigPath);
 end
 end
 
@@ -781,6 +1039,21 @@ function ready = slap2_launcher_ready_to_start(fig)
 %SLAP2_LAUNCHER_READY_TO_START Confirm both rig and session are configured.
 
 ready = slap2_launcher_has_session_folder(fig) && slap2_launcher_has_rig_selection(fig, true);
+end
+
+
+function tf = slap2_launcher_is_python_controlled(fig)
+%SLAP2_LAUNCHER_IS_PYTHON_CONTROLLED Determine if Python owns the UI state.
+
+tf = false;
+if isempty(fig) || ~isvalid(fig)
+    return;
+end
+
+data = fig.UserData;
+if isfield(data, 'ControlledByPython') && ~isempty(data.ControlledByPython)
+    tf = logical(data.ControlledByPython);
+end
 end
 
 
@@ -1225,6 +1498,7 @@ if isempty(fig) || ~isvalid(fig)
 end
 
 assignin('base', 'SLAP2_LAUNCHER_COMPLETED', true);
+slap2_launcher_set_pending_stage('none');
 slap2_launcher_update_status(fig, 'Completion signaled. Python will continue.');
 
 data = fig.UserData;
@@ -1237,6 +1511,11 @@ fig.UserData = data;
 
 if strcmpi(fig.WaitStatus, 'waiting')
     uiresume(fig);
+end
+
+if ~slap2_launcher_is_python_controlled(fig) && slap2_launcher_manual_completion_pending(fig)
+    slap2_launcher_set_manual_completion_pending(fig, false);
+    slap2_launcher_close_ui(fig);
 end
 
 end
@@ -1298,6 +1577,33 @@ while idx <= numel(cleanedArgs) - 1
         keyLower = lower(char(key));
         if strcmp(keyLower, 'resume')
             resumeMode = slap2_launcher_to_logical(cleanedArgs{idx + 1});
+            cleanedArgs(idx:idx + 1) = [];
+            break;
+        end
+    end
+    idx = idx + 1;
+end
+end
+
+
+function [stage, cleanedArgs] = slap2_launcher_extract_resume_stage(args)
+%SLAP2_LAUNCHER_EXTRACT_RESUME_STAGE Parse requested resume stage keyword.
+
+stage = 'start';
+cleanedArgs = args;
+
+idx = 1;
+while idx <= numel(cleanedArgs) - 1
+    key = cleanedArgs{idx};
+    if ischar(key) || isstring(key)
+        keyLower = lower(char(key));
+        if strcmp(keyLower, 'resume_stage')
+            stageCandidate = lower(strtrim(slap2_launcher_to_text(cleanedArgs{idx + 1}))); %#ok<STREMP>
+            if any(strcmp(stageCandidate, {'completion', 'start'}))
+                stage = stageCandidate;
+            else
+                stage = 'start';
+            end
             cleanedArgs(idx:idx + 1) = [];
             break;
         end
@@ -1417,4 +1723,36 @@ function version = slap2_launcher_helper_version()
 %SLAP2_LAUNCHER_HELPER_VERSION Return the consolidated helper version string.
 
 version = slap2_launcher_version();
+end
+
+
+
+function slap2_launcher_set_pending_stage(stage)
+%SLAP2_LAUNCHER_SET_PENDING_STAGE Persist pending launcher state in base workspace.
+
+pendingValue = lower(strtrim(slap2_launcher_to_text(stage)));
+if isempty(pendingValue)
+    pendingValue = 'none';
+end
+
+assignin('base', 'SLAP2_LAUNCHER_PENDING_STAGE', pendingValue);
+end
+
+
+function stage = slap2_launcher_get_pending_stage()
+%SLAP2_LAUNCHER_GET_PENDING_STAGE Retrieve pending launcher state from base workspace.
+
+stage = 'none';
+try
+    existsFlag = evalin('base', 'exist(''SLAP2_LAUNCHER_PENDING_STAGE'', ''var'')');
+    if existsFlag
+        stageValue = evalin('base', 'SLAP2_LAUNCHER_PENDING_STAGE');
+        textValue = lower(strtrim(slap2_launcher_to_text(stageValue)));
+        if ~isempty(textValue)
+            stage = textValue;
+        end
+    end
+catch
+    stage = 'none';
+end
 end

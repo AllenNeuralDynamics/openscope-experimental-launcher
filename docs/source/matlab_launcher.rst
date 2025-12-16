@@ -98,6 +98,16 @@ Most workflows only need a handful of parameters:
    alive, logs the failure, and keeps trying to reconnect so you can relaunch
    MATLAB and re-share the engine without restarting Python.
 
+Manual / MATLAB-only Workflows
+------------------------------
+
+When no Python launcher is attached, you can still run SLAP2 directly from the
+shared-engine UI: select a session folder and rig description using the buttons
+on the window, then press **Start SLAP2 acquisition**. The UI enables the
+button automatically once both selections are valid and runs the bundled
+``slap2`` function end-to-end. This is useful for exploratory sessions where the
+standardized metadata pipeline is unnecessary.
+
 Local Smoke Test
 ----------------
 
