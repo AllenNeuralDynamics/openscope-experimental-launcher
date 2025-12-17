@@ -136,8 +136,15 @@ slap2_launcher_set_python_control(fig, true);
 [resumeStage, varargin] = slap2_launcher_extract_resume_stage(varargin);
 [rigDescriptionPath, varargin] = slap2_launcher_extract_named_arg(varargin, 'rig_description_path');
 
+slap2_launcher_log( ...
+    'Python requested SLAP2 execution (resume=%s, stage=%s).', ...
+    slap2_launcher_bool_text(resumeMode), ...
+    slap2_launcher_to_text(resumeStage) ...
+);
+
 if ~isempty(rigDescriptionPath)
     slap2_launcher_set_rig_path(fig, rigDescriptionPath);
+    slap2_launcher_log('Rig description path injected: %s', slap2_launcher_to_text(rigDescriptionPath));
 end
 
 sessionFolder = '';
@@ -155,12 +162,19 @@ end
 slap2_launcher_update_metadata(fig, 'session', sessionFolder);
 if ~isempty(sessionFolder)
     assignin('base', 'SLAP2_SESSION_FOLDER', sessionFolder);
+    slap2_launcher_log('Session folder argument supplied: %s', sessionFolder);
+else
+    slap2_launcher_log('No session folder argument supplied; waiting for UI selection.');
 end
 
 originalDir = pwd;
 restoreDir = onCleanup(@() cd(originalDir)); %#ok<NASGU>
 
 slap2_launcher_prepare_start_controls(fig, resumeMode);
+slap2_launcher_log( ...
+    'Start controls prepared (resume=%s).', ...
+    slap2_launcher_bool_text(resumeMode) ...
+);
 
 if resumeMode
     if strcmpi(resumeStage, 'completion')
@@ -172,40 +186,52 @@ if resumeMode
         resumeStatus = 'MATLAB reconnected. Press "Resume SLAP2 acquisition" to continue.';
     end
     slap2_launcher_update_status(fig, resumeStatus);
+    slap2_launcher_log('Resume instructions displayed: %s', resumeStatus);
 end
 
+slap2_launcher_log('Waiting for SLAP2_LAUNCHER_START_CONFIRMED flag from UI.');
 slap2_launcher_wait_for_flag(fig, 'SLAP2_LAUNCHER_START_CONFIRMED', ...
     'SLAP2:MatlabLauncher:StartNotConfirmed', ...
     'Start SLAP2 acquisition was not confirmed before continuing.');
+slap2_launcher_log('Start confirmed; preparing to run slap2.');
 
 sessionFolder = slap2_launcher_current_session_folder(fig);
 if ~isempty(sessionFolder)
     assignin('base', 'SLAP2_SESSION_FOLDER', sessionFolder);
     try
         cd(sessionFolder);
+        slap2_launcher_log('Changed working directory to session folder: %s', sessionFolder);
     catch dirErr
         warning('SLAP2:MatlabLauncher:ChangeDirFailed', ...
             'Failed to change directory to session folder "%s": %s', sessionFolder, dirErr.message);
+        slap2_launcher_log('Failed to change directory to "%s": %s', sessionFolder, dirErr.message);
     end
+else
+    slap2_launcher_log('Session folder still unset after start confirmation.');
 end
 
 slap2_launcher_set_python_control(fig, false);
 slap2_launcher_update_status(fig, 'Running slap2 ...');
+slap2_launcher_log('Invoking slap2 with %d argument(s).', numel(varargin));
 
 try
     slap2(varargin{:});
+    slap2_launcher_log('slap2 completed without raising an error.');
 catch err
     slap2_launcher_update_status(fig, ['Error: ' err.message]);
+    slap2_launcher_log('slap2 raised an error: %s', err.message);
     slap2_launcher_reset_start_controls(fig, resumeMode);
     rethrow(err);
 end
 
 slap2_launcher_update_status(fig, 'Acquisition complete. Press "End SLAP2 acquisition" when ready to continue.');
 slap2_launcher_prepare_for_completion(fig);
+slap2_launcher_log('Waiting for SLAP2_LAUNCHER_COMPLETED confirmation from operator.');
 
 slap2_launcher_wait_for_flag(fig, 'SLAP2_LAUNCHER_COMPLETED', ...
     'SLAP2:MatlabLauncher:CompletionNotConfirmed', ...
     'End SLAP2 acquisition was not confirmed before continuing.');
+slap2_launcher_log('Completion confirmed. Closing SLAP2 launcher UI.');
 
 slap2_launcher_set_python_control(fig, false);
 slap2_launcher_close_ui(fig);
@@ -767,6 +793,7 @@ end
 
 assignin('base', 'SLAP2_LAUNCHER_START_CONFIRMED', true);
 assignin('base', 'SLAP2_LAUNCHER_COMPLETED', false);
+slap2_launcher_log('Operator pressed Start/Resume in the MATLAB UI.');
 
 data = fig.UserData;
 data.StartStopState = 'running';
@@ -797,6 +824,7 @@ if isfield(data, 'StartStopButton') && isvalid(data.StartStopButton)
     data.StartStopButton.Enable = 'on';
 end
 fig.UserData = data;
+slap2_launcher_log('UI ready for completion confirmation. Waiting for End press.');
 end
 
 
@@ -1500,6 +1528,7 @@ end
 assignin('base', 'SLAP2_LAUNCHER_COMPLETED', true);
 slap2_launcher_set_pending_stage('none');
 slap2_launcher_update_status(fig, 'Completion signaled. Python will continue.');
+slap2_launcher_log('Operator pressed End SLAP2 acquisition; notifying Python.');
 
 data = fig.UserData;
 if isfield(data, 'StartStopButton') && isvalid(data.StartStopButton)
@@ -1725,6 +1754,57 @@ function version = slap2_launcher_helper_version()
 version = slap2_launcher_version();
 end
 
+
+
+function text = slap2_launcher_bool_text(value)
+%SLAP2_LAUNCHER_BOOL_TEXT Return "true"/"false" for logging purposes.
+
+tf = false;
+try
+    tf = logical(value);
+catch
+    tf = false;
+end
+
+if tf
+    text = 'true';
+else
+    text = 'false';
+end
+end
+
+
+function slap2_launcher_log(message, varargin)
+%SLAP2_LAUNCHER_LOG Emit timestamped stdout messages captured by Python.
+
+if nargin < 1 || isempty(message)
+    message = '';
+end
+
+try
+    if ~isempty(varargin)
+        message = sprintf(message, varargin{:});
+    end
+catch
+    % Leave original message if formatting fails.
+end
+
+timestamp = '';
+try
+    timestamp = datestr(now, 'HH:MM:SS'); %#ok<DATST>
+catch
+    timestamp = '';
+end
+
+if ~isempty(timestamp)
+    prefix = sprintf('[%s]', timestamp);
+else
+    prefix = '';
+end
+
+line = sprintf('[SLAP2]%s %s', prefix, slap2_launcher_to_text(message));
+fprintf('%s\n', line);
+end
 
 
 function slap2_launcher_set_pending_stage(stage)
