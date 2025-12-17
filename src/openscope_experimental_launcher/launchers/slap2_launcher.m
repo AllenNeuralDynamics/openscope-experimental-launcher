@@ -948,20 +948,53 @@ end
 function slap2_launcher_wait_for_flag(fig, flagName, errorId, errorMessage)
 %SLAP2_LAUNCHER_WAIT_FOR_FLAG Block until the specified launcher flag is true.
 
+if nargin < 3 || isempty(errorId)
+    errorId = 'SLAP2:MatlabLauncher:WaitInterrupted';
+end
+
+if nargin < 4 || isempty(errorMessage)
+    errorMessage = sprintf('Waiting for "%s" was interrupted.', slap2_launcher_to_text(flagName));
+end
+
+heartbeatSeconds = 30;
+heartbeatTimer = tic;
+
 while true
     slap2_launcher_assert_ui_available(fig, flagName);
-
-    uiwait(fig);
 
     if slap2_launcher_get_flag(flagName)
         return;
     end
 
-    if isempty(fig) || ~isvalid(fig)
-        slap2_launcher_raise_ui_unavailable(flagName);
+    if toc(heartbeatTimer) >= heartbeatSeconds
+        slap2_launcher_log('Waiting for %s confirmation ...', slap2_launcher_to_text(flagName));
+        heartbeatTimer = tic;
     end
 
-    error(errorId, errorMessage);
+    if ~slap2_launcher_wait_iteration(fig)
+        if isempty(fig) || ~isvalid(fig)
+            slap2_launcher_raise_ui_unavailable(flagName);
+        end
+        error(errorId, errorMessage);
+    end
+end
+end
+
+function success = slap2_launcher_wait_iteration(fig)
+%SLAP2_LAUNCHER_WAIT_ITERATION Yield control while waiting for UI flags.
+
+success = true;
+
+try
+    drawnow limitrate;
+    pause(0.05);
+catch
+    success = false;
+    return;
+end
+
+if isempty(fig) || ~isvalid(fig)
+    success = false;
 end
 end
 
