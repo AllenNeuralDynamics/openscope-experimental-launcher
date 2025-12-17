@@ -1190,7 +1190,7 @@ if ~exist(rigPath, 'file')
     return;
 end
 
-destPath = fullfile(sessionFolder, 'rigDescription.json');
+destPath = fullfile(sessionFolder, 'slap2_machine.json');
 
 if isfield(data, 'RigCopyCompleted') && data.RigCopyCompleted
     if isfield(data, 'RigCopyTarget') && ~isempty(data.RigCopyTarget) && strcmpi(data.RigCopyTarget, destPath)

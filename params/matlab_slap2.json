@@ -1,0 +1,48 @@
+{
+    "launcher": "matlab",
+    "subject_id": "test_mouse_local",
+    "user_id": "local_operator",
+    "output_root_folder": "C:\\OpenScopeLocalSessions",
+    "matlab_engine_name": "slap2_launcher",
+    "matlab_entrypoint": "slap2_launcher",
+    "script_parameters": {
+        "rig_description_path": "C:\\Users\\ScanImage\\Documents\\slap2\\configuration.json"
+    },
+    "pre_acquisition_pipeline": [
+    {
+    "module_type": "launcher_module",
+    "module_path": "metadata_subject_fetch",
+    "module_parameters": {
+        "metadata_subject_id": "{subject_id}"
+            }
+    },    
+    {
+      "module_type": "launcher_module",
+      "module_path": "experiment_notes_editor",
+      "module_parameters": {
+        "experiment_notes_launch_editor": true,
+        "experiment_notes_filename": "notes/experiment_notes.txt"
+      }
+    }
+    ],
+    "post_acquisition_pipeline": [
+    {
+      "module_type": "launcher_module",
+      "module_path": "experiment_notes_finalize",
+      "module_parameters": {
+        "experiment_notes_filename": "notes/experiment_notes.txt",
+        "experiment_notes_confirm_prompt": "Confirm experiment notes are saved; press Enter to finish."
+      }
+    }, 
+     {
+            "module_type": "launcher_module",
+            "module_path": "session_archiver",
+            "module_parameters": {
+            "network_dir": "\\\\allen\\aind\\scratch\\OpenScope\\Slap2\\Data\\{subject_id}\\{session_uuid}\\slap2",
+            "backup_dir": "C:\\BonsaiDataPredictiveProcessing\\Archive\\{subject_id}\\{session_uuid}",
+            "max_retries": 3
+            }
+        }
+    ],
+    "description": "SLAP2 configuration usingthe MATLAB shared-engine launcher locally."
+}
