@@ -52,9 +52,6 @@ parameter JSON file to enable the built-in TCP handshake:
 - ``session_sync_node_name`` (optional): friendly label displayed in logs for each launcher.
 - ``session_sync_key_param`` (optional): parameter that carries the shared key (defaults to
   ``subject_id``). Override via ``session_sync_session_key`` when necessary.
-- ``session_sync_session_name`` (optional, master): explicit folder name. If omitted, the master
-  falls back to ``session_sync_name_param`` (defaults to ``session_uuid``) or the automatically
-  generated timestamp-based value.
 
 Example snippet:
 

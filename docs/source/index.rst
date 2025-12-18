@@ -17,7 +17,7 @@ OpenScope Experimental Launcher Documentation
 .. image:: https://img.shields.io/badge/python->=3.8-blue?logo=python
    :alt: Python Version
 
-**Modular, pipeline-driven experimental launcher for OpenScope. All pre- and post-acquisition logic is handled by standalone modules, not the launcher core.**
+**Modular, pipeline-driven experimental launcher for OpenScope. Pre- and post-acquisition work runs via pipeline modules, while the launcher core also provides built-in session synchronization and orchestration.**
 
 Overview
 --------
