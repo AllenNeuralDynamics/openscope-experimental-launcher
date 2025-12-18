@@ -1,0 +1,14 @@
+{
+  "launcher": "base",
+  "subject_id": "mouse_sync_demo",
+  "user_id": "experimenter",
+  "script_path": "echo",
+  "output_root_folder": "C:/data/session_sync_demo/slave",
+  "pre_acquisition_pipeline": [],
+  "post_acquisition_pipeline": [],
+  "session_sync_role": "slave",
+  "session_sync_master_host": "127.0.0.1",
+  "session_sync_port": 50001,
+  "session_sync_node_name": "imaging-rig",
+  "notes": "Launch after the master file reports it is listening for slaves."
+}

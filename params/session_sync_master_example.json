@@ -1,0 +1,15 @@
+{
+  "launcher": "base",
+  "subject_id": "mouse_sync_demo",
+  "user_id": "experimenter",
+  "script_path": "echo",
+  "output_root_folder": "C:/data/session_sync_demo/master",
+  "pre_acquisition_pipeline": [],
+  "post_acquisition_pipeline": [],
+  "session_sync_role": "master",
+  "session_sync_port": 50001,
+  "session_sync_expected_slaves": 1,
+  "session_sync_bind_host": "127.0.0.1",
+  "session_sync_node_name": "behavior-rig",
+  "notes": "Launch this file on the master rig before any slaves."
+}

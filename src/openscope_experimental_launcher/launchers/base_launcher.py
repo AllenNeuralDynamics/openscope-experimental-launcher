@@ -109,6 +109,7 @@ except ImportError:
 from ..utils import rig_config
 from ..utils import git_manager
 from ..utils import param_utils 
+from ..utils import session_sync as session_sync_utils
 from .. import __version__
 
 
@@ -323,6 +324,54 @@ class BaseLauncher:
             if isinstance(expanded, (str, int, float)):
                 context[key] = str(expanded)
     
+    def _maybe_synchronize_session_name(self) -> None:
+        """Launch master/slave session sync before folders/logging are created."""
+
+        role = str(self.params.get("session_sync_role") or self.params.get("session_sync_mode") or "").strip().lower()
+        if not role or role in {"", "disabled", "none"}:
+            return
+
+        logger = logging.getLogger(__name__)
+        if role == "master":
+            fallback_name = (
+                self.session_uuid
+                or str(self.params.get("session_uuid") or "")
+                or self._generate_session_uuid()
+            )
+            session_name = session_sync_utils.master_sync(self.params, logger, fallback_name)
+        elif role == "slave":
+            session_name = session_sync_utils.slave_sync(self.params, logger)
+        else:
+            raise ValueError("session_sync_role must be 'master' or 'slave' when enabled")
+
+        self.session_uuid = session_name
+        self.params["session_uuid"] = session_name
+        logging.info("Session sync established shared session '%s'", session_name)
+
+    def _ensure_session_uuid(self) -> str:
+        if self.session_uuid:
+            return self.session_uuid
+        existing = str(self.params.get("session_uuid") or "").strip()
+        if existing:
+            self.session_uuid = existing
+            return self.session_uuid
+        self.session_uuid = self._generate_session_uuid()
+        return self.session_uuid
+
+    def _generate_session_uuid(self) -> str:
+        date_time_offset = datetime.datetime.now()
+        subject = self.subject_id or str(self.params.get("subject_id") or "session")
+        if AIND_DATA_SCHEMA_AVAILABLE:
+            try:
+                session_name = build_data_name(label=subject, creation_datetime=date_time_offset)
+                logging.info("Generated AIND-compliant session name: %s", session_name)
+                return session_name
+            except Exception as exc:
+                logging.warning("Failed to generate AIND session name, falling back: %s", exc)
+        session_name = f"{subject}_{date_time_offset.strftime('%Y-%m-%d_%H-%M-%S')}"
+        logging.info("Using fallback session name: %s", session_name)
+        return session_name
+    
     def determine_output_session_folder(self) -> Optional[str]:
         """
         Determine the session output directory.
@@ -338,33 +387,12 @@ class BaseLauncher:
             output_root_folder = self.params.get("output_root_folder", os.getcwd())
             logging.info(f"Using output_root_folder: {output_root_folder}")
 
-            # Validate subject_id is available
-            if not self.subject_id:
+            # Validate subject_id is available (only needed if no session_uuid was provided)
+            if not self.subject_id and not self.session_uuid and not self.params.get("session_uuid"):
                 logging.error("Cannot generate session directory: missing subject_id")
                 return None
-            
-            # Generate timestamped session folder name
-            date_time_offset = datetime.datetime.now()
-            
-            if AIND_DATA_SCHEMA_AVAILABLE:
-                try:
-                    # Use AIND standard naming: {subject_id}_{datetime}
-                    session_name = build_data_name(
-                        label=self.subject_id,
-                        creation_datetime=date_time_offset
-                    )
-                    logging.info(f"Generated AIND-compliant session name: {session_name}")
-                except Exception as e:
-                    logging.warning(f"Failed to use AIND data schema naming, falling back to default: {e}")
-                    # Fallback to default naming
-                    session_name = f"{self.subject_id}_{date_time_offset.strftime('%Y-%m-%d_%H-%M-%S')}"
-            else:
-                # Fallback naming when AIND data schema is not available
-                session_name = f"{self.subject_id}_{date_time_offset.strftime('%Y-%m-%d_%H-%M-%S')}"
-                logging.info(f"Using fallback session name: {session_name}")
-            
-            # Store session UUID for metadata
-            self.session_uuid = session_name
+
+            session_name = self._ensure_session_uuid()
 
             # Create full session folder path
             output_session_folder = os.path.join(output_root_folder, session_name)
@@ -854,6 +882,9 @@ class BaseLauncher:
 
         try:
             self.start_time = datetime.datetime.now()
+
+            # Ensure all launchers agree on session naming before folders/logs are created.
+            self._maybe_synchronize_session_name()
 
             # Set up repository
             if not git_manager.setup_repository(self.params):
