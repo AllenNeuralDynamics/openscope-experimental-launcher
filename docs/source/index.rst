@@ -132,8 +132,6 @@ Contents
    matlab_launcher
    end_state_system
 
-   pre_acquisition
-   post_acquisition
    modules
 
    resource-monitoring

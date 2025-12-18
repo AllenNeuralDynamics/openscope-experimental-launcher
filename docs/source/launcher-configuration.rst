@@ -36,6 +36,63 @@ These parameters control the core behavior of the launcher and are accepted in t
 | local_repository_path     | string    | Local directory to clone/use the repository. Optional.              |
 +---------------------------+-----------+---------------------------------------------------------------------+
 
+Session Synchronization Parameters
+----------------------------------
+``BaseLauncher`` can negotiate a shared session folder name across multiple launchers (for example,
+behavior + imaging rigs) before any data is written. Configure the following keys in the main
+parameter JSON file to enable the built-in TCP handshake:
+
+- ``session_sync_role``: ``"master"`` or ``"slave"`` (any other value disables the feature).
+- ``session_sync_port``: TCP port used by both master and slave launchers.
+- ``session_sync_expected_slaves`` (master): number of slave launchers that must acknowledge before
+  the master proceeds.
+- ``session_sync_bind_host`` (master): interface to bind the listening socket to (``127.0.0.1`` for
+  same-machine tests, ``0.0.0.0`` for remote clients).
+- ``session_sync_master_host`` (slave): hostname or IP address of the master.
+- ``session_sync_node_name`` (optional): friendly label displayed in logs for each launcher.
+- ``session_sync_key_param`` (optional): parameter that carries the shared key (defaults to
+  ``subject_id``). Override via ``session_sync_session_key`` when necessary.
+- ``session_sync_session_name`` (optional, master): explicit folder name. If omitted, the master
+  falls back to ``session_sync_name_param`` (defaults to ``session_uuid``) or the automatically
+  generated timestamp-based value.
+
+Example snippet:
+
+.. code-block:: json
+
+   {
+     "subject_id": "mouse123",
+     "user_id": "tester",
+     "session_sync_role": "master",
+     "session_sync_port": 47001,
+     "session_sync_expected_slaves": 2
+   }
+
+Workflow checklist:
+
+1. Pick a TCP port that is free on the master machine and set ``session_sync_port`` to that value in
+   every launcher.
+2. Launch the master parameter file first (``session_sync_role = "master"``). ``BaseLauncher`` logs
+   that it is listening and blocks until the expected number of slaves connect.
+3. Start each slave (``session_sync_role = "slave"``) with ``session_sync_master_host`` pointing to
+   the master's hostname/IP. Slaves retry connections until the master responds, then adopt the
+   shared session name announced by the master.
+4. Once all acknowledgements are received, every launcher resumes its normal workflow (repository
+   setup, folder creation, logging, etc.) with a synchronized ``session_uuid``.
+
+Timeout and retry controls:
+
+- ``session_sync_timeout_sec``: maximum time the master waits for all slaves _or_ a slave waits to
+  reach the master (default 120 seconds).
+- ``session_sync_ack_timeout_sec``: per-message timeout during the JSON handshake (default 30
+  seconds).
+- ``session_sync_retry_delay_sec`` (slave only): delay between connection attempts (default 1
+  second).
+
+Local testing: bind the master to ``127.0.0.1`` and set each slave's ``session_sync_master_host`` to
+``127.0.0.1``. The repository includes ready-to-run examples in
+``params/session_sync_master_example.json`` and ``params/session_sync_slave_example.json``.
+
 Optional Interface Parameters
 -----------------------------
 The following keys apply only when launching a specific external environment.

@@ -1,23 +1,25 @@
-Pre-Acquisition Modules
-=======================
+Pre-Acquisition Pipelines
+=========================
 
-The full reference for pre-acquisition pipeline modules now lives in the :ref:`pre-modules` section of :doc:`modules`.
+The exhaustive catalog of pre-acquisition modules lives in the :ref:`pre-modules` section of
+:doc:`modules`. This page keeps a slim reminder of how the pipeline is wired and then focuses on the
+launcher-level session synchronization system that often accompanies pre-acquisition work.
 
-Quick Reminders
+Pipeline Basics
 ---------------
 
-- Populate ``pre_acquisition_pipeline`` in your parameter file with module names under
-  ``src/openscope_experimental_launcher/pre_acquisition``.
-- Each module implements ``run_pre_acquisition`` (or ``run``) and should return ``0`` on success.
-- Refer to :doc:`modules` for detailed parameter descriptions, built-in module catalogs, and extension tips.
+- Populate ``pre_acquisition_pipeline`` with module names under
+  ``src/openscope_experimental_launcher/pre_acquisition`` (see :doc:`modules` for details).
+- Each module exposes ``run_pre_acquisition`` (or ``run``) and should return ``0`` on success.
+- Pipelines run _before_ the acquisition subprocess starts, so they can safely prepare prompts,
+  metadata, or folders that downstream steps need.
 
-Session Synchronization (Built-in)
-----------------------------------
+Session Synchronization
+-----------------------
 
-Sharing a session folder name across multiple launchers (for example, a behavior rig and an imaging
-rig) no longer requires pre-acquisition modules. Instead, configure the following top-level
-parameters so ``BaseLauncher`` can negotiate the name **before** it creates the output folder or
-starts logging:
+``BaseLauncher`` can coordinate session folder names across multiple launchers (for example, a
+behavior rig and an imaging rig) before any output directories or logs are created. Configure these
+top-level parameters to enable the handshake:
 
 - ``session_sync_role``: ``"master"`` or ``"slave"`` (anything else disables syncing).
 - ``session_sync_port`` (both roles): TCP port for the coordination socket.
@@ -42,8 +44,7 @@ Example snippet from a parameter file:
      "user_id": "tester",
      "session_sync_role": "master",
      "session_sync_port": 47001,
-     "session_sync_expected_slaves": 2,
-     "session_sync_session_name": "mouse123_2025-12-17"
+     "session_sync_expected_slaves": 2
    }
 
 Slave launchers set ``session_sync_role`` to ``"slave"`` and supply ``session_sync_master_host`` in
