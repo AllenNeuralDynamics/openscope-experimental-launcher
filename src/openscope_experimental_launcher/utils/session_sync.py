@@ -250,7 +250,16 @@ def _await_slaves(
 ) -> List[Dict[str, Any]]:
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server.bind((config.bind_host, config.port))
+    try:
+        server.bind((config.bind_host, config.port))
+    except OSError as err:
+        if getattr(err, "winerror", None) == 10049:
+            raise OSError(
+                "session_sync_bind_host must be a local interface address on this machine. "
+                "Use '0.0.0.0' to listen on all interfaces, '127.0.0.1' for localhost-only, or "
+                "set it to the machine's own IP (not the remote peer)."
+            ) from err
+        raise
     server.listen(config.expected_slaves)
     logger.info(
         "Session sync master listening on %s:%d for %d slave(s)",
