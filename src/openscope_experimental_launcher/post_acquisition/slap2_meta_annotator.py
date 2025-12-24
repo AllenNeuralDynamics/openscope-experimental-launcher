@@ -93,7 +93,14 @@ def run(params: Dict[str, Any]) -> int:
     ref_stack_dir = params.get("ref_stack_dir", "slap2/dynamic_data/reference_stack")
     manifest_name = params.get("manifest_name", "routing_manifest.json")
 
-    routing_manifest_path = session_dir / "launcher_metadata" / manifest_name
+    manifest_path_param = params.get("manifest_path")
+    if manifest_path_param:
+        manifest_path_obj = Path(str(manifest_path_param)).expanduser()
+        routing_manifest_path = (
+            manifest_path_obj if manifest_path_obj.is_absolute() else session_dir / manifest_path_obj
+        )
+    else:
+        routing_manifest_path = session_dir / "launcher_metadata" / manifest_name
 
     LOG.info("SLAP2 meta annotator starting | session_dir=%s", session_dir)
 
