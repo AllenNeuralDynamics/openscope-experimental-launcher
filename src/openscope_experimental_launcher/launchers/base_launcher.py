@@ -243,7 +243,7 @@ class BaseLauncher:
         Param files may provide a PEP 440 specifier string under `launcher_version`, e.g.
         
         - ">=0.2,<0.3"
-        - "==0.2.1.dev1"
+        - "==0.2.2"
 
         If not present, a warning is emitted and execution continues.
         If present but incompatible, a RuntimeError is raised.
@@ -270,7 +270,7 @@ class BaseLauncher:
         except Exception as exc:
             raise RuntimeError(
                 f"Invalid 'launcher_version' specifier: {spec!r}. "
-                "Expected a PEP 440 specifier set like '>=0.2,<0.3' or '==0.2.1.dev1'."
+                "Expected a PEP 440 specifier set like '>=0.2,<0.3' or '==0.2.2'."
             ) from exc
 
         try:
