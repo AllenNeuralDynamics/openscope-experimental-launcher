@@ -160,6 +160,7 @@ class BaseLauncher:
         self.start_time = None
         self.stop_time = None
         self.config = {}
+        self._log_level = logging.getLogger().getEffectiveLevel()
         
         # Session tracking variables
         self.subject_id = ""
@@ -243,7 +244,7 @@ class BaseLauncher:
         Param files may provide a PEP 440 specifier string under `launcher_version`, e.g.
         
         - ">=0.2,<0.3"
-        - "==0.2.2"
+        - "==0.2.4"
 
         If not present, a warning is emitted and execution continues.
         If present but incompatible, a RuntimeError is raised.
@@ -270,7 +271,7 @@ class BaseLauncher:
         except Exception as exc:
             raise RuntimeError(
                 f"Invalid 'launcher_version' specifier: {spec!r}. "
-                "Expected a PEP 440 specifier set like '>=0.2,<0.3' or '==0.2.2'."
+                "Expected a PEP 440 specifier set like '>=0.2,<0.3' or '==0.2.4'."
             ) from exc
 
         try:
@@ -566,7 +567,8 @@ class BaseLauncher:
             output_log_path = os.path.join(launcher_metadata_dir, log_filename)
             
             output_handler = SharedFileHandler(output_log_path, encoding="utf-8")
-            output_handler.setLevel(logging.DEBUG)
+            effective_level = getattr(self, "_log_level", logging.getLogger().getEffectiveLevel())
+            output_handler.setLevel(effective_level)
             output_handler.setFormatter(log_format)
             root_logger.addHandler(output_handler)
             
@@ -582,7 +584,7 @@ class BaseLauncher:
                 centralized_log_path = os.path.join(centralized_dir, log_filename)
                 
                 centralized_handler = SharedFileHandler(centralized_log_path, encoding="utf-8")
-                centralized_handler.setLevel(logging.DEBUG)  # Slightly higher level for centralized
+                centralized_handler.setLevel(effective_level)
                 centralized_handler.setFormatter(log_format)
                 root_logger.addHandler(centralized_handler)
                 
@@ -591,12 +593,12 @@ class BaseLauncher:
             # 3. Set up console handler if not already present
             if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
                 console_handler = logging.StreamHandler()
-                console_handler.setLevel(logging.DEBUG)
+                console_handler.setLevel(effective_level)
                 console_handler.setFormatter(logging.Formatter('%(levelname)s - %(message)s'))
                 root_logger.addHandler(console_handler)
             
             # Set overall logging level
-            root_logger.setLevel(logging.DEBUG)
+            root_logger.setLevel(effective_level)
             
             # Log session information
             logging.info("="*60)
@@ -700,7 +702,10 @@ class BaseLauncher:
                 if not func:
                     logging.warning(f"Module {mod_name} has no callable entry point; skipping.")
                     return True
-                result = func(param_file) if func.__code__.co_argcount == 1 else func(merged_params)
+                if func.__code__.co_argcount == 0:
+                    result = func()
+                else:
+                    result = func(merged_params)
                 if result is None:
                     return True
                 if isinstance(result, bool):
