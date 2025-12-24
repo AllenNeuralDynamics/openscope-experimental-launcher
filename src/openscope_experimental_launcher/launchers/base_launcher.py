@@ -117,12 +117,13 @@ from .. import __version__
 
 try:
     from packaging.specifiers import SpecifierSet
-    from packaging.version import Version
+    from packaging.version import Version, InvalidVersion
 
     _PACKAGING_AVAILABLE = True
 except Exception:  # pragma: no cover
     SpecifierSet = None  # type: ignore[assignment]
     Version = None  # type: ignore[assignment]
+    InvalidVersion = None  # type: ignore[assignment]
     _PACKAGING_AVAILABLE = False
 
 
@@ -272,7 +273,16 @@ class BaseLauncher:
                 "Expected a PEP 440 specifier set like '>=0.2,<0.3' or '==0.2.1.dev1'."
             ) from exc
 
-        current = Version(str(self._version))
+        try:
+            current = Version(str(self._version))
+        except InvalidVersion as exc:
+            warnings.warn(
+                f"Launcher version '{self._version}' is not a valid PEP 440 version; skipping launcher_version enforcement.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            return
+
         if current not in spec_set:
             raise RuntimeError(
                 f"This parameter file requires launcher_version {str(spec)!r}, but running launcher is {self._version!r}."

@@ -78,6 +78,12 @@ def _write_manifest(manifest_path: Path, entries: List[Dict[str, Any]]) -> None:
 
 
 def run(params: Dict[str, Any]) -> int:
+    if params is None:
+        params = {}
+    elif not isinstance(params, dict):
+        LOG.warning("slap2_meta_annotator received non-dict params; interpreting as manifest_path")
+        params = {"manifest_path": params}
+
     # Defaults and parameters
     session_dir_param = params.get("source_dir") or params.get("output_session_folder")
     if not session_dir_param:
