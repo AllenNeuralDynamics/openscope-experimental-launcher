@@ -98,9 +98,9 @@ def run(params: Dict[str, Any]) -> int:
     assume_yes = bool(params.get("assume_yes", False))
     default_brain_area = str(params.get("default_brain_area", "VISp"))
     default_depth = str(params.get("default_depth", "unknown"))
-    dynamic_dir = params.get("dynamic_dir", "slap2/dynamic_data")
-    structure_dir = params.get("structure_dir", "slap2/structure_stack")
-    ref_stack_dir = params.get("ref_stack_dir", "slap2/dynamic_data/reference_stack")
+    dynamic_dir = params.get("dynamic_dir", "dynamic_data")
+    structure_dir = params.get("structure_dir", "structure_stack")
+    ref_stack_dir = params.get("ref_stack_dir", "dynamic_data/reference_stack")
     manifest_name = params.get("manifest_name", "routing_manifest.json")
 
     manifest_path_param = params.get("manifest_path")
