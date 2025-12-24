@@ -261,16 +261,18 @@ def _await_slaves(
             ) from err
         raise
     server.listen(config.expected_slaves)
-    logger.info(
-        "Session sync master listening on %s:%d for %d slave(s)",
+    logger.warning(
+        "Session sync master waiting on %s:%d for %d slave(s) (timeout %.0fs)",
         config.bind_host,
         config.port,
         config.expected_slaves,
+        config.timeout,
     )
 
     deadline = time.time() + config.timeout
     channels: List[Dict[str, Any]] = []
     try:
+        next_status = time.time() + 10.0
         while len(channels) < config.expected_slaves:
             remaining = deadline - time.time()
             if remaining <= 0:
@@ -308,6 +310,15 @@ def _await_slaves(
 
             logger.info("Session sync slave %s connected from %s", node_name, addr)
             channels.append({"channel": channel, "node": node_name})
+
+            if time.time() >= next_status and len(channels) < config.expected_slaves:
+                logger.warning(
+                    "Session sync master still waiting: %d/%d slave(s) connected (%.0fs remaining)",
+                    len(channels),
+                    config.expected_slaves,
+                    max(deadline - time.time(), 0),
+                )
+                next_status = time.time() + 10.0
         return channels
     finally:
         server.close()
@@ -363,7 +374,16 @@ def _broadcast_session_name(
 def _connect_with_retry(config: SlaveConfig, logger: logging.Logger) -> Optional[JsonChannel]:
     deadline = time.time() + config.timeout
     last_error: Optional[Exception] = None
+    next_status = time.time()
     while time.time() < deadline:
+        if time.time() >= next_status:
+            logger.warning(
+                "Session sync slave waiting for master %s:%d (%.0fs remaining)",
+                config.master_host,
+                config.port,
+                max(deadline - time.time(), 0),
+            )
+            next_status = time.time() + 10.0
         try:
             remaining = max(deadline - time.time(), 0.1)
             sock = socket.create_connection((config.master_host, config.port), timeout=remaining)

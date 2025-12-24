@@ -100,6 +100,11 @@ class SessionArchiver:
         start_time = datetime.now(timezone.utc)
         bytes_transferred = 0
         iterator = self._iter_routed_files() if self._routing_paths is not None else self._iter_session_files()
+        all_files = list(iterator)
+        total_files = len(all_files)
+        LOG.warning("Session archiver started | files=%d | network=%s | backup=%s", total_files, self.enable_network_copy, self.enable_backup_copy)
+        iterator = iter(all_files)
+        last_progress = datetime.now(timezone.utc)
         for file_path in iterator:
             rel_path = file_path.relative_to(self.session_dir)
             rel_key = rel_path.as_posix()
@@ -124,11 +129,31 @@ class SessionArchiver:
                 LOG.error("Failed to archive '%s': %s", rel_key, exc, exc_info=True)
                 self._mark_file(rel_key, status="error", error=str(exc))
 
+            now = datetime.now(timezone.utc)
+            if (now - last_progress).total_seconds() >= 10:
+                processed = self.successful + self.failed + self.deferred
+                LOG.warning(
+                    "Archiver progress: %d/%d files | success=%d deferred=%d failed=%d",
+                    processed,
+                    total_files,
+                    self.successful,
+                    self.deferred,
+                    self.failed,
+                )
+                last_progress = now
+
         if self.remove_empty_dirs and not self.dry_run:
             self._prune_empty_directories()
 
         elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
         self._log_transfer_summary(bytes_transferred, elapsed)
+        LOG.warning(
+            "Archiver finished: success=%d deferred=%d failed=%d | elapsed=%.1fs",
+            self.successful,
+            self.deferred,
+            self.failed,
+            elapsed,
+        )
 
     @staticmethod
     def _normalize_patterns(patterns: Iterable[str] | None, *, default: Optional[str] = None) -> list[str]:
