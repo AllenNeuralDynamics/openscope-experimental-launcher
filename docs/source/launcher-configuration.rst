@@ -36,6 +36,29 @@ These parameters control the core behavior of the launcher and are accepted in t
 | local_repository_path     | string    | Local directory to clone/use the repository. Optional.              |
 +---------------------------+-----------+---------------------------------------------------------------------+
 
+Parameter File Pinning (Recommended)
+-----------------------------------
+To reduce the chance of running a parameter file with an incompatible launcher release, parameter JSON files may
+include the following optional top-level fields:
+
+- ``launcher_version`` (recommended): a `PEP 440 <https://peps.python.org/pep-0440/>`_ version specifier set
+  indicating which launcher versions are allowed to run this file, for example ``">=0.2,<0.3"``.
+  If omitted, the launcher continues but emits a warning.
+- ``$schema`` (optional): URL (or local path) of the JSON Schema the file was authored against.
+  Pin this to an immutable tag/commit in your params repo rather than ``main``.
+
+Example:
+
+.. code-block:: json
+
+   {
+     "$schema": "https://raw.githubusercontent.com/<org>/<params-repo>/v2025.12/schemas/launcher/1.7.0.json",
+     "launcher_version": ">=0.2,<0.3",
+     "launcher": "base",
+     "subject_id": "mouse123",
+     "user_id": "tester"
+   }
+
 Session Synchronization Parameters
 ----------------------------------
 ``BaseLauncher`` can negotiate a shared session folder name across multiple launchers (for example,
@@ -89,6 +112,10 @@ Timeout and retry controls:
 Local testing: bind the master to ``127.0.0.1`` and set each slave's ``session_sync_master_host`` to
 ``127.0.0.1``. The repository includes ready-to-run examples in
 ``params/session_sync_master_example.json`` and ``params/session_sync_slave_example.json``.
+
+.. note::
+  ``session_sync_bind_host`` is the *local* address the master listens on. It must be an IP that is
+  assigned to the master machine (or ``0.0.0.0``). Do not set it to a remote machine's IP.
 
 Optional Interface Parameters
 -----------------------------

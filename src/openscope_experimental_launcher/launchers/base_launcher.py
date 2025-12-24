@@ -12,6 +12,7 @@ import sys
 import time
 import signal
 import logging
+import warnings
 import datetime
 import platform
 import psutil
@@ -21,6 +22,7 @@ import threading
 import importlib
 import importlib.util
 import traceback
+from pathlib import Path
 
 if os.name == "nt":  # pragma: no cover - Windows-specific imports
     try:
@@ -109,8 +111,19 @@ except ImportError:
 from ..utils import rig_config
 from ..utils import git_manager
 from ..utils import param_utils 
+from ..utils import schema_validator
 from ..utils import session_sync as session_sync_utils
 from .. import __version__
+
+try:
+    from packaging.specifiers import SpecifierSet
+    from packaging.version import Version
+
+    _PACKAGING_AVAILABLE = True
+except Exception:  # pragma: no cover
+    SpecifierSet = None  # type: ignore[assignment]
+    Version = None  # type: ignore[assignment]
+    _PACKAGING_AVAILABLE = False
 
 
 
@@ -194,6 +207,17 @@ class BaseLauncher:
             help_texts=help_texts
         )
 
+        # Validate against JSON Schemas early to fail fast on malformed param files.
+        try:
+            if param_file:
+                schema_validator.validate_param_file(Path(param_file), payload=self.params)
+        except Exception as exc:
+            raise RuntimeError(f"Parameter validation failed: {exc}") from exc
+
+        # Optional safety check: ensure this param file was authored for this launcher version.
+        # This is intentionally enforced early (before repository setup / session folder creation).
+        self._enforce_param_launcher_version()
+
         # Propagate any missing rig_config fields into params
         for k, v in self.rig_config.items():
             if k not in self.params:
@@ -210,6 +234,49 @@ class BaseLauncher:
         logging.info(f"Using subject_id: {self.subject_id}, user_id: {self.user_id}")
         logging.info(f"Using rig: {self.rig_config['rig_id']}")
         logging.info("BaseLauncher initialized")
+
+
+    def _enforce_param_launcher_version(self) -> None:
+        """Enforce optional `launcher_version` specifier from the param file.
+
+        Param files may provide a PEP 440 specifier string under `launcher_version`, e.g.
+        
+        - ">=0.2,<0.3"
+        - "==0.2.1.dev1"
+
+        If not present, a warning is emitted and execution continues.
+        If present but incompatible, a RuntimeError is raised.
+        """
+
+        spec = self.params.get("launcher_version")
+        if spec is None or str(spec).strip() == "":
+            warnings.warn(
+                "Parameter file does not specify 'launcher_version'. "
+                "Add a PEP 440 specifier (e.g. '>=0.2,<0.3') to prevent running with an incompatible launcher.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            return
+
+        if not _PACKAGING_AVAILABLE:
+            raise RuntimeError(
+                "Cannot enforce 'launcher_version' because the optional dependency 'packaging' is not available. "
+                "Install it (pip install packaging) or remove the 'launcher_version' field."
+            )
+
+        try:
+            spec_set = SpecifierSet(str(spec))
+        except Exception as exc:
+            raise RuntimeError(
+                f"Invalid 'launcher_version' specifier: {spec!r}. "
+                "Expected a PEP 440 specifier set like '>=0.2,<0.3' or '==0.2.1.dev1'."
+            ) from exc
+
+        current = Version(str(self._version))
+        if current not in spec_set:
+            raise RuntimeError(
+                f"This parameter file requires launcher_version {str(spec)!r}, but running launcher is {self._version!r}."
+            )
 
     
     def _get_platform_info(self) -> Dict[str, Any]:

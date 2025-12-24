@@ -41,6 +41,7 @@ class SessionArchiver:
         backup_dir: Path,
         *,
         manifest_path: Path,
+        routing_manifest_path: Path | None = None,
         checksum_algo: str = "sha256",
         include_patterns: Iterable[str] = ("*",),
         exclude_patterns: Iterable[str] = (),
@@ -55,6 +56,7 @@ class SessionArchiver:
         self.network_dir = network_dir
         self.backup_dir = backup_dir
         self.manifest_path = manifest_path
+        self.routing_manifest_path = routing_manifest_path
         self.checksum_algo = checksum_algo
         self.include_patterns = self._normalize_patterns(include_patterns, default="*")
         self.exclude_patterns = self._normalize_patterns(exclude_patterns)
@@ -80,10 +82,25 @@ class SessionArchiver:
         self.failed = 0
         self.deferred = 0
 
+        self._routing_paths: list[Path] | None = None
+        if self.routing_manifest_path and self.routing_manifest_path.exists():
+            try:
+                data = json.loads(self.routing_manifest_path.read_text(encoding="utf-8"))
+                entries = data.get("entries", [])
+                paths: list[Path] = []
+                for entry in entries:
+                    for rel in entry.get("files", []) or []:
+                        paths.append(self.session_dir / rel)
+                self._routing_paths = paths
+                LOG.info("Routing manifest loaded (%d files): %s", len(paths), self.routing_manifest_path)
+            except Exception as exc:  # noqa: BLE001
+                LOG.warning("Failed to load routing manifest %s: %s", self.routing_manifest_path, exc)
+
     def run(self) -> None:
         start_time = datetime.now(timezone.utc)
         bytes_transferred = 0
-        for file_path in self._iter_session_files():
+        iterator = self._iter_routed_files() if self._routing_paths is not None else self._iter_session_files()
+        for file_path in iterator:
             rel_path = file_path.relative_to(self.session_dir)
             rel_key = rel_path.as_posix()
 
@@ -127,6 +144,19 @@ class SessionArchiver:
     def _iter_session_files(self) -> Iterable[Path]:
         for path in self.session_dir.rglob("*"):
             if path.is_file() and self._should_transfer(path):
+                yield path
+
+    def _iter_routed_files(self) -> Iterable[Path]:
+        # Follow routing manifest entries; fall back to full traversal if missing files
+        assert self._routing_paths is not None
+        yielded: set[Path] = set()
+        for path in self._routing_paths:
+            if path.exists() and path.is_file():
+                yielded.add(path)
+                yield path
+        # Include any other files not captured by routing manifest
+        for path in self._iter_session_files():
+            if path not in yielded:
                 yield path
 
     def _should_transfer(self, path: Path) -> bool:
@@ -450,6 +480,11 @@ def run_post_acquisition(
     manifest_value = params.get("manifest_path") or default_manifest
     manifest_path = Path(manifest_value).expanduser()
 
+    routing_manifest_value = params.get("routing_manifest")
+    routing_manifest_path = None
+    if routing_manifest_value:
+        routing_manifest_path = Path(str(routing_manifest_value)).expanduser()
+
     LOG.info("Starting session archiver")
 
     if not session_dir.exists():
@@ -489,12 +524,17 @@ def run_post_acquisition(
         ),
         enable_network_copy=move_to_network,
         enable_backup_copy=copy_to_backup,
+        routing_manifest_path=routing_manifest_path,
     )
 
     LOG.info("Session directory: %s", session_dir)
     LOG.info("Network directory: %s", network_dir)
     LOG.info("Backup directory: %s", backup_dir)
     LOG.info("Manifest path: %s", manifest_path)
+    LOG.info(
+        "Routing manifest: %s",
+        f"{routing_manifest_path} (exists={routing_manifest_path.exists()})" if routing_manifest_path else "None",
+    )
     LOG.info("Dry run: %s | Checksum: %s | Retries: %s", archiver.dry_run, archiver.checksum_algo, archiver.max_retries)
     LOG.info("Include patterns: %s", archiver.include_patterns)
     LOG.info("Exclude patterns: %s", archiver.exclude_patterns)
