@@ -173,9 +173,9 @@ class BonsaiLauncher(BaseLauncher):
 
     # No _start_output_readers override; inherit BaseLauncher behavior for stdout/stderr logging.
 
-def run_from_params(param_file):
+def run_from_params(param_file, *, log_level=None):
     """
     Module-level entry point for the unified launcher wrapper.
     Calls BonsaiLauncher.run_from_params.
     """
-    return BonsaiLauncher.run_from_params(param_file)
+    return BonsaiLauncher.run_from_params(param_file, log_level=log_level)

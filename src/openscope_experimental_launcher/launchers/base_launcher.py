@@ -709,7 +709,7 @@ class BaseLauncher:
                     return result == 0
                 return True
             except Exception as e:
-                logging.error(f"Launcher module error {mod_name}: {e}")
+                logging.exception(f"Launcher module error {mod_name}: {e}")
                 return False
 
         def _invoke_script_module(path_in_repo: str, merged_params: dict) -> bool:
@@ -790,7 +790,7 @@ class BaseLauncher:
                     result = func(*ordered)
                 return result in (None, 0, True)
             except Exception as e:
-                logging.error(f"Script module error {path_in_repo}: {e}")
+                logging.exception(f"Script module error {path_in_repo}: {e}")
                 return False
 
         for raw_entry in pipeline:
@@ -1093,7 +1093,7 @@ class BaseLauncher:
         return False
     
     @classmethod
-    def run_from_params(cls, param_file):
+    def run_from_params(cls, param_file, *, log_level=None):
         """
         Run the experiment with the specified parameters.
         
@@ -1103,9 +1103,16 @@ class BaseLauncher:
         Returns:
             True if successful, False otherwise
         """
-        # Set up basic logging
+        # Set up basic logging; default to warnings/errors unless caller requests higher verbosity
+        if log_level is None:
+            level = logging.WARNING
+        elif isinstance(log_level, str):
+            level = logging.getLevelName(log_level.upper())
+        else:
+            level = int(log_level)
+
         logging.basicConfig(
-            level=logging.INFO,
+            level=level,
             format='%(asctime)s - %(levelname)s - %(message)s'
         )
         
@@ -1361,9 +1368,9 @@ class BaseLauncher:
             return None
 
 
-def run_from_params(param_file):
+def run_from_params(param_file, *, log_level=None):
     """
     Module-level entry point for the unified launcher wrapper.
     Calls BaseLauncher.run_from_params.
     """
-    return BaseLauncher.run_from_params(param_file)
+    return BaseLauncher.run_from_params(param_file, log_level=log_level)

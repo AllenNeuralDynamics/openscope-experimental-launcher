@@ -52,9 +52,9 @@ class PythonLauncher(BaseLauncher):
         
         return process
 
-def run_from_params(param_file):
+def run_from_params(param_file, *, log_level=None):
     """
     Module-level entry point for the unified launcher wrapper.
     Calls PythonLauncher.run_from_params.
     """
-    return PythonLauncher.run_from_params(param_file)
+    return PythonLauncher.run_from_params(param_file, log_level=log_level)

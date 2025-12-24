@@ -67,9 +67,9 @@ class MatlabLauncher(BaseLauncher):
             self._matlab_request = None
         return result
 
-def run_from_params(param_file):
+def run_from_params(param_file, *, log_level=None):
     """
     Module-level entry point for the unified launcher wrapper.
     Calls MatlabLauncher.run_from_params.
     """
-    return MatlabLauncher.run_from_params(param_file)
+    return MatlabLauncher.run_from_params(param_file, log_level=log_level)
