@@ -1777,7 +1777,7 @@ end
 function version = slap2_launcher_version()
 %SLAP2_LAUNCHER_VERSION Return the MATLAB launcher UI version string.
 
-version = '2025.12.23-5';
+version = '2025.12.23-6';
 end
 
 

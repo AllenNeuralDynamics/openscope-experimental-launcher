@@ -244,7 +244,7 @@ class BaseLauncher:
         Param files may provide a PEP 440 specifier string under `launcher_version`, e.g.
         
         - ">=0.2,<0.3"
-        - "==0.2.6"
+        - "==0.2.7"
 
         If not present, a warning is emitted and execution continues.
         If present but incompatible, a RuntimeError is raised.
@@ -271,7 +271,7 @@ class BaseLauncher:
         except Exception as exc:
             raise RuntimeError(
                 f"Invalid 'launcher_version' specifier: {spec!r}. "
-                "Expected a PEP 440 specifier set like '>=0.2,<0.3' or '==0.2.6'."
+                "Expected a PEP 440 specifier set like '>=0.2,<0.3' or '==0.2.7'."
             ) from exc
 
         try:
@@ -568,7 +568,8 @@ class BaseLauncher:
             
             output_handler = SharedFileHandler(output_log_path, encoding="utf-8")
             effective_level = getattr(self, "_log_level", logging.getLogger().getEffectiveLevel())
-            output_handler.setLevel(effective_level)
+            # Always capture full detail to file
+            output_handler.setLevel(logging.DEBUG)
             output_handler.setFormatter(log_format)
             root_logger.addHandler(output_handler)
             
@@ -584,7 +585,7 @@ class BaseLauncher:
                 centralized_log_path = os.path.join(centralized_dir, log_filename)
                 
                 centralized_handler = SharedFileHandler(centralized_log_path, encoding="utf-8")
-                centralized_handler.setLevel(effective_level)
+                centralized_handler.setLevel(logging.DEBUG)
                 centralized_handler.setFormatter(log_format)
                 root_logger.addHandler(centralized_handler)
                 
@@ -598,7 +599,7 @@ class BaseLauncher:
                 root_logger.addHandler(console_handler)
             
             # Set overall logging level
-            root_logger.setLevel(effective_level)
+            root_logger.setLevel(logging.DEBUG)
             
             # Log session information
             logging.info("="*60)
