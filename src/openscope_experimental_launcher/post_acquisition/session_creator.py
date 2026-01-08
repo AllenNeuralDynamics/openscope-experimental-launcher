@@ -154,13 +154,8 @@ def run_post_acquisition(param_file: str = None, overrides: dict = None) -> int:
     Loads parameters, prompts for missing fields, and runs session creation.
     Returns 0 on success, nonzero on error.
     """
-    import logging
     from pathlib import Path
     from openscope_experimental_launcher.utils import param_utils
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s'
-    )
     required_fields = ["output_session_folder"]
     defaults = {}
     help_texts = {"output_session_folder": "Session output folder (from launcher)"}

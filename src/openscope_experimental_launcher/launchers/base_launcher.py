@@ -567,7 +567,6 @@ class BaseLauncher:
             output_log_path = os.path.join(launcher_metadata_dir, log_filename)
             
             output_handler = SharedFileHandler(output_log_path, encoding="utf-8")
-            effective_level = getattr(self, "_log_level", logging.getLogger().getEffectiveLevel())
             # Always capture full detail to file
             output_handler.setLevel(logging.DEBUG)
             output_handler.setFormatter(log_format)
@@ -591,14 +590,17 @@ class BaseLauncher:
                 
                 logging.info(f"Centralized logging started: {centralized_log_path}")
             
-            # 3. Set up console handler if not already present
-            if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
+            # Ensure console handler stays at requested verbosity.
+            console_level = getattr(self, "_console_log_level", logging.INFO)
+            stream_handlers = [h for h in root_logger.handlers if isinstance(h, logging.StreamHandler)]
+            if not stream_handlers:
                 console_handler = logging.StreamHandler()
-                console_handler.setLevel(effective_level)
-                console_handler.setFormatter(logging.Formatter('%(levelname)s - %(message)s'))
                 root_logger.addHandler(console_handler)
-            
-            # Set overall logging level
+                stream_handlers = [console_handler]
+            for h in stream_handlers:
+                h.setLevel(console_level)
+
+            # Set overall logging level so file handlers can capture everything.
             root_logger.setLevel(logging.DEBUG)
             
             # Log session information
@@ -703,10 +705,42 @@ class BaseLauncher:
                 if not func:
                     logging.warning(f"Module {mod_name} has no callable entry point; skipping.")
                     return True
-                if func.__code__.co_argcount == 0:
+                import inspect
+                sig = inspect.signature(func)
+                params_list = list(sig.parameters.values())
+                if len(params_list) == 0:
                     result = func()
+                elif len(params_list) == 1:
+                    p0 = params_list[0]
+                    p0_name = (p0.name or "").lower()
+                    if p0_name in {"param_file", "paramfile", "param_path", "params_file", "params_path"}:
+                        result = func(param_file)
+                    elif p0_name in {"params", "parameters", "merged_params", "config", "cfg"}:
+                        result = func(merged_params)
+                    else:
+                        # Heuristic fallback: prefer dict if module likely expects params.
+                        ann = p0.annotation
+                        if ann in (dict, Dict):
+                            result = func(merged_params)
+                        else:
+                            # Backward-compatible default: pass param file path.
+                            result = func(param_file)
                 else:
-                    result = func(merged_params)
+                    # Map by parameter names.
+                    call_kwargs = {}
+                    for p in params_list:
+                        pname = (p.name or "").lower()
+                        if pname in {"param_file", "paramfile", "param_path", "params_file", "params_path"}:
+                            call_kwargs[p.name] = param_file
+                        elif pname in {"params", "parameters", "merged_params", "config", "cfg"}:
+                            call_kwargs[p.name] = merged_params
+                        elif p.name in merged_params:
+                            call_kwargs[p.name] = merged_params[p.name]
+                        elif p.default is not inspect._empty:
+                            call_kwargs[p.name] = p.default
+                        else:
+                            call_kwargs[p.name] = None
+                    result = func(**call_kwargs)
                 if result is None:
                     return True
                 if isinstance(result, bool):
@@ -1109,18 +1143,24 @@ class BaseLauncher:
         Returns:
             True if successful, False otherwise
         """
-        # Set up basic logging; default to warnings/errors unless caller requests higher verbosity
+        # Configure logging early.
+        # Policy:
+        # - Console: controlled by `log_level` (default INFO)
+        # - File: always captures DEBUG+ once continuous logging is enabled
         if log_level is None:
-            level = logging.WARNING
+            console_level = logging.INFO
         elif isinstance(log_level, str):
-            level = logging.getLevelName(log_level.upper())
+            console_level = logging.getLevelName(log_level.upper())
         else:
-            level = int(log_level)
+            console_level = int(log_level)
 
-        logging.basicConfig(
-            level=level,
-            format='%(asctime)s - %(levelname)s - %(message)s'
-        )
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(console_level)
+        console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+
+        # Force configuration because earlier import-time warnings can implicitly
+        # configure logging before we get here.
+        logging.basicConfig(level=logging.DEBUG, handlers=[console_handler], force=True)
         
         try:
             # Validate parameter file
@@ -1130,6 +1170,7 @@ class BaseLauncher:
             
             # Create launcher instance with parameter file
             launcher = cls(param_file=param_file)
+            launcher._console_log_level = console_level
             
             # Run the launcher
             logging.info(f"Starting {cls.__name__} with parameters: {param_file}")

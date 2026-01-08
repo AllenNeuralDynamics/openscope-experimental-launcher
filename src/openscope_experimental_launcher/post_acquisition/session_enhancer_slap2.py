@@ -344,13 +344,8 @@ def run_post_acquisition(param_file: str = None, overrides: dict = None) -> int:
     Loads parameters, prompts for missing fields, and runs enhancement.
     Returns 0 on success, 1 on error.
     """
-    import logging
     from pathlib import Path
     from openscope_experimental_launcher.utils import param_utils
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s'
-    )
     required_fields = [
         "output_session_folder", "session_type", "targeted_structure", "fov_coordinate_ml", "fov_coordinate_ap", "fov_coordinate_unit", "fov_reference", "magnification", "fov_scale_factor"
     ]
