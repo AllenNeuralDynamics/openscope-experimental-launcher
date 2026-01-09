@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Operator Gate Pre-Acquisition**: New `wait_for_user_input` module to pause until an operator confirms readiness
 - **Modular Session Creation**: Moved session.json creation from launchers to post-acquisition for better extensibility
 - **Session Creator**: New `SessionCreator` class for standardized session.json generation
 - **Session Enhancer Framework**: Launcher-specific enhancement system (e.g., `session_enhancer_bonsai.py`)
