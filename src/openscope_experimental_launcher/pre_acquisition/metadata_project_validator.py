@@ -24,12 +24,21 @@ def _load_params(param_source: Any, overrides: Optional[Mapping[str, Any]] = Non
 
 
 def _resolve_session_folder(params: Mapping[str, Any]) -> Path:
-    session_dir = params.get("output_session_folder") or params.get("session_dir")
+    session_dir = params.get("session_dir") or params.get("output_session_folder")
     if not session_dir:
-        raise metadata_api.MetadataServiceError("output_session_folder parameter is required for metadata caching")
-    path = Path(session_dir)
+        raise metadata_api.MetadataServiceError("Provide session_dir or output_session_folder for metadata caching")
+    path = Path(session_dir).expanduser()
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def _resolve_output_path(params: Mapping[str, Any], session_dir: Path) -> Path:
+    explicit = params.get("metadata_project_path")
+    if explicit:
+        path = Path(str(explicit)).expanduser()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path
+    return session_dir / "project.json"
 
 
 def _initial_project_value(params: Mapping[str, Any]) -> Optional[str]:
@@ -60,7 +69,11 @@ def run_pre_acquisition(param_source: Any, overrides: Optional[Mapping[str, Any]
         params = _load_params(param_source, overrides)
         base_url = metadata_api.resolve_base_url(params)
         timeout = metadata_api.resolve_timeout(params)
-        session_folder = _resolve_session_folder(params)
+        if params.get("metadata_project_path"):
+            output_path = _resolve_output_path(params, Path.cwd())
+        else:
+            session_folder = _resolve_session_folder(params)
+            output_path = _resolve_output_path(params, session_folder)
 
         default_project = _initial_project_value(params)
         prompt = params.get("metadata_project_prompt", _DEFAULT_PROMPT)
@@ -115,7 +128,6 @@ def run_pre_acquisition(param_source: Any, overrides: Optional[Mapping[str, Any]
             return 1
         project_name = resolved_project
 
-        output_path = session_folder / "project.json"
         output_path.write_text(
             json.dumps({"project_name": project_name}, indent=2), encoding="utf-8"
         )

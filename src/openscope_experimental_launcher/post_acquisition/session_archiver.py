@@ -476,7 +476,7 @@ def run_post_acquisition(
 
     base_session = params.get("session_dir") or params.get("output_session_folder")
     if not base_session:
-        LOG.error("Parameter 'session_dir' missing and no output_session_folder available")
+        LOG.error("Provide session_dir or output_session_folder for session archiving")
         return 2
     session_dir = Path(base_session).expanduser().resolve()
 

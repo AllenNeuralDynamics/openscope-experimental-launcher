@@ -21,22 +21,34 @@ def _load_params(param_source: Any, overrides: Optional[Mapping[str, Any]] = Non
         if overrides:
             params.update(overrides)
         return params
-    return param_utils.load_parameters(
-        param_file=param_source,
-        overrides=overrides,
-        required_fields=["output_session_folder"],
-        defaults={},
-        help_texts={
-            "output_session_folder": "Session output folder where notes should be stored",
-        },
-    )
+    return param_utils.load_parameters(param_file=param_source, overrides=overrides)
 
 
-def _resolve_session_dir(params: Mapping[str, Any]) -> Path:
-    base = params.get("output_session_folder") or params.get("session_dir")
-    if not base:
-        raise ValueError("Missing output_session_folder parameter for experiment notes editor")
-    return Path(base).expanduser().resolve()
+def _resolve_notes_path(params: Mapping[str, Any]) -> Path:
+    filename = params.get("experiment_notes_filename", _DEFAULT_NOTES_FILENAME)
+    path = Path(str(filename)).expanduser()
+    if not path.is_absolute():
+        # If relative, resolve against cwd; placeholders should already be expanded upstream
+        path = (Path.cwd() / path).resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _ensure_header_with_pid(notes_path: Path, encoding: str, pid: int) -> None:
+    """Add header metadata with the editor PID if not present."""
+    pid_line = f"# EditorPID: {pid}\n"
+    if notes_path.exists():
+        try:
+            content = notes_path.read_text(encoding=encoding)
+        except Exception:  # noqa: BLE001
+            return
+        if "EditorPID:" in content:
+            return
+        notes_path.write_text(pid_line + content, encoding=encoding)
+    else:
+        timestamp = datetime.now(timezone.utc).isoformat()
+        header = f"# Experiment Notes\n# Created: {timestamp}\n{pid_line}\n"
+        notes_path.write_text(header, encoding=encoding)
 
 
 def _normalize_args(args: Any) -> list[str]:
@@ -52,22 +64,16 @@ def _normalize_args(args: Any) -> list[str]:
 def run_pre_acquisition(param_file: Any = None, overrides: Optional[Mapping[str, Any]] = None) -> int:
     try:
         params = _load_params(param_file, overrides)
-        session_dir = _resolve_session_dir(params)
-        notes_filename = params.get("experiment_notes_filename", _DEFAULT_NOTES_FILENAME)
-        notes_filename = notes_filename.format(session_folder=str(session_dir))
-        notes_path = Path(notes_filename)
-        if not notes_path.is_absolute():
-            notes_path = session_dir / notes_path
-        notes_path.parent.mkdir(parents=True, exist_ok=True)
+        notes_path = _resolve_notes_path(params)
 
         encoding = params.get("experiment_notes_encoding", "utf-8")
-        if not notes_path.exists():
+        if notes_path.exists():
+            LOG.info("Using existing experiment notes file at %s", notes_path)
+        else:
             timestamp = datetime.now(timezone.utc).isoformat()
             header = f"# Experiment Notes\n# Created: {timestamp}\n\n"
             notes_path.write_text(header, encoding=encoding)
             LOG.info("Created experiment notes file at %s", notes_path)
-        else:
-            LOG.info("Using existing experiment notes file at %s", notes_path)
 
         launch_editor = bool(params.get("experiment_notes_launch_editor", True))
         editor_command_param = params.get("experiment_notes_editor_command", "notepad.exe")
@@ -87,6 +93,8 @@ def run_pre_acquisition(param_file: Any = None, overrides: Optional[Mapping[str,
             try:
                 proc = subprocess.Popen(command)
                 LOG.info("Launched experiment notes editor (PID %s)", proc.pid)
+                if proc.pid:
+                    _ensure_header_with_pid(notes_path, encoding, proc.pid)
             except FileNotFoundError:
                 LOG.error("Editor command not found: %s", command[0])
                 return 1

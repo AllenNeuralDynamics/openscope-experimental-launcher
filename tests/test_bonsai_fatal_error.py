@@ -58,3 +58,39 @@ def test_timeout_terminates_process(monkeypatch):
     # Run monitor which should timeout and terminate
     launcher._monitor_process()
     assert proc._terminated is True, "Process should be terminated after timeout"
+
+
+def test_bonsai_retries_then_succeeds(monkeypatch):
+    launcher = BonsaiLauncher()
+    launcher.params.update({
+        "subject_id": "mouse",
+        "user_id": "tester",
+        "output_root_folder": ".",
+        "bonsai_max_retries": 2,
+        "bonsai_retry_delay_sec": 0,
+    })
+
+    # Always agree to retry.
+    monkeypatch.setattr(
+        "openscope_experimental_launcher.utils.param_utils.get_user_input",
+        lambda *a, **k: "y",
+    )
+
+    # Fail twice, then succeed.
+    attempts = {"n": 0}
+
+    class ImmediateExit(DummyProcess):
+        def __init__(self, rc, stderr_lines=None):
+            super().__init__(stderr_lines=stderr_lines or [])
+            self.returncode = rc
+
+    def fake_create_process():
+        attempts["n"] += 1
+        if attempts["n"] < 3:
+            return ImmediateExit(1, stderr_lines=["hardware missing"])
+        return ImmediateExit(0, stderr_lines=[])
+
+    monkeypatch.setattr(launcher, "create_process", fake_create_process)
+
+    assert launcher.start_experiment() is True
+    assert attempts["n"] == 3
