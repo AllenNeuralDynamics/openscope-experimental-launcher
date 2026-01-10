@@ -220,6 +220,9 @@ class BaseLauncher:
         # This is intentionally enforced early (before repository setup / session folder creation).
         self._enforce_param_launcher_version()
 
+        # Log the launcher version to help trace which binary ran a given param file.
+        logging.info("openscope-experimental-launcher version: %s", self._version)
+
         # Propagate any missing rig_config fields into params
         for k, v in self.rig_config.items():
             if k not in self.params:
