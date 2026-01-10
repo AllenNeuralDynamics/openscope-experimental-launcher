@@ -1,5 +1,6 @@
 {
     "launcher": "matlab",
+    "launcher_version": ">=0.0.0",
     "subject_id": "test_mouse_local",
     "user_id": "local_operator",
     "output_root_folder": "C:\\OpenScopeLocalSessions",

@@ -386,7 +386,7 @@ def run_post_acquisition(
     param_file: Union[str, Dict[str, Any]],
     overrides: Optional[Dict[str, Any]] = None,
 ) -> int:
-    required_fields = ["network_dir", "backup_dir"]
+    required_fields = ["session_dir", "network_dir", "backup_dir"]
     defaults = {
         "include_patterns": ["*"],
         "exclude_patterns": [],
@@ -397,6 +397,7 @@ def run_post_acquisition(
         "remove_empty_dirs": False,
     }
     help_texts = {
+        "session_dir": "Session output directory to archive",
         "network_dir": "Network destination where files will be copied",
         "backup_dir": "Local directory where originals are moved after verification",
     }
@@ -474,9 +475,9 @@ def run_post_acquisition(
             return current_value
         return Path(text).expanduser()
 
-    base_session = params.get("session_dir") or params.get("output_session_folder")
+    base_session = params.get("session_dir")
     if not base_session:
-        LOG.error("Provide session_dir or output_session_folder for session archiving")
+        LOG.error("Provide session_dir for session archiving")
         return 2
     session_dir = Path(base_session).expanduser().resolve()
 

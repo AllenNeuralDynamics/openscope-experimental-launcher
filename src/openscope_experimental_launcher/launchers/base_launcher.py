@@ -9,6 +9,9 @@ Interface-specific functionality is delegated to separate interface modules.
 
 import os
 import sys
+
+_DEFAULT_LAUNCHER_VERSION_SPEC = ">=0.0.0"
+
 import time
 import signal
 import logging
@@ -216,6 +219,9 @@ class BaseLauncher:
         except Exception as exc:
             raise RuntimeError(f"Parameter validation failed: {exc}") from exc
 
+        if not self.params.get("launcher_version"):
+            self.params["launcher_version"] = _DEFAULT_LAUNCHER_VERSION_SPEC
+
         # Optional safety check: ensure this param file was authored for this launcher version.
         # This is intentionally enforced early (before repository setup / session folder creation).
         self._enforce_param_launcher_version()
@@ -372,8 +378,6 @@ class BaseLauncher:
             context.setdefault("session_uuid", str(self.session_uuid))
         if self.output_session_folder:
             context.setdefault("output_session_folder", str(self.output_session_folder))
-            context.setdefault("session_folder", str(self.output_session_folder))
-            context.setdefault("session_dir", str(self.output_session_folder))
         rig_id = self.rig_config.get("rig_id") if isinstance(self.rig_config, dict) else None
         if rig_id:
             context.setdefault("rig_id", str(rig_id))
@@ -800,8 +804,8 @@ class BaseLauncher:
                     for k, v in func_args.items():
                         if isinstance(v, str):
                             # Placeholder expansion
-                            if '{session_folder}' in v and sess_dir:
-                                v = v.replace('{session_folder}', sess_dir)
+                            if '{output_session_folder}' in v and sess_dir:
+                                v = v.replace('{output_session_folder}', sess_dir)
                             # Auto-resolve for *_path/_file keys if relative
                             if sess_dir and not os.path.isabs(v) and (k.endswith('_path') or k.endswith('_file')):
                                 v = os.path.normpath(os.path.join(sess_dir, v))

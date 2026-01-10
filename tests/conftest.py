@@ -44,7 +44,8 @@ def sample_params():
         "bonsai_path": "workflows/test_workflow.bonsai",
         "repository_url": "https://github.com/test/repo.git",
         "repository_commit_hash": "main",
-        "local_repository_path": "/tmp/test_repo"
+        "local_repository_path": "/tmp/test_repo",
+        "launcher_version": ">=0.0.0"
     }
 
 

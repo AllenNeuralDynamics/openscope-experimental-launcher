@@ -1,5 +1,6 @@
 {
     "launcher": "bonsai",
+    "launcher_version": ">=0.0.0",
     "repository_url": "https://github.com/AllenNeuralDynamics/openscope-community-predictive-processing.git",
     "repository_commit_hash": "ac2b22c288b17bcd41d332dce27ef32ae87f6540",
     "local_repository_path": "C:/BonsaiDataPredictiveProcessingTest",

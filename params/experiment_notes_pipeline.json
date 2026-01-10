@@ -1,5 +1,6 @@
 {
   "launcher": "base",
+  "launcher_version": ">=0.0.0",
   "subject_id": "notes_demo_mouse",
   "user_id": "notes_tester",
   "output_root_folder": "./test_sessions",

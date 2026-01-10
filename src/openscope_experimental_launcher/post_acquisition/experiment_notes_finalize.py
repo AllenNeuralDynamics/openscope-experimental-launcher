@@ -30,7 +30,10 @@ def _resolve_notes_path(params: Mapping[str, Any]) -> Path:
     notes_filename = params.get("experiment_notes_filename", _DEFAULT_NOTES_FILENAME)
     path = Path(str(notes_filename)).expanduser()
     if not path.is_absolute():
-        path = (Path.cwd() / path).resolve()
+        base = params.get("output_session_folder")
+        if not base:
+            raise ValueError("output_session_folder is required to resolve experiment notes path")
+        path = (Path(str(base)).expanduser() / path).resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -70,15 +73,24 @@ def _show_preview(notes_path: Path, encoding: str, preview_limit: Optional[int])
         )
 
 
-def _confirm_yes(prompt: str, prompt_func) -> bool:
+def _confirm_yes(prompt: str, prompt_func, *, allow_no: bool, max_attempts: Optional[int]) -> bool:
+    attempts = 0
+    limit = max_attempts if max_attempts is not None else 3
     while True:
-        resp = prompt_func(prompt, "no")
+        resp = prompt_func(prompt, "")
         if resp is None:
             continue
         text = str(resp).strip().lower()
-        if text in {"yes", "y"}:
+        if text in {"yes", "y", ""}:
             return True
-        if text in {"no", "n", ""}:
+        if text in {"no", "n"}:
+            if allow_no:
+                LOG.info("Confirmation declined; exiting experiment notes finalization.")
+                return False
+            attempts += 1
+            if limit is not None and attempts >= limit:
+                LOG.error("Confirmation not received after %s attempt(s); aborting.", attempts)
+                return False
             LOG.info("Confirmation declined; please review notes and confirm again.")
             continue
 
@@ -111,8 +123,12 @@ def run_post_acquisition(param_file: Any = None, overrides: Optional[Mapping[str
             _show_preview(notes_path, encoding, preview_limit)
 
         prompt = params.get("experiment_notes_confirm_prompt", _DEFAULT_CONFIRM_PROMPT)
+        allow_no = bool(params.get("experiment_notes_allow_no", False))
+        max_attempts = params.get("experiment_notes_confirm_max_attempts")
         _show_preview(notes_path, encoding, preview_limit)  # fresh preview before confirmation
-        _confirm_yes(prompt, param_utils.get_user_input)
+        confirmed = _confirm_yes(prompt, param_utils.get_user_input, allow_no=allow_no, max_attempts=max_attempts)
+        if not confirmed:
+            return 1
 
         if params.get("experiment_notes_autoclose_editor", True):
             pid = _extract_editor_pid(notes_path, encoding)

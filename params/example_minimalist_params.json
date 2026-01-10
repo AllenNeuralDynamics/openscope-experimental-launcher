@@ -1,5 +1,6 @@
 {
     "launcher": "base",
+    "launcher_version": ">=0.0.0",
     "pre_acquisition_pipeline": [
         "example_pre_acquisition_module"
     ],

@@ -85,13 +85,9 @@ def run(params: Dict[str, Any]) -> int:
         params = {"manifest_path": params}
 
     # Defaults and parameters
-    session_dir_param = (
-        params.get("source_dir")
-        or params.get("output_session_folder")
-        or params.get("session_folder")
-    )
+    session_dir_param = params.get("output_session_folder")
     if not session_dir_param:
-        LOG.error("source_dir or output_session_folder is required for slap2_meta_annotator")
+        LOG.error("output_session_folder is required for slap2_meta_annotator")
         return 2
     session_dir = Path(str(session_dir_param)).expanduser().resolve()
 

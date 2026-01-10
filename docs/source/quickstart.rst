@@ -57,13 +57,15 @@ Extend the workflow by listing modules in your parameter file:
 
 * **Metadata service checks** – see ``params/example_metadata_pipeline.json`` for subject, procedures, and project validation prior to acquisition. Modules default to the in-rig host ``http://aind-metadata-service``; override via ``metadata_service_base_url`` when your deployment uses a different metadata host.
 * **Experiment notes workflow** – ``params/experiment_notes_pipeline.json`` previews notes before the run and requires confirmation after the run.
-* **Session archiver** – add ``session_archiver`` to ``post_acquisition_pipeline`` to copy data to backup storage with checksum and throughput logging.
+* **Session archiver** – add ``session_archiver`` to ``post_acquisition_pipeline`` to copy data to backup storage with checksum and throughput logging. Provide ``session_dir`` (usually ``{output_session_folder}``), plus ``network_dir`` and ``backup_dir``.
 
 You can exercise a module independently via:
 
 .. code-block:: bash
 
    python run_module.py --module_type post_acquisition --module_name session_archiver --param_file params/example_metadata_pipeline.json
+
+The param file you pass must include ``session_dir`` (or override it via ``--overrides session_dir=<path>``) in addition to the archive destinations.
 
 Outputs
 -------

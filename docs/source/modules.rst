@@ -167,9 +167,10 @@ Post-Acquisition Modules
             non-positive value to display the full file.
 
 - **session_archiver**: Transfers session artifacts to a network path, maintains a local backup, and records results in a
-    manifest for resumable copies. Logs aggregate transfer throughput (MB/s) to help benchmark archive performance. Key
-    parameters include ``network_dir``, ``backup_dir``, ``include_patterns``, ``exclude_patterns``, ``skip_completed``,
-    ``checksum_algo``, and ``max_retries``; all support placeholder expansion.
+    manifest for resumable copies. Logs aggregate transfer throughput (MB/s) to help benchmark archive performance.
+    Requires ``session_dir`` (point it at ``{output_session_folder}``), plus ``network_dir`` and ``backup_dir``. Other
+    knobs include ``include_patterns``, ``exclude_patterns``, ``skip_completed``, ``checksum_algo``, and ``max_retries``;
+    all support placeholder expansion.
 - **session_creator**: Builds standards-compliant ``session.json`` metadata, typically using AIND schema helpers.
 - **stimulus_table_predictive_processing**: Normalizes Predictive Processing stimulus tables for downstream analysis.
 - **session_enhancer_bonsai**, **session_enhancer_predictive_processing**, **session_enhancer_slap2**: Enrich session metadata
@@ -194,13 +195,13 @@ Testing Modules
 ---------------
 Design modules with pure side effects (file creation) and simple returns; write unit tests that:
 
-1. Create a temporary param file with `output_session_folder` set.
+1. Create a temporary param file with `output_session_folder` set (or `session_dir` when the module requires it, e.g., `session_archiver`).
 2. Call the module function directly.
 3. Assert expected files exist and contents are valid.
 
 Troubleshooting
 ---------------
-* Missing session folder -> ensure launcher ran initialization or `output_session_folder` provided.
+* Missing session folder -> ensure launcher ran initialization or the required key (`output_session_folder` or `session_dir`) is provided.
 * Subprocess invocation failures -> inspect `proc.stderr` and verify script path.
 * Parameter key missing -> verify placeholder expanded in `processed_parameters.json`.
 

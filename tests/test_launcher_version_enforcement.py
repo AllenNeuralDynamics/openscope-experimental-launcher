@@ -1,8 +1,10 @@
 import json
+import warnings
 from unittest.mock import patch
 
 import pytest
 
+from openscope_experimental_launcher.launchers import base_launcher
 from openscope_experimental_launcher.launchers.base_launcher import BaseLauncher
 
 
@@ -12,7 +14,7 @@ def _write_params(tmp_path, payload):
     return str(path)
 
 
-def test_launcher_version_missing_warns(tmp_path):
+def test_launcher_version_missing_sets_default(tmp_path):
     param_file = _write_params(
         tmp_path,
         {
@@ -26,8 +28,15 @@ def test_launcher_version_missing_warns(tmp_path):
         "openscope_experimental_launcher.utils.rig_config.get_rig_config",
         return_value={"rig_id": "test_rig", "output_root_folder": "C:/tmp"},
     ):
-        with pytest.warns(RuntimeWarning, match=r"does not specify 'launcher_version'"):
-            BaseLauncher(param_file=param_file)
+        with warnings.catch_warnings(record=True) as record:
+            warnings.simplefilter("always")
+            launcher = BaseLauncher(param_file=param_file)
+
+    assert record == []
+    assert (
+        launcher.params["launcher_version"]
+        == base_launcher._DEFAULT_LAUNCHER_VERSION_SPEC
+    )
 
 
 def test_launcher_version_matching_allows(tmp_path):

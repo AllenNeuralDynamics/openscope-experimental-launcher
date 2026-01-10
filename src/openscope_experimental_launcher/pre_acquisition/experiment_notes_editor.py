@@ -28,8 +28,10 @@ def _resolve_notes_path(params: Mapping[str, Any]) -> Path:
     filename = params.get("experiment_notes_filename", _DEFAULT_NOTES_FILENAME)
     path = Path(str(filename)).expanduser()
     if not path.is_absolute():
-        # If relative, resolve against cwd; placeholders should already be expanded upstream
-        path = (Path.cwd() / path).resolve()
+        base = params.get("output_session_folder")
+        if not base:
+            raise ValueError("output_session_folder is required to resolve experiment notes path")
+        path = (Path(str(base)).expanduser() / path).resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 

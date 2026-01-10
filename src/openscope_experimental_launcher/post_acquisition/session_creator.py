@@ -62,20 +62,34 @@ class SessionCreator:
             return False
 
     def create_session_file(self, force: bool = False) -> bool:
-        if not AIND_DATA_SCHEMA_AVAILABLE:
-            logging.error("aind-data-schema not available, cannot create session file")
-            return False
         if self.session_file.exists() and not force:
             logging.info(f"Session file already exists: {self.session_file}")
             logging.info("Use --force to overwrite")
             return True
+
         try:
             session_start_time = self._get_session_start_time()
             session_end_time = self._get_session_end_time()
-            # Flattened schema support: subject_id/user_id directly on end_state
             subject_id = self.end_state.get('subject_id', self.launcher_metadata.get('subject_id', 'unknown'))
             user_id = self.end_state.get('user_id', self.launcher_metadata.get('user_id', 'unknown'))
             rig_id = self.end_state.get('rig_config', {}).get('rig_id', self.launcher_metadata.get('rig_id', 'unknown'))
+
+            if not AIND_DATA_SCHEMA_AVAILABLE:
+                logging.warning("aind-data-schema not available, writing minimal session.json")
+                minimal = {
+                    "subject_id": subject_id,
+                    "user_id": user_id,
+                    "experimenter_full_name": [user_id] if user_id else [],
+                    "rig_id": rig_id,
+                    "session_start_time": session_start_time.isoformat(),
+                    "session_end_time": session_end_time.isoformat(),
+                    "notes": self._get_session_notes(),
+                }
+                with open(self.session_file, 'w', encoding='utf-8') as f:
+                    json.dump(minimal, f, indent=2)
+                logging.info(f"Session file created: {self.session_file}")
+                return True
+
             session = Session(
                 experimenter_full_name=[user_id],
                 session_start_time=session_start_time,

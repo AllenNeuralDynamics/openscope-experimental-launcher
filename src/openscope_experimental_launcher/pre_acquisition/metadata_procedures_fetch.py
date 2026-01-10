@@ -37,10 +37,10 @@ def _resolve_subject_id(params: Mapping[str, Any]) -> str:
 
 
 def _resolve_session_folder(params: Mapping[str, Any]) -> Path:
-    session_dir = params.get("session_dir") or params.get("output_session_folder")
+    session_dir = params.get("output_session_folder")
     if not session_dir:
-        raise metadata_api.MetadataServiceError("Provide session_dir or output_session_folder for metadata caching")
-    path = Path(session_dir).expanduser()
+        raise metadata_api.MetadataServiceError("Provide output_session_folder for metadata caching")
+    path = Path(str(session_dir)).expanduser()
     path.mkdir(parents=True, exist_ok=True)
     return path
 

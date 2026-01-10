@@ -42,8 +42,8 @@ To reduce the chance of running a parameter file with an incompatible launcher r
 include the following optional top-level fields:
 
 - ``launcher_version`` (recommended): a `PEP 440 <https://peps.python.org/pep-0440/>`_ version specifier set
-  indicating which launcher versions are allowed to run this file, for example ``">=0.2,<0.3"``.
-  If omitted, the launcher continues but emits a warning.
+  indicating which launcher versions are allowed to run this file, for example ``">=0.2.7"``.
+  If omitted, the launcher fills ``>=<current>`` by default so enforcement still runs.
 - ``$schema`` (optional): URL (or local path) of the JSON Schema the file was authored against.
   Pin this to an immutable tag/commit in your params repo rather than ``main``.
 
@@ -53,7 +53,7 @@ Example:
 
    {
      "$schema": "https://raw.githubusercontent.com/<org>/<params-repo>/v2025.12/schemas/launcher/1.7.0.json",
-     "launcher_version": ">=0.2,<0.3",
+    "launcher_version": ">=0.2.7",
      "launcher": "base",
      "subject_id": "mouse123",
      "user_id": "tester"

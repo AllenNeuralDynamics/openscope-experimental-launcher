@@ -1,5 +1,6 @@
 {
   "launcher": "base",
+  "launcher_version": ">=0.0.0",
   "output_root_folder": "./test_sessions",
   "metadata_service_timeout": 10,
   "pre_acquisition_pipeline": [

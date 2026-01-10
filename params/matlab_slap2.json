@@ -1,5 +1,6 @@
 {
     "launcher": "matlab",
+  "launcher_version": ">=0.0.0",
     "output_root_folder": "C:\\OpenScopeLocalSessions",
     "matlab_engine_name": "slap2_launcher",
     "matlab_entrypoint": "slap2_launcher",
