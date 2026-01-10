@@ -733,6 +733,13 @@ class BaseLauncher:
                             # Backward-compatible default: pass param file path.
                             result = func(param_file)
                 else:
+                    # Special-case common two-arg signatures used by launcher modules
+                    # that expect a parameter source plus optional overrides.
+                    first_two = [p.name for p in params_list][:2]
+                    if first_two in (["param_source", "overrides"], ["param_file", "overrides"]):
+                        result = func(merged_params, None)
+                        return result in (None, 0, True)
+
                     # Map by parameter names.
                     call_kwargs = {}
                     for p in params_list:
