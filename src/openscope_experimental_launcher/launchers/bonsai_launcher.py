@@ -183,7 +183,7 @@ class BonsaiLauncher(BaseLauncher):
           If omitted/null -> unlimited retries (until operator says no).
           If 0 -> no retries (fail immediately).
         - bonsai_retry_delay_sec (float): delay between retries (default 0)
-        - bonsai_fail_on_stderr (bool): treat any stderr output as failure (default False)
+        - bonsai_fail_on_stderr (bool): treat any stderr output as failure (default True)
         - bonsai_retry_error_patterns (list[str]): regex patterns; if any match stdout/stderr, treat as failure
         """
 
@@ -197,7 +197,8 @@ class BonsaiLauncher(BaseLauncher):
                 max_retries = None
 
         retry_delay = float(self.params.get("bonsai_retry_delay_sec", 0) or 0)
-        fail_on_stderr = bool(self.params.get("bonsai_fail_on_stderr", False))
+        # Default to fail on any stderr so operator is always prompted unless explicitly disabled.
+        fail_on_stderr = bool(self.params.get("bonsai_fail_on_stderr", True))
         patterns = self.params.get("bonsai_retry_error_patterns") or []
         if isinstance(patterns, str):
             patterns = [patterns]
