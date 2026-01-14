@@ -430,39 +430,33 @@ class BaseLauncher:
                     bypass_prompt.format(role=role), default="", cast_func=str
                 )
                 if str(ans).strip().lower() in {"b"}:
-                    logging.warning("Session sync bypassed by operator input; continuing without sync.")
+                    session_name = (
+                        self.session_uuid
+                        or str(self.params.get("session_uuid") or "")
+                        or self._generate_session_uuid()
+                    )
+                    self.session_uuid = session_name
+                    self.params["session_uuid"] = session_name
+                    logging.warning(
+                        "Session sync bypassed by operator input; continuing without sync using session '%s'.",
+                        session_name,
+                    )
                     return
             except Exception:
                 logging.debug("Session sync bypass prompt failed; continuing with sync.")
 
         logger = logging.getLogger(__name__)
-        try:
-            if role == "master":
-                fallback_name = (
-                    self.session_uuid
-                    or str(self.params.get("session_uuid") or "")
-                    or self._generate_session_uuid()
-                )
-                session_name = session_sync_utils.master_sync(self.params, logger, fallback_name)
-            elif role == "slave":
-                session_name = session_sync_utils.slave_sync(self.params, logger)
-            else:
-                raise ValueError("session_sync_role must be 'master' or 'slave' when enabled")
-        except Exception as exc:
-            if allow_bypass:
-                logging.error("Session sync failed: %s", exc)
-                try:
-                    ans = param_utils.get_user_input(
-                        f"Session sync failed ({exc}). Bypass and continue without sync? [y/n]",
-                        default="y",
-                        cast_func=str,
-                    )
-                    if str(ans).strip().lower() in {"y", "yes"}:
-                        logging.warning("Session sync bypassed after failure; continuing without sync.")
-                        return
-                except Exception:
-                    logging.debug("Session sync failure prompt errored; re-raising.")
-            raise
+        if role == "master":
+            fallback_name = (
+                self.session_uuid
+                or str(self.params.get("session_uuid") or "")
+                or self._generate_session_uuid()
+            )
+            session_name = session_sync_utils.master_sync(self.params, logger, fallback_name)
+        elif role == "slave":
+            session_name = session_sync_utils.slave_sync(self.params, logger)
+        else:
+            raise ValueError("session_sync_role must be 'master' or 'slave' when enabled")
 
         self.session_uuid = session_name
         self.params["session_uuid"] = session_name
