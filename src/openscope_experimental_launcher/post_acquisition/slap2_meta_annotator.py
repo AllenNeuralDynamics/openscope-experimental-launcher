@@ -93,8 +93,6 @@ def run(params: Dict[str, Any]) -> int:
 
     assume_yes = bool(params.get("assume_yes", False))
     default_brain_area = str(params.get("default_brain_area", "VISp"))
-    default_dmd1_depth = str(params.get("default_dmd1_depth", ""))
-    default_dmd2_depth = str(params.get("default_dmd2_depth", ""))
     dynamic_dir = params.get("dynamic_dir", "dynamic_data")
     structure_dir = params.get("structure_dir", "structure_stack")
     ref_stack_dir = params.get("ref_stack_dir", "dynamic_data/reference_stack")
@@ -117,22 +115,10 @@ def run(params: Dict[str, Any]) -> int:
 
     # Session-level defaults (prompt once)
     brain_area_default = _prompt(
-        "Brain area for meta files? (applies to all)",
+        "Default brain area for meta files? (used as per-file default)",
         default_brain_area,
         assume_yes=assume_yes,
     )
-    dmd1_depth = _prompt(
-        "Depth for DMD1 (microns from brain surface)?",
-        default_dmd1_depth,
-        assume_yes=assume_yes,
-    )
-    dmd2_depth = _prompt(
-        "Depth for DMD2 (microns from brain surface)?",
-        default_dmd2_depth,
-        assume_yes=assume_yes,
-    )
-
-    depth_map = {"dmd1": dmd1_depth, "dmd2": dmd2_depth}
 
     entries: List[Dict[str, Any]] = []
     counter = 1
@@ -177,11 +163,14 @@ def run(params: Dict[str, Any]) -> int:
         elif "dmd2" in stem_lower:
             device = "dmd2"
 
-        depth_value = depth_map.get(device, "")
-        if not depth_value:
-            LOG.warning("No depth provided for %s; leaving depth empty", meta_path.name)
+        depth_prompt = f"Depth for {device.upper()} (microns from brain surface)?" if device else "Depth for meta (microns from brain surface)?"
+        depth_value = _prompt(depth_prompt, None, assume_yes=assume_yes)
 
-        brain_area_value = brain_area_default
+        brain_area_value = _prompt(
+            f"Brain area for meta '{meta_path.relative_to(session_dir)}'?",
+            brain_area_default,
+            assume_yes=assume_yes,
+        )
 
         normalized_stem = _build_normalized_stem(type_choice, meta_path.stem, counter)
         counter += 1
