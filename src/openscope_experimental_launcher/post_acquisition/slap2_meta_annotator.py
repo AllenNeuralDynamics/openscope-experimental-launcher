@@ -1,7 +1,7 @@
 """Annotate and normalize SLAP2 session files before archiving.
 
 Steps:
-- Prompt operator for defaults (brain area, depth) unless assume_yes.
+- Prompt operator once for shared brain area and DMD1/DMD2 depths (no per-file prompts).
 - Discover .meta files, classify type, prompt to confirm per file.
 - Rename stems to a normalized form, move meta + sibling files into
     convention subfolders, and emit per-stem annotations and a routing
@@ -93,7 +93,8 @@ def run(params: Dict[str, Any]) -> int:
 
     assume_yes = bool(params.get("assume_yes", False))
     default_brain_area = str(params.get("default_brain_area", "VISp"))
-    default_depth = str(params.get("default_depth", "unknown"))
+    default_dmd1_depth = str(params.get("default_dmd1_depth", ""))
+    default_dmd2_depth = str(params.get("default_dmd2_depth", ""))
     dynamic_dir = params.get("dynamic_dir", "dynamic_data")
     structure_dir = params.get("structure_dir", "structure_stack")
     ref_stack_dir = params.get("ref_stack_dir", "dynamic_data/reference_stack")
@@ -116,15 +117,22 @@ def run(params: Dict[str, Any]) -> int:
 
     # Session-level defaults (prompt once)
     brain_area_default = _prompt(
-        "Default brain area for meta files?",
+        "Brain area for meta files? (applies to all)",
         default_brain_area,
         assume_yes=assume_yes,
     )
-    depth_default = _prompt(
-        "Default depth for meta files (microns from brain surface)?",
-        default_depth,
+    dmd1_depth = _prompt(
+        "Depth for DMD1 (microns from brain surface)?",
+        default_dmd1_depth,
         assume_yes=assume_yes,
     )
+    dmd2_depth = _prompt(
+        "Depth for DMD2 (microns from brain surface)?",
+        default_dmd2_depth,
+        assume_yes=assume_yes,
+    )
+
+    depth_map = {"dmd1": dmd1_depth, "dmd2": dmd2_depth}
 
     entries: List[Dict[str, Any]] = []
     counter = 1
@@ -163,16 +171,17 @@ def run(params: Dict[str, Any]) -> int:
             LOG.warning("Unknown type for %s; skipping", meta_path)
             continue
 
-        depth_value = _prompt(
-            f"Depth for {meta_path.name}? (microns from brain surface)",
-            depth_default,
-            assume_yes=assume_yes,
-        )
-        brain_area_value = _prompt(
-            f"Brain area for {meta_path.name}?",
-            brain_area_default,
-            assume_yes=assume_yes,
-        )
+        device = None
+        if "dmd1" in stem_lower:
+            device = "dmd1"
+        elif "dmd2" in stem_lower:
+            device = "dmd2"
+
+        depth_value = depth_map.get(device, "")
+        if not depth_value:
+            LOG.warning("No depth provided for %s; leaving depth empty", meta_path.name)
+
+        brain_area_value = brain_area_default
 
         normalized_stem = _build_normalized_stem(type_choice, meta_path.stem, counter)
         counter += 1
