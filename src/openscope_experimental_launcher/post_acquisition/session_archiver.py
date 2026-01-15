@@ -83,6 +83,7 @@ class SessionArchiver:
         self.deferred = 0
 
         self._routing_paths: list[Path] | None = None
+        self._routing_rel: set[str] = set()
         if self.routing_manifest_path and self.routing_manifest_path.exists():
             try:
                 data = json.loads(self.routing_manifest_path.read_text(encoding="utf-8"))
@@ -90,7 +91,9 @@ class SessionArchiver:
                 paths: list[Path] = []
                 for entry in entries:
                     for rel in entry.get("files", []) or []:
-                        paths.append(self.session_dir / rel)
+                        rel_path = Path(rel)
+                        paths.append(self.session_dir / rel_path)
+                        self._routing_rel.add(rel_path.as_posix())
                 self._routing_paths = paths
                 LOG.info("Routing manifest loaded (%d files): %s", len(paths), self.routing_manifest_path)
             except Exception as exc:  # noqa: BLE001
@@ -99,8 +102,8 @@ class SessionArchiver:
     def run(self) -> None:
         start_time = datetime.now(timezone.utc)
         bytes_transferred = 0
-        iterator = self._iter_routed_files() if self._routing_paths is not None else self._iter_session_files()
-        all_files = list(iterator)
+        # Always iterate full session for backup; gate network copy per routing manifest when present.
+        all_files = list(self._iter_session_files())
         total_files = len(all_files)
         LOG.warning("Session archiver started | files=%d | network=%s | backup=%s", total_files, self.enable_network_copy, self.enable_backup_copy)
         iterator = iter(all_files)
@@ -114,7 +117,8 @@ class SessionArchiver:
                 continue
 
             try:
-                transferred = self._process_single_file(file_path, rel_path)
+                network_allowed = (self._routing_paths is None) or (rel_key in self._routing_rel)
+                transferred = self._process_single_file(file_path, rel_path, network_allowed=network_allowed)
                 bytes_transferred += transferred
                 self.successful += 1
             except DeferredTransfer as exc:
@@ -192,14 +196,14 @@ class SessionArchiver:
             return True
         return any(fnmatch(rel, pattern) or fnmatch(path.name, pattern) for pattern in self.include_patterns)
 
-    def _process_single_file(self, source: Path, rel_path: Path) -> int:
+    def _process_single_file(self, source: Path, rel_path: Path, *, network_allowed: bool = True) -> int:
         rel_key = rel_path.as_posix()
-        dest_path = self.network_dir / rel_path if self.enable_network_copy else None
+        dest_path = self.network_dir / rel_path if (self.enable_network_copy and network_allowed) else None
         backup_path = self.backup_dir / rel_path if self.enable_backup_copy else None
 
         LOG.info("Transferring '%s'", rel_key)
 
-        if not self.enable_network_copy and not self.enable_backup_copy:
+        if not (self.enable_network_copy and network_allowed) and not self.enable_backup_copy:
             LOG.info("Network and backup transfers disabled; skipping '%s'", rel_key)
             self._mark_file(
                 rel_key,
@@ -225,17 +229,19 @@ class SessionArchiver:
         while True:
             try:
                 entry_fields: Dict[str, Any] = {
-                    "network_copy": self.enable_network_copy,
+                    "network_copy": self.enable_network_copy and network_allowed,
                     "backup_copy": self.enable_backup_copy,
                 }
 
-                if self.enable_network_copy:
+                if self.enable_network_copy and network_allowed:
                     if dest_path is None:
                         raise ValueError("Destination path unavailable for network copy")
                     self._copy_with_temp(source, dest_path)
                     checksum = self._verify_checksum(source, dest_path)
                     entry_fields["checksum"] = checksum
                     entry_fields["network_path"] = str(dest_path)
+                elif self.enable_backup_copy:
+                    entry_fields["checksum"] = self._compute_digest(source)
                 else:
                     entry_fields["checksum"] = self._compute_digest(source)
 
