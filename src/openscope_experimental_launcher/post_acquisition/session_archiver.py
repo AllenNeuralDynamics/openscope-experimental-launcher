@@ -11,6 +11,7 @@ import json
 import logging
 import shutil
 import tempfile
+import time
 from datetime import datetime, timezone
 from fnmatch import fnmatch
 from hashlib import new as new_hash
@@ -365,6 +366,19 @@ class SessionArchiver:
             json.dump(self._manifest, tmp, indent=2)
             tmp.flush()
             temp_path = Path(tmp.name)
+        # Windows can transiently lock the target; retry a few times before giving up.
+        for attempt in range(3):
+            try:
+                temp_path.replace(self.manifest_path)
+                return
+            except PermissionError:
+                if self.manifest_path.exists():
+                    try:
+                        self.manifest_path.unlink()
+                    except OSError:
+                        pass
+                time.sleep(0.2 * (attempt + 1))
+        # Final attempt without swallowing the error so callers see the failure.
         temp_path.replace(self.manifest_path)
 
     def _prune_empty_directories(self) -> None:

@@ -188,7 +188,12 @@ def run(params: Dict[str, Any]) -> int:
 
 def run_post_acquisition(param_file: Union[str, Dict[str, Any]], overrides: Optional[Dict[str, Any]] = None) -> int:
     try:
-        params = param_utils.load_parameters(param_file=param_file, overrides=overrides)
+        if isinstance(param_file, dict):
+            params = dict(param_file)
+            if overrides:
+                params.update(overrides)
+        else:
+            params = param_utils.load_parameters(param_file=param_file, overrides=overrides)
         return run(params)
     except Exception as exc:  # noqa: BLE001
         LOG.error("Stimuli annotation failed: %s", exc, exc_info=True)
