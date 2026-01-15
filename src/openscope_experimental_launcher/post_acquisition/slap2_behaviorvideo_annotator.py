@@ -144,126 +144,105 @@ def run(params: Dict[str, Any]) -> int:
         routing_manifest_path = (
             manifest_path_obj if manifest_path_obj.is_absolute() else session_dir / manifest_path_obj
         )
-            if params is None:
-                params = {}
-            elif not isinstance(params, dict):
-                LOG.warning("slap2_behaviorvideo_annotator received non-dict params; interpreting as session dir")
-                params = {"output_session_folder": params}
+    else:
+        routing_manifest_path = session_dir / "launcher_metadata" / manifest_name
 
-            session_dir_param = params.get("output_session_folder")
-            if not session_dir_param:
-                LOG.error("output_session_folder is required for slap2_behaviorvideo_annotator")
-                return 2
-            session_dir = Path(str(session_dir_param)).expanduser().resolve()
+    if not session_dir.exists():
+        LOG.error("Session directory does not exist: %s", session_dir)
+        return 2
 
-            behavior_videos_dir = params.get("behavior_videos_dir", "behavior-videos")
-            manifest_name = params.get("manifest_name", "routing_manifest.json")
+    avi_files = sorted(session_dir.rglob("*.avi"))
+    if not avi_files:
+        LOG.warning("No .avi files found under %s", session_dir)
+        return 0
 
-            manifest_path_param = params.get("manifest_path")
-            if manifest_path_param:
-                manifest_path_obj = Path(str(manifest_path_param)).expanduser()
-                routing_manifest_path = (
-                    manifest_path_obj if manifest_path_obj.is_absolute() else session_dir / manifest_path_obj
-                )
+    event_map = _discover_event_logs(session_dir)
+    name_map = _build_camera_name_map(params)
+    used_names: set[str] = set()
+    entries: List[Dict[str, Any]] = []
+    existing_entries: List[Dict[str, Any]] = manifest_utils.read_manifest_entries(routing_manifest_path)
+
+    for avi_path in avi_files:
+        camera_name = _normalize_camera_name(avi_path.stem, name_map)
+        container_name = _unique_container_name(camera_name, used_names, session_dir / behavior_videos_dir)
+        used_names.add(container_name)
+
+        dest_dir = session_dir / behavior_videos_dir / container_name
+        dest_video = dest_dir / f"video{avi_path.suffix}"
+        metadata_path = dest_dir / "metadata.csv"
+
+        event_file = _select_event_file(camera_name, event_map)
+        rows: List[Tuple[Any, Any, Any]] = []
+        if event_file and event_file.exists():
+            rows = _load_event_rows(event_file)
+        else:
+            LOG.warning("No SoftwareEvents file found for %s; writing empty metadata", camera_name)
+
+        LOG.info(
+            "Prepared behavior video package | camera=%s | src=%s | dest=%s | events=%s",
+            camera_name,
+            avi_path.relative_to(session_dir),
+            dest_dir.relative_to(session_dir),
+            event_file.name if event_file else "none",
+        )
+
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        _write_metadata_csv(metadata_path, rows)
+
+        final_video_path = dest_video
+        if final_video_path.exists():
+            final_video_path = final_video_path.with_name(final_video_path.stem + "_dup" + final_video_path.suffix)
+        shutil.move(str(avi_path), final_video_path)
+
+        dest_event_path: Path | None = None
+        if event_file and event_file.exists():
+            dest_event_path = dest_dir / event_file.name
+            if dest_event_path.exists():
+                dest_event_path = dest_event_path.with_name(dest_event_path.stem + "_dup" + dest_event_path.suffix)
+            try:
+                shutil.move(str(event_file), dest_event_path)
+            except Exception as exc:  # noqa: BLE001
+                LOG.warning("Failed to move SoftwareEvents file %s -> %s: %s", event_file, dest_event_path, exc)
+                dest_event_path = event_file
+
+        LOG.info(
+            "Behavior video packaged | camera=%s | video=%s | metadata=%s",
+            container_name,
+            final_video_path.relative_to(session_dir),
+            metadata_path.relative_to(session_dir),
+        )
+
+        file_list = [
+            final_video_path.relative_to(session_dir).as_posix(),
+            metadata_path.relative_to(session_dir).as_posix(),
+        ]
+        if dest_event_path:
+            file_list.append(dest_event_path.relative_to(session_dir).as_posix())
+
+        entries.append(
+            {
+                "container": container_name,
+                "source_video": avi_path.relative_to(session_dir).as_posix(),
+                "dest_dir": dest_dir.relative_to(session_dir).as_posix(),
+                "video": final_video_path.relative_to(session_dir).as_posix(),
+                "metadata": metadata_path.relative_to(session_dir).as_posix(),
+                "event_file": dest_event_path.relative_to(session_dir).as_posix() if dest_event_path else "",
+                "files": file_list,
+            }
+        )
+
+    if entries:
+        combined_entries = existing_entries + entries
+        metadata_files = _collect_launcher_metadata(session_dir)
+        if metadata_files:
+            existing_metadata = next((e for e in combined_entries if e.get("type") == "launcher_metadata"), None)
+            if existing_metadata:
+                merged = set(existing_metadata.get("files", []) or [])
+                merged.update(metadata_files)
+                existing_metadata["files"] = sorted(merged)
             else:
-                routing_manifest_path = session_dir / "launcher_metadata" / manifest_name
+                combined_entries.append({"type": "launcher_metadata", "files": sorted(set(metadata_files))})
+        manifest_utils.write_manifest(routing_manifest_path, combined_entries)
+        LOG.info("Behavior video manifest written: %s", routing_manifest_path)
 
-            if not session_dir.exists():
-                LOG.error("Session directory does not exist: %s", session_dir)
-                return 2
-
-            avi_files = sorted(session_dir.rglob("*.avi"))
-            if not avi_files:
-                LOG.warning("No .avi files found under %s", session_dir)
-                return 0
-
-            event_map = _discover_event_logs(session_dir)
-            name_map = _build_camera_name_map(params)
-            used_names: set[str] = set()
-            entries: List[Dict[str, Any]] = []
-            existing_entries: List[Dict[str, Any]] = manifest_utils.read_manifest_entries(routing_manifest_path)
-
-            for avi_path in avi_files:
-                camera_name = _normalize_camera_name(avi_path.stem, name_map)
-                container_name = _unique_container_name(camera_name, used_names, session_dir / behavior_videos_dir)
-                used_names.add(container_name)
-
-                dest_dir = session_dir / behavior_videos_dir / container_name
-                dest_video = dest_dir / f"video{avi_path.suffix}"
-                metadata_path = dest_dir / "metadata.csv"
-
-                event_file = _select_event_file(camera_name, event_map)
-                rows: List[Tuple[Any, Any, Any]] = []
-                if event_file and event_file.exists():
-                    rows = _load_event_rows(event_file)
-                else:
-                    LOG.warning("No SoftwareEvents file found for %s; writing empty metadata", camera_name)
-
-                LOG.info(
-                    "Prepared behavior video package | camera=%s | src=%s | dest=%s | events=%s",
-                    camera_name,
-                    avi_path.relative_to(session_dir),
-                    dest_dir.relative_to(session_dir),
-                    event_file.name if event_file else "none",
-                )
-
-                dest_dir.mkdir(parents=True, exist_ok=True)
-                _write_metadata_csv(metadata_path, rows)
-
-                final_video_path = dest_video
-                if final_video_path.exists():
-                    final_video_path = final_video_path.with_name(final_video_path.stem + "_dup" + final_video_path.suffix)
-                shutil.move(str(avi_path), final_video_path)
-
-                dest_event_path: Path | None = None
-                if event_file and event_file.exists():
-                    dest_event_path = dest_dir / event_file.name
-                    if dest_event_path.exists():
-                        dest_event_path = dest_event_path.with_name(dest_event_path.stem + "_dup" + dest_event_path.suffix)
-                    try:
-                        shutil.move(str(event_file), dest_event_path)
-                    except Exception as exc:  # noqa: BLE001
-                        LOG.warning("Failed to move SoftwareEvents file %s -> %s: %s", event_file, dest_event_path, exc)
-                        dest_event_path = event_file
-
-                LOG.info(
-                    "Behavior video packaged | camera=%s | video=%s | metadata=%s",
-                    container_name,
-                    final_video_path.relative_to(session_dir),
-                    metadata_path.relative_to(session_dir),
-                )
-
-                file_list = [
-                    final_video_path.relative_to(session_dir).as_posix(),
-                    metadata_path.relative_to(session_dir).as_posix(),
-                ]
-                if dest_event_path:
-                    file_list.append(dest_event_path.relative_to(session_dir).as_posix())
-
-                entries.append(
-                    {
-                        "container": container_name,
-                        "source_video": avi_path.relative_to(session_dir).as_posix(),
-                        "dest_dir": dest_dir.relative_to(session_dir).as_posix(),
-                        "video": final_video_path.relative_to(session_dir).as_posix(),
-                        "metadata": metadata_path.relative_to(session_dir).as_posix(),
-                        "event_file": dest_event_path.relative_to(session_dir).as_posix() if dest_event_path else "",
-                        "files": file_list,
-                    }
-                )
-
-            if entries:
-                combined_entries = existing_entries + entries
-                metadata_files = _collect_launcher_metadata(session_dir)
-                if metadata_files:
-                    existing_metadata = next((e for e in combined_entries if e.get("type") == "launcher_metadata"), None)
-                    if existing_metadata:
-                        merged = set(existing_metadata.get("files", []) or [])
-                        merged.update(metadata_files)
-                        existing_metadata["files"] = sorted(merged)
-                    else:
-                        combined_entries.append({"type": "launcher_metadata", "files": sorted(set(metadata_files))})
-                manifest_utils.write_manifest(routing_manifest_path, combined_entries)
-                LOG.info("Behavior video manifest written: %s", routing_manifest_path)
-
-            return 0
+    return 0
