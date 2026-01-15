@@ -10,6 +10,7 @@ Steps:
 from __future__ import annotations
 
 import csv
+import json
 import logging
 import shutil
 from pathlib import Path
@@ -38,14 +39,14 @@ def _select_event_file(camera_name: str, event_map: Dict[str, Path]) -> Path | N
     for candidate_key, path in event_map.items():
         if key in candidate_key or candidate_key in key:
             return path
-
-
-        def _collect_launcher_metadata(session_dir: Path) -> List[str]:
-            metadata_dir = session_dir / "launcher_metadata"
-            if not metadata_dir.exists():
-                return []
-            return [p.relative_to(session_dir).as_posix() for p in metadata_dir.rglob("*") if p.is_file()]
     return None
+
+
+def _collect_launcher_metadata(session_dir: Path) -> List[str]:
+    metadata_dir = session_dir / "launcher_metadata"
+    if not metadata_dir.exists():
+        return []
+    return [p.relative_to(session_dir).as_posix() for p in metadata_dir.rglob("*") if p.is_file()]
 
 
 def _load_event_rows(event_path: Path) -> List[Tuple[Any, Any, Any]]:
@@ -79,6 +80,8 @@ def _write_metadata_csv(csv_path: Path, rows: Sequence[Tuple[Any, Any, Any]]) ->
         writer.writerow(["ReferenceTime", "CameraFrameNumber", "CameraFrameTime"])
         for ref_time, frame_num, frame_time in rows:
             writer.writerow([ref_time, frame_num, frame_time])
+
+
 def _unique_container_name(base: str, used: set[str], root: Path) -> str:
     safe = base.replace(" ", "_")
     candidate = safe

@@ -2,7 +2,7 @@
 
 - Prompts operator to choose which .harp folder (behavior session) to use.
 - Keeps orientations_*.csv at the harp parent level.
-- Moves other CSVs into behavior/stimuli/.
+- Moves other CSVs into stimuli/ (session root) so archive lands at behavior/stimuli.
 - Ensures predictive_processing_session.csv is present in stimuli/ (copied if found elsewhere).
 - Registers all moved/copied CSVs in the routing manifest so the archiver copies them.
 """
@@ -130,8 +130,7 @@ def run(params: Dict[str, Any]) -> int:
             return 0
 
     parent_dir = chosen_dir.parent
-    behavior_root = session_dir / "behavior"
-    stimuli_dir = behavior_root / "stimuli"
+    stimuli_dir = session_dir / "stimuli"
 
     csv_paths = list(parent_dir.glob("*.csv"))
     orientation_paths: List[Path] = []

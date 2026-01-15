@@ -2,7 +2,7 @@
 
 - Discover *.harp folders under the session.
 - If multiple, default to the most recently modified; prompt operator to choose/confirm.
-- Rename the folder to <Device>.harp (default device VCO1_Behavior).
+- Move the chosen harp folder to the session root as <Device>.harp (default device VCO1_Behavior).
 - Rename contained files to include the device prefix and update YAML content to the device.
 - Append entries to the routing manifest so the archiver can route these files.
 """
@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
@@ -96,6 +97,22 @@ def _rename_files(target_dir: Path, old_stem: str, device_name: str) -> List[Pat
             new_base = device_name + old_base[len(old_stem) :]
         elif not old_base.startswith(device_name):
             new_base = f"{device_name}_{old_base}"
+
+        behavior_prefix = f"{device_name}_Behavior"
+        if new_base.startswith(behavior_prefix):
+            remainder = new_base[len(behavior_prefix) :]
+            if remainder.startswith("_"):
+                remainder = remainder[1:]
+            new_base = f"{device_name}_{remainder}" if remainder else device_name
+
+        dup_device_prefix = f"{device_name}_{device_name}_"
+        if new_base.startswith(dup_device_prefix):
+            new_base = f"{device_name}_{new_base[len(dup_device_prefix):]}"
+
+        while "__" in new_base:
+            new_base = new_base.replace("__", "_")
+        new_base = new_base.rstrip("_")
+
         new_path = path.with_name(new_base + suffix)
         if new_path != path:
             path.rename(new_path)
@@ -111,9 +128,26 @@ def _update_yaml_device(file_paths: List[Path], old_stem: str, device_name: str)
             text = path.read_text(encoding="utf-8")
             if old_stem:
                 text = text.replace(old_stem, device_name)
+            text = re.sub(r"(?m)^device:\s*.*$", f"device: {device_name}", text)
             path.write_text(text, encoding="utf-8")
         except Exception as exc:  # noqa: BLE001
             LOG.warning("Failed to update YAML device in %s: %s", path, exc)
+
+
+def _next_available_dir(base_dir: Path, desired_name: str, current_path: Path) -> Path:
+    target = base_dir / desired_name
+    if target == current_path:
+        return target
+    if not target.exists():
+        return target
+    stem = Path(desired_name).stem
+    suffix = Path(desired_name).suffix
+    counter = 2
+    while True:
+        candidate = base_dir / f"{stem}_{counter}{suffix}"
+        if candidate == current_path or not candidate.exists():
+            return candidate
+        counter += 1
 
 
 def _collect_launcher_metadata(session_dir: Path) -> List[str]:
@@ -139,6 +173,14 @@ def run(params: Dict[str, Any]) -> int:
     assume_yes = bool(params.get("assume_yes", False))
     device_name = str(params.get("device_name", "VCO1_Behavior"))
     manifest_name = params.get("manifest_name", "routing_manifest.json")
+
+    behavior_root_param = params.get("behavior_root")
+    if behavior_root_param:
+        behavior_root = Path(str(behavior_root_param)).expanduser()
+        if not behavior_root.is_absolute():
+            behavior_root = session_dir / behavior_root
+    else:
+        behavior_root = session_dir
 
     manifest_path_param = params.get("manifest_path")
     if manifest_path_param:
@@ -170,15 +212,18 @@ def run(params: Dict[str, Any]) -> int:
             return 0
 
     old_stem = chosen_dir.stem
-    target_dir = chosen_dir.with_name(f"{device_name}.harp")
-    if target_dir != chosen_dir:
-        target_dir.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(chosen_dir), target_dir)
+    target_name = f"{device_name}.harp"
+    final_harp_dir = _next_available_dir(behavior_root, target_name, chosen_dir)
+    if final_harp_dir != chosen_dir:
+        final_harp_dir.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(chosen_dir), final_harp_dir)
+    else:
+        final_harp_dir = chosen_dir
 
-    renamed_files = _rename_files(target_dir, old_stem=old_stem, device_name=device_name)
+    renamed_files = _rename_files(final_harp_dir, old_stem=old_stem, device_name=device_name)
     _update_yaml_device(renamed_files, old_stem=old_stem, device_name=device_name)
 
-    file_list = [p.relative_to(session_dir).as_posix() for p in target_dir.glob("*") if p.is_file()]
+    file_list = [p.relative_to(session_dir).as_posix() for p in final_harp_dir.glob("*") if p.is_file()]
 
     entries: List[Dict[str, Any]] = manifest_utils.read_manifest_entries(routing_manifest_path)
 
@@ -186,7 +231,7 @@ def run(params: Dict[str, Any]) -> int:
         {
             "type": "behavior_harp",
             "device": device_name,
-            "harp_dir": target_dir.relative_to(session_dir).as_posix(),
+            "harp_dir": final_harp_dir.relative_to(session_dir).as_posix(),
             "files": file_list,
         }
     )
