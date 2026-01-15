@@ -10,13 +10,13 @@ Steps:
 from __future__ import annotations
 
 import csv
-import json
 import logging
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from openscope_experimental_launcher.utils import param_utils
+from openscope_experimental_launcher.utils import manifest_utils
 
 LOG = logging.getLogger(__name__)
 
@@ -38,6 +38,13 @@ def _select_event_file(camera_name: str, event_map: Dict[str, Path]) -> Path | N
     for candidate_key, path in event_map.items():
         if key in candidate_key or candidate_key in key:
             return path
+
+
+        def _collect_launcher_metadata(session_dir: Path) -> List[str]:
+            metadata_dir = session_dir / "launcher_metadata"
+            if not metadata_dir.exists():
+                return []
+            return [p.relative_to(session_dir).as_posix() for p in metadata_dir.rglob("*") if p.is_file()]
     return None
 
 
@@ -72,13 +79,6 @@ def _write_metadata_csv(csv_path: Path, rows: Sequence[Tuple[Any, Any, Any]]) ->
         writer.writerow(["ReferenceTime", "CameraFrameNumber", "CameraFrameTime"])
         for ref_time, frame_num, frame_time in rows:
             writer.writerow([ref_time, frame_num, frame_time])
-
-
-def _write_manifest(manifest_path: Path, entries: List[Dict[str, Any]]) -> None:
-    manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({"entries": entries}, indent=2), encoding="utf-8")
-
-
 def _unique_container_name(base: str, used: set[str], root: Path) -> str:
     safe = base.replace(" ", "_")
     candidate = safe
@@ -159,12 +159,7 @@ def run(params: Dict[str, Any]) -> int:
     name_map = _build_camera_name_map(params)
     used_names: set[str] = set()
     entries: List[Dict[str, Any]] = []
-    existing_entries: List[Dict[str, Any]] = []
-    if routing_manifest_path.exists():
-        try:
-            existing_entries = json.loads(routing_manifest_path.read_text(encoding="utf-8")).get("entries", [])
-        except Exception as exc:  # noqa: BLE001
-            LOG.warning("Failed to read existing routing manifest %s: %s", routing_manifest_path, exc)
+    existing_entries: List[Dict[str, Any]] = manifest_utils.read_manifest_entries(routing_manifest_path)
 
     for avi_path in avi_files:
         camera_name = _normalize_camera_name(avi_path.stem, name_map)
@@ -235,16 +230,24 @@ def run(params: Dict[str, Any]) -> int:
         )
 
     if entries:
-        _write_manifest(routing_manifest_path, existing_entries + entries)
+        combined_entries = existing_entries + entries
+        metadata_files = _collect_launcher_metadata(session_dir)
+        if metadata_files:
+            existing_metadata = next((e for e in combined_entries if e.get("type") == "launcher_metadata"), None)
+            if existing_metadata:
+                merged = set(existing_metadata.get("files", []) or [])
+                merged.update(metadata_files)
+                existing_metadata["files"] = sorted(merged)
+            else:
+                combined_entries.append({"type": "launcher_metadata", "files": sorted(set(metadata_files))})
+        manifest_utils.write_manifest(routing_manifest_path, combined_entries)
         LOG.info("Behavior video manifest written: %s", routing_manifest_path)
 
     return 0
-
-
-def main():  # pragma: no cover - entrypoint helper
-    params = param_utils.load_parameters()
-    raise SystemExit(run(params))
-
-
-if __name__ == "__main__":  # pragma: no cover
-    main()
+def run_post_acquisition(param_file: Union[str, Dict[str, Any]], overrides: Optional[Dict[str, Any]] = None) -> int:
+    try:
+        params = param_utils.load_parameters(param_file=param_file, overrides=overrides)
+        return run(params)
+    except Exception as exc:  # noqa: BLE001
+        LOG.error("Behavior video annotation failed: %s", exc, exc_info=True)
+        return 1

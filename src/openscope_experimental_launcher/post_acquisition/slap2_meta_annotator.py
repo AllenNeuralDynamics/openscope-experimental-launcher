@@ -10,13 +10,13 @@ Steps:
 
 from __future__ import annotations
 
-import json
 import logging
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from openscope_experimental_launcher.utils import param_utils
+from openscope_experimental_launcher.utils import manifest_utils
 
 LOG = logging.getLogger(__name__)
 
@@ -67,14 +67,11 @@ def _build_normalized_stem(file_type: str, original_stem: str, counter: int) -> 
 def _write_annotation(annotation_path: Path, payload: Dict[str, Any]) -> None:
     annotation_path.parent.mkdir(parents=True, exist_ok=True)
     annotation_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-
-
-def _write_manifest(manifest_path: Path, entries: List[Dict[str, Any]]) -> None:
-    manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest = {
-        "entries": entries,
-    }
-    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+def _collect_launcher_metadata(session_dir: Path) -> List[str]:
+    metadata_dir = session_dir / "launcher_metadata"
+    if not metadata_dir.exists():
+        return []
+    return [p.relative_to(session_dir).as_posix() for p in metadata_dir.rglob("*") if p.is_file()]
 
 
 def run(params: Dict[str, Any]) -> int:
@@ -120,7 +117,7 @@ def run(params: Dict[str, Any]) -> int:
         assume_yes=assume_yes,
     )
 
-    entries: List[Dict[str, Any]] = []
+    entries: List[Dict[str, Any]] = manifest_utils.read_manifest_entries(routing_manifest_path)
     counter = 1
 
     meta_files = sorted(session_dir.rglob("*.meta"))
@@ -238,17 +235,25 @@ def run(params: Dict[str, Any]) -> int:
             }
         )
 
+    launcher_metadata_files = _collect_launcher_metadata(session_dir)
+    if launcher_metadata_files:
+        existing_metadata = next((e for e in entries if e.get("type") == "launcher_metadata"), None)
+        if existing_metadata:
+            file_set = set(existing_metadata.get("files", []) or [])
+            file_set.update(launcher_metadata_files)
+            existing_metadata["files"] = sorted(file_set)
+        else:
+            entries.append({"type": "launcher_metadata", "files": sorted(set(launcher_metadata_files))})
+
     if entries:
-        _write_manifest(routing_manifest_path, entries)
+        manifest_utils.write_manifest(routing_manifest_path, entries)
         LOG.info("Routing manifest written: %s", routing_manifest_path)
 
     return 0
-
-
-def main():  # pragma: no cover - entrypoint helper
-    params = param_utils.load_parameters()
-    raise SystemExit(run(params))
-
-
-if __name__ == "__main__":  # pragma: no cover
-    main()
+def run_post_acquisition(param_file: Union[str, Dict[str, Any]], overrides: Optional[Dict[str, Any]] = None) -> int:
+    try:
+        params = param_utils.load_parameters(param_file=param_file, overrides=overrides)
+        return run(params)
+    except Exception as exc:  # noqa: BLE001
+        LOG.error("SLAP2 meta annotation failed: %s", exc, exc_info=True)
+        return 1

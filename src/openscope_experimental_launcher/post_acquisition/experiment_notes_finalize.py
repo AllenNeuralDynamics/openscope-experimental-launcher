@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Mapping, Optional
 
 from openscope_experimental_launcher.utils import param_utils
+from openscope_experimental_launcher.utils import manifest_utils
 
 LOG = logging.getLogger(__name__)
 
@@ -111,6 +112,9 @@ def run_post_acquisition(param_file: Any = None, overrides: Optional[Mapping[str
         params = _load_params(param_file, overrides)
         notes_path = _resolve_notes_path(params)
 
+        session_dir_param = params.get("output_session_folder")
+        session_dir = Path(str(session_dir_param)).expanduser().resolve() if session_dir_param else notes_path.parent
+
         if not notes_path.exists():
             LOG.warning("Experiment notes file not found at %s; creating empty file", notes_path)
             notes_path.parent.mkdir(parents=True, exist_ok=True)
@@ -134,6 +138,29 @@ def run_post_acquisition(param_file: Any = None, overrides: Optional[Mapping[str
             pid = _extract_editor_pid(notes_path, encoding)
             if pid:
                 _try_close_pid(pid)
+
+        manifest_param = params.get("manifest_path")
+        if manifest_param:
+            manifest_path = Path(str(manifest_param)).expanduser()
+            if not manifest_path.is_absolute():
+                manifest_path = session_dir / manifest_path
+        else:
+            manifest_path = session_dir / "launcher_metadata" / "routing_manifest.json"
+
+        try:
+            rel_notes = notes_path.relative_to(session_dir).as_posix()
+            entries = manifest_utils.read_manifest_entries(manifest_path)
+            existing = next((e for e in entries if e.get("type") == "experiment_notes"), None)
+            if existing:
+                files = set(existing.get("files", []) or [])
+                files.add(rel_notes)
+                existing["files"] = sorted(files)
+            else:
+                entries.append({"type": "experiment_notes", "files": [rel_notes]})
+            manifest_utils.write_manifest(manifest_path, entries)
+            LOG.info("Experiment notes registered in routing manifest: %s", manifest_path)
+        except Exception as exc:  # noqa: BLE001
+            LOG.warning("Could not register experiment notes in manifest %s: %s", manifest_path, exc)
 
         LOG.info("Experiment notes finalized at %s", notes_path)
         return 0
