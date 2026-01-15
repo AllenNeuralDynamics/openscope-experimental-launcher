@@ -54,12 +54,12 @@ def _format_size(num_bytes: int) -> str:
     return f"{int(num_bytes)} B"
 
 
-def _pick_harp_dir(harp_dirs: List[Path], assume_yes: bool) -> Path | None:
+def _pick_harp_dir(harp_dirs: List[Path], prompt_on_multiple: bool = True) -> Path | None:
     if not harp_dirs:
         return None
     harp_dirs_sorted = sorted(harp_dirs, key=lambda p: p.stat().st_mtime, reverse=True)
     default_dir = harp_dirs_sorted[0]
-    if len(harp_dirs_sorted) == 1 or assume_yes:
+    if len(harp_dirs_sorted) == 1 or not prompt_on_multiple:
         return default_dir
 
     option_lines = []
@@ -170,7 +170,7 @@ def run(params: Dict[str, Any]) -> int:
         return 2
     session_dir = Path(str(session_dir_param)).expanduser().resolve()
 
-    assume_yes = bool(params.get("assume_yes", False))
+    prompt_on_multiple = bool(params.get("prompt_on_multiple", True))
     device_name = str(params.get("device_name", "VCO1_Behavior"))
     manifest_name = params.get("manifest_name", "routing_manifest.json")
 
@@ -200,16 +200,10 @@ def run(params: Dict[str, Any]) -> int:
         LOG.warning("No .harp folders found under %s", session_dir)
         return 0
 
-    chosen_dir = _pick_harp_dir(harp_dirs, assume_yes=assume_yes)
+    chosen_dir = _pick_harp_dir(harp_dirs, prompt_on_multiple=prompt_on_multiple)
     if chosen_dir is None:
         LOG.warning("No .harp folder selected")
         return 0
-
-    if not assume_yes:
-        confirm = _prompt(f"Use harp folder '{chosen_dir}'? (y/N)", "n", assume_yes=False)
-        if str(confirm).lower() not in {"y", "yes"}:
-            LOG.info("Operator declined harp folder selection")
-            return 0
 
     old_stem = chosen_dir.stem
     target_name = f"{device_name}.harp"
