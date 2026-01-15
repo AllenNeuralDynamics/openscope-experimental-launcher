@@ -135,7 +135,7 @@ def run(params: Dict[str, Any]) -> int:
 
     assume_yes = bool(params.get("assume_yes", False))
     behavior_videos_dir = params.get("behavior_videos_dir", "behavior-videos")
-    manifest_name = params.get("manifest_name", "behavior_videos_manifest.json")
+    manifest_name = params.get("manifest_name", "routing_manifest.json")
 
     manifest_path_param = params.get("manifest_path")
     if manifest_path_param:
@@ -159,6 +159,12 @@ def run(params: Dict[str, Any]) -> int:
     name_map = _build_camera_name_map(params)
     used_names: set[str] = set()
     entries: List[Dict[str, Any]] = []
+    existing_entries: List[Dict[str, Any]] = []
+    if routing_manifest_path.exists():
+        try:
+            existing_entries = json.loads(routing_manifest_path.read_text(encoding="utf-8")).get("entries", [])
+        except Exception as exc:  # noqa: BLE001
+            LOG.warning("Failed to read existing routing manifest %s: %s", routing_manifest_path, exc)
 
     for avi_path in avi_files:
         camera_name = _normalize_camera_name(avi_path.stem, name_map)
@@ -209,6 +215,13 @@ def run(params: Dict[str, Any]) -> int:
             metadata_path.relative_to(session_dir),
         )
 
+        file_list = [
+            final_video_path.relative_to(session_dir).as_posix(),
+            metadata_path.relative_to(session_dir).as_posix(),
+        ]
+        if event_file:
+            file_list.append(event_file.relative_to(session_dir).as_posix())
+
         entries.append(
             {
                 "container": container_name,
@@ -217,11 +230,12 @@ def run(params: Dict[str, Any]) -> int:
                 "video": final_video_path.relative_to(session_dir).as_posix(),
                 "metadata": metadata_path.relative_to(session_dir).as_posix(),
                 "event_file": event_file.relative_to(session_dir).as_posix() if event_file else "",
+                "files": file_list,
             }
         )
 
     if entries:
-        _write_manifest(routing_manifest_path, entries)
+        _write_manifest(routing_manifest_path, existing_entries + entries)
         LOG.info("Behavior video manifest written: %s", routing_manifest_path)
 
     return 0
