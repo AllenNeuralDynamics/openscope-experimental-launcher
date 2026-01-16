@@ -1,8 +1,7 @@
 """Collect and organize SLAP2 stimuli CSV files for archiving.
 
 - Prompts operator to choose which .harp folder (behavior session) to use.
-- Keeps orientations_*.csv at the harp parent level.
-- Moves other CSVs into stimuli/ (session root) so archive lands at behavior/stimuli.
+- Moves all CSVs (including orientations_*.csv) into stimuli/ (session root) so archive lands at behavior/stimuli.
 - Ensures predictive_processing_session.csv is present in stimuli/ (copied if found elsewhere).
 - Registers all moved/copied CSVs in the routing manifest so the archiver copies them.
 """
@@ -127,25 +126,18 @@ def run(params: Dict[str, Any]) -> int:
     stimuli_dir = session_dir / "stimuli"
 
     csv_paths = list(parent_dir.glob("*.csv"))
-    orientation_paths: List[Path] = []
     stimuli_paths: List[Path] = []
 
     for csv_path in csv_paths:
-        name_lower = csv_path.name.lower()
-        if name_lower.startswith("orientations_"):
-            if csv_path.parent != parent_dir:
-                dest = parent_dir / csv_path.name
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.move(str(csv_path), dest)
-                csv_path = dest
-            orientation_paths.append(csv_path)
-        else:
-            stimuli_dir.mkdir(parents=True, exist_ok=True)
-            dest = stimuli_dir / csv_path.name
-            if dest.exists():
-                dest = dest.with_name(dest.stem + "_dup" + dest.suffix)
-            shutil.move(str(csv_path), dest)
+        stimuli_dir.mkdir(parents=True, exist_ok=True)
+        dest = stimuli_dir / csv_path.name
+        if dest == csv_path:
             stimuli_paths.append(dest)
+            continue
+        if dest.exists():
+            dest = dest.with_name(dest.stem + "_dup" + dest.suffix)
+        shutil.move(str(csv_path), dest)
+        stimuli_paths.append(dest)
 
     if not any(p.name == "predictive_processing_session.csv" for p in stimuli_paths):
         extra_predictive = list(session_dir.rglob("predictive_processing_session.csv"))
@@ -161,10 +153,7 @@ def run(params: Dict[str, Any]) -> int:
             except Exception as exc:  # noqa: BLE001
                 LOG.warning("Failed to copy predictive_processing_session.csv to stimuli folder: %s", exc)
 
-    files_for_manifest = []
-    files_for_manifest.extend(p.relative_to(session_dir).as_posix() for p in orientation_paths)
-    files_for_manifest.extend(p.relative_to(session_dir).as_posix() for p in stimuli_paths)
-    files_for_manifest = sorted(set(files_for_manifest))
+    files_for_manifest = sorted({p.relative_to(session_dir).as_posix() for p in stimuli_paths})
 
     if not files_for_manifest:
         LOG.info("No stimuli CSV files found to register")
