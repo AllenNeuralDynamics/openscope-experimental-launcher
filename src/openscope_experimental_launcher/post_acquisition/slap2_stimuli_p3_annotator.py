@@ -135,17 +135,28 @@ def run(params: Dict[str, Any]) -> int:
     parent_dir = chosen_dir.parent
     stimuli_dir = behavior_root / "stimuli"
 
+    def _is_stimulus_csv(path: Path) -> bool:
+        name = path.name.lower()
+        return name.startswith("orientations_") or name == "predictive_processing_session.csv"
+
     csv_paths = []
-    for search_dir in {parent_dir, session_dir}:
-        csv_paths.extend(search_dir.glob("*.csv"))
+    search_roots = {parent_dir, session_dir}
+    for search_dir in search_roots:
+        csv_paths.extend(p for p in search_dir.glob("*.csv") if _is_stimulus_csv(p))
+
+    # Also search deeper (e.g., the original Bonsai output folder) for stimulus CSVs.
+    for p in session_dir.rglob("*.csv"):
+        if _is_stimulus_csv(p):
+            csv_paths.append(p)
+
     # Deduplicate while preserving path objects
     csv_paths = list({p.resolve(): p for p in csv_paths}.values())
 
     if not csv_paths:
-        LOG.info("No stimuli CSV files found near %s or %s", parent_dir, session_dir)
+        LOG.info("No stimuli CSV files found near harp or session root: %s | %s", parent_dir, session_dir)
         return 0
 
-    LOG.info("Found %d stimuli CSV(s) near harp: %s", len(csv_paths), [p.name for p in csv_paths])
+    LOG.info("Found %d stimulus CSV(s): %s", len(csv_paths), [p.relative_to(session_dir).as_posix() for p in csv_paths])
     stimuli_paths: List[Path] = []
     stimuli_dir.mkdir(parents=True, exist_ok=True)
 
