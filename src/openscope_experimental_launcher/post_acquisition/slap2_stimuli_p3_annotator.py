@@ -1,7 +1,7 @@
 """Collect and organize SLAP2 stimuli CSV files for archiving.
 
 - Prompts operator to choose which .harp folder (behavior session) to use.
-- Moves all CSVs (including orientations_*.csv) into stimuli/ (session root) so archive lands at behavior/stimuli.
+- Moves all CSVs (including orientations_*.csv) into behavior/stimuli/ (or stimuli/ if no behavior root).
 - Ensures predictive_processing_session.csv is present in stimuli/ (copied if found elsewhere).
 - Registers all moved/copied CSVs in the routing manifest so the archiver copies them.
 """
@@ -99,6 +99,16 @@ def run(params: Dict[str, Any]) -> int:
     prompt_on_multiple = bool(params.get("prompt_on_multiple", True))
     manifest_name = params.get("manifest_name", "routing_manifest.json")
 
+    behavior_root_param = params.get("behavior_root")
+    if behavior_root_param:
+        behavior_root = Path(str(behavior_root_param)).expanduser()
+        if not behavior_root.is_absolute():
+            behavior_root = session_dir / behavior_root
+    else:
+        behavior_root = session_dir / "behavior"
+    if not behavior_root.exists():
+        behavior_root = session_dir
+
     manifest_path_param = params.get("manifest_path")
     if manifest_path_param:
         manifest_path_obj = Path(str(manifest_path_param)).expanduser()
@@ -123,9 +133,13 @@ def run(params: Dict[str, Any]) -> int:
         return 0
 
     parent_dir = chosen_dir.parent
-    stimuli_dir = session_dir / "stimuli"
+    stimuli_dir = behavior_root / "stimuli"
 
-    csv_paths = list(parent_dir.glob("*.csv"))
+    csv_paths = []
+    for search_dir in {parent_dir, session_dir}:
+        csv_paths.extend(search_dir.glob("*.csv"))
+    # Deduplicate while preserving path objects
+    csv_paths = list({p.resolve(): p for p in csv_paths}.values())
     stimuli_paths: List[Path] = []
 
     for csv_path in csv_paths:
