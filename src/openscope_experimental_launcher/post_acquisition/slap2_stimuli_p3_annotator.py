@@ -140,17 +140,34 @@ def run(params: Dict[str, Any]) -> int:
         csv_paths.extend(search_dir.glob("*.csv"))
     # Deduplicate while preserving path objects
     csv_paths = list({p.resolve(): p for p in csv_paths}.values())
+
+    if not csv_paths:
+        LOG.info("No stimuli CSV files found near %s or %s", parent_dir, session_dir)
+        return 0
+
+    LOG.info("Found %d stimuli CSV(s) near harp: %s", len(csv_paths), [p.name for p in csv_paths])
     stimuli_paths: List[Path] = []
+    stimuli_dir.mkdir(parents=True, exist_ok=True)
 
     for csv_path in csv_paths:
-        stimuli_dir.mkdir(parents=True, exist_ok=True)
         dest = stimuli_dir / csv_path.name
         if dest == csv_path:
             stimuli_paths.append(dest)
             continue
         if dest.exists():
             dest = dest.with_name(dest.stem + "_dup" + dest.suffix)
-        shutil.move(str(csv_path), dest)
+        try:
+            shutil.move(str(csv_path), dest)
+            LOG.info("Moved stimuli CSV %s -> %s", csv_path, dest)
+        except Exception as exc:  # noqa: BLE001
+            LOG.warning("Move failed for %s -> %s (%s); attempting copy then delete", csv_path, dest, exc)
+            try:
+                shutil.copy2(csv_path, dest)
+                csv_path.unlink(missing_ok=True)
+                LOG.info("Copied stimuli CSV %s -> %s", csv_path, dest)
+            except Exception as exc_copy:  # noqa: BLE001
+                LOG.error("Failed to move or copy stimuli CSV %s -> %s: %s", csv_path, dest, exc_copy)
+                continue
         stimuli_paths.append(dest)
 
     if not any(p.name == "predictive_processing_session.csv" for p in stimuli_paths):
