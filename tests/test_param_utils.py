@@ -12,6 +12,12 @@ def test_load_parameters_from_file(tmp_path):
     assert params["foo"] == 1
     assert params["bar"] == "baz"
 
+
+def test_load_parameters_from_mapping():
+    params = param_utils.load_parameters({"foo": 1, "bar": "baz"})
+    assert params["foo"] == 1
+    assert params["bar"] == "baz"
+
 def test_load_parameters_with_overrides(tmp_path):
     param_file = tmp_path / "params.json"
     param_file.write_text(json.dumps({"foo": 1}))

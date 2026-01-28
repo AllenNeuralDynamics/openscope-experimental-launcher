@@ -1,6 +1,8 @@
 import json
 import logging
-from typing import Callable, Dict, Any, Optional
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Any, Callable, Dict, Optional, Union
 
 def get_user_input(prompt: str, default=None, cast_func=str):
     """
@@ -18,7 +20,7 @@ def get_user_input(prompt: str, default=None, cast_func=str):
 
 
 def load_parameters(
-    param_file: Optional[str] = None,
+    param_file: Optional[Union[str, Path, Mapping[str, Any]]] = None,
     overrides: Optional[Dict[str, Any]] = None,
     required_fields: Optional[list] = None,
     defaults: Optional[Dict[str, Any]] = None,
@@ -30,10 +32,13 @@ def load_parameters(
     Loads parameters from a JSON file, applies overrides, and prompts for missing required fields.
     Returns a dictionary of parameters.
     """
-    params = {}
+    params: Dict[str, Any] = {}
     if param_file:
-        with open(param_file) as f:
-            params.update(json.load(f))
+        if isinstance(param_file, Mapping):
+            params.update(param_file)
+        else:
+            with open(Path(param_file)) as f:
+                params.update(json.load(f))
     if overrides:
         params.update(overrides)
     # Prompt for missing required fields
