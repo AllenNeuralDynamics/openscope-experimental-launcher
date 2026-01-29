@@ -11,7 +11,6 @@ LOG = logging.getLogger(__name__)
 
 
 _DEF_ROOT = "behavior-videos"
-_DEF_EXTS = {".avi", ".mp4", ".mpeg", ".mpg", ".mov", ".mkv", ".mjpg", ".mjpeg", ".h264"}
 
 
 def _load_params(param_source: Any, overrides: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
@@ -31,13 +30,13 @@ def _find_behavior_roots(session_dir: Path, root_name: str) -> List[Path]:
     return roots
 
 
-def _iter_nested_files(root: Path, exts: Iterable[str]) -> List[Path]:
-    targets = []
-    ext_set = {e.lower() for e in exts}
+def _iter_nested_files(root: Path, exts: Optional[Iterable[str]]) -> List[Path]:
+    targets: List[Path] = []
+    ext_set = {e.lower() for e in exts} if exts else None
     for path in root.rglob("*"):
         if not path.is_file():
             continue
-        if path.suffix.lower() not in ext_set:
+        if ext_set is not None and path.suffix.lower() not in ext_set:
             continue
         targets.append(path)
     return targets
@@ -88,12 +87,15 @@ def run_post_acquisition(param_file: Any = None, overrides: Optional[Mapping[str
             dest_base = Path(str(destination_param)).expanduser()
             if not dest_base.is_absolute():
                 dest_base = session_dir / dest_base
-            else:
-                # Default: flatten into session_dir/<behavior_videos_root>
-                dest_base = session_dir / root_name
-            dest_base.mkdir(parents=True, exist_ok=True)
+        else:
+            # Default: flatten directly into the session folder
+            dest_base = session_dir
+        dest_base.mkdir(parents=True, exist_ok=True)
 
-        exts = params.get("behavior_videos_extensions", list(_DEF_EXTS))
+        exts_param = params.get("behavior_videos_extensions")
+        exts = None
+        if exts_param:
+            exts = list(exts_param)
         copy_only = bool(params.get("behavior_videos_copy_only", False))
         remove_empty = bool(params.get("behavior_videos_prune_empty", True))
 
