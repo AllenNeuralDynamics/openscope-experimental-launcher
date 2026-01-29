@@ -24,6 +24,7 @@ import subprocess
 import threading
 import importlib
 import importlib.util
+from importlib import metadata as importlib_metadata
 import traceback
 from pathlib import Path
 
@@ -531,6 +532,7 @@ class BaseLauncher:
         - Original input parameters from the JSON file (input_parameters.json)
         - Processed parameters after merging rig config (processed_parameters.json)
         - Command line arguments used to run the experiment
+        - Git commit snapshots for the launcher and workflow repository
         
         The processed_parameters.json file contains only the input parameters 
         (after merging with rig config) and can be used as input to replicate 
@@ -570,6 +572,48 @@ class BaseLauncher:
             with open(cmdline_file, 'w') as f:
                 json.dump(cmdline_info, f, indent=2)
             logging.info(f"Saved command line info to: {cmdline_file}")
+
+            # 4. Record git commit hashes for provenance
+            git_entries = []
+
+            # Workflow repository (if configured and is a git repo)
+            repo_path = git_manager.get_repository_path(self.params)
+            if repo_path and Path(repo_path, ".git").exists():
+                git_entries.append(
+                    {
+                        "name": "workflow_repository",
+                        "path": repo_path,
+                        "repository_url": self.params.get("repository_url"),
+                        "commit": git_manager.get_current_commit(repo_path),
+                    }
+                )
+
+            # Launcher repository (this codebase) - fall back to package version if installed from wheel
+            launcher_root = git_manager.find_repo_root(Path(__file__).resolve())
+            if launcher_root and Path(launcher_root, ".git").exists():
+                git_entries.append(
+                    {
+                        "name": "openscope-experimental-launcher",
+                        "path": launcher_root,
+                        "commit": git_manager.get_current_commit(launcher_root),
+                    }
+                )
+            else:
+                git_entries.append(
+                    {
+                        "name": "openscope-experimental-launcher",
+                        "commit": None,
+                        "package_version": importlib_metadata.version("openscope-experimental-launcher"),
+                        "source": "pip-installed (no .git)",
+                    }
+                )
+
+            git_entries = [e for e in git_entries if e.get("commit") or e.get("package_version")]
+            if git_entries:
+                git_file = os.path.join(metadata_dir, "git_revisions.json")
+                with open(git_file, "w") as f:
+                    json.dump(git_entries, f, indent=2)
+                logging.info("Recorded git revisions: %s", git_file)
             logging.info(f"Launcher metadata saved to: {metadata_dir}")
             
         except Exception as e:

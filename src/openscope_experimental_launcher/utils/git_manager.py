@@ -9,7 +9,8 @@ import logging
 import subprocess
 import shutil
 import stat
-from typing import Dict, Any, Optional
+from pathlib import Path
+from typing import Dict, Any, Optional, Union
 
 
 def _check_git_available() -> bool:
@@ -290,3 +291,22 @@ def get_repository_path(params: Dict[str, Any]) -> Optional[str]:
     
     repo_name = _get_repo_name_from_url(repo_url)
     return os.path.join(local_repo_path, repo_name)
+
+
+def find_repo_root(start_path: Union[str, Path]) -> Optional[str]:
+    """Walk upward from start_path to find the nearest git repo root."""
+    path = Path(start_path).resolve()
+    for candidate in [path, *path.parents]:
+        if (candidate / ".git").exists():
+            return str(candidate)
+    return None
+
+
+def get_current_commit(repo_path: Union[str, Path]) -> Optional[str]:
+    """Public helper to return HEAD commit hash for a repo path."""
+    repo_path = Path(repo_path)
+    if not repo_path.exists() or not (repo_path / ".git").exists():
+        return None
+    if not _check_git_available():
+        return None
+    return _get_current_commit_hash(str(repo_path))

@@ -185,7 +185,13 @@ class BonsaiLauncher(BaseLauncher):
         - bonsai_retry_delay_sec (float): delay between retries (default 0)
         - bonsai_fail_on_stderr (bool): treat any stderr output as failure (default True)
         - bonsai_retry_error_patterns (list[str]): regex patterns; if any match stdout/stderr, treat as failure
+                - bonsai_continue_on_failure (bool): legacy flag to proceed after a failure. Superseded by the
+                    explicit operator prompt below.
+                - bonsai_failure_default (str): default action when prompting on failure. One of
+                    "retry", "proceed", "abort". Defaults to "retry" when retries remain, otherwise "abort".
         """
+
+                continue_on_failure = bool(self.params.get("bonsai_continue_on_failure", False))
 
         max_retries_raw = self.params.get("bonsai_max_retries", None)
         max_retries: Optional[int]
@@ -274,34 +280,65 @@ class BonsaiLauncher(BaseLauncher):
                 if str(line).strip():
                     logging.error("Bonsai stderr: %s", line)
 
-            # Enforce optional cap.
-            if max_retries == 0:
-                return False
-            if max_retries is not None and retries_used >= max_retries:
-                return False
+            can_retry = (max_retries is None) or (retries_used < max_retries)
+            default_action = str(
+                self.params.get(
+                    "bonsai_failure_default",
+                    "proceed" if continue_on_failure else ("retry" if can_retry else "abort"),
+                )
+                or ""
+            ).lower()
+            if default_action not in {"retry", "proceed", "abort"}:
+                default_action = "retry" if can_retry else "abort"
+            if default_action == "retry" and not can_retry:
+                default_action = "abort"
 
-            # Default behavior: prompt operator to retry (default yes).
+            prompt_options = []
+            if can_retry:
+                prompt_options.append("[r]etry")
+            prompt_options.append("[p]roceed")
+            prompt_options.append("[a]bort")
+            prompt_str = " / ".join(prompt_options)
+
             try:
                 from openscope_experimental_launcher.utils import param_utils
 
-                ans = param_utils.get_user_input(
-                    f"Bonsai workflow failed ({failure_reason}). Retry? [y/n]",
-                    default="y",
+                raw = param_utils.get_user_input(
+                    f"Bonsai workflow failed ({failure_reason}). {prompt_str}?",
+                    default=default_action[0] if default_action else None,
                     cast_func=str,
                 )
-                do_retry = str(ans).strip().lower() in {"y", "yes", "1", "true"}
+                ans = str(raw).strip().lower()
             except Exception:
-                # If we cannot prompt, fail closed (do not loop unexpectedly).
-                do_retry = False
+                ans = default_action
 
-            if not do_retry:
-                return False
+            choice_map = {
+                "r": "retry",
+                "retry": "retry",
+                "p": "proceed",
+                "proceed": "proceed",
+                "c": "proceed",
+                "a": "abort",
+                "abort": "abort",
+            }
+            action = choice_map.get(ans, default_action)
 
-            if retry_delay > 0:
-                time.sleep(retry_delay)
+            if action == "retry":
+                if not can_retry:
+                    logging.error("Retry selected but maximum retries have been reached.")
+                    action = "abort"
+                else:
+                    if retry_delay > 0:
+                        time.sleep(retry_delay)
+                    retries_used += 1
+                    attempt += 1
+                    continue
 
-            retries_used += 1
-            attempt += 1
+            if action == "proceed":
+                logging.warning("Bonsai failure ignored; continuing session flow after failure.")
+                return True
+
+            return False
 
     # No _start_output_readers override; inherit BaseLauncher behavior for stdout/stderr logging.
 
