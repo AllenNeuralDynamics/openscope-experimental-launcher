@@ -178,18 +178,18 @@ class BonsaiLauncher(BaseLauncher):
 
         Default behavior: on failure, ask the operator whether to retry (default yes).
 
-        Controlled via params:
-        - bonsai_max_retries (int | null): maximum retries after the first attempt.
-          If omitted/null -> unlimited retries (until operator says no).
-          If 0 -> no retries (fail immediately).
-        - bonsai_retry_delay_sec (float): delay between retries (default 0)
-        - bonsai_fail_on_stderr (bool): treat any stderr output as failure (default True)
-        - bonsai_retry_error_patterns (list[str]): regex patterns; if any match stdout/stderr, treat as failure
+                Controlled via params:
+                - bonsai_max_retries (int | null): maximum retries after the first attempt.
+                    If omitted/null -> unlimited retries (until operator says no).
+                    If 0 -> no retries (fail immediately).
+                - bonsai_retry_delay_sec (float): delay between retries (default 0)
+                - bonsai_fail_on_stderr (bool): treat any stderr output as failure (default True)
+                - bonsai_retry_error_patterns (list[str]): regex patterns; if any match stdout/stderr, treat as failure
                 - bonsai_continue_on_failure (bool): legacy flag to proceed after a failure. Superseded by the
                     explicit operator prompt below.
                 - bonsai_failure_default (str): default action when prompting on failure. One of
                     "retry", "proceed", "abort". Defaults to "retry" when retries remain, otherwise "abort".
-        """
+                """
 
                 continue_on_failure = bool(self.params.get("bonsai_continue_on_failure", False))
 
