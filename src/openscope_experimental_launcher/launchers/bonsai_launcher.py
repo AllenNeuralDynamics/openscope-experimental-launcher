@@ -191,7 +191,7 @@ class BonsaiLauncher(BaseLauncher):
                     "retry", "proceed", "abort". Defaults to "retry" when retries remain, otherwise "abort".
                 """
 
-                continue_on_failure = bool(self.params.get("bonsai_continue_on_failure", False))
+        continue_on_failure = bool(self.params.get("bonsai_continue_on_failure", False))
 
         max_retries_raw = self.params.get("bonsai_max_retries", None)
         max_retries: Optional[int]
