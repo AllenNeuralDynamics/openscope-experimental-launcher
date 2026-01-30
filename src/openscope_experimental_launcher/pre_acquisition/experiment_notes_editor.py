@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import shlex
 import subprocess
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Optional
 
@@ -48,7 +48,7 @@ def _ensure_header_with_pid(notes_path: Path, encoding: str, pid: int) -> None:
             return
         notes_path.write_text(pid_line + content, encoding=encoding)
     else:
-        timestamp = datetime.now(timezone.utc).isoformat()
+        timestamp = datetime.now().astimezone().isoformat()
         header = f"# Experiment Notes\n# Created: {timestamp}\n{pid_line}\n"
         notes_path.write_text(header, encoding=encoding)
 
@@ -72,7 +72,7 @@ def run_pre_acquisition(param_file: Any = None, overrides: Optional[Mapping[str,
         if notes_path.exists():
             LOG.info("Using existing experiment notes file at %s", notes_path)
         else:
-            timestamp = datetime.now(timezone.utc).isoformat()
+            timestamp = datetime.now().astimezone().isoformat()
             header = f"# Experiment Notes\n# Created: {timestamp}\n\n"
             notes_path.write_text(header, encoding=encoding)
             LOG.info("Created experiment notes file at %s", notes_path)
