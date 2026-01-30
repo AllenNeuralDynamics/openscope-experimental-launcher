@@ -95,6 +95,13 @@ class SessionArchiver:
                         rel_path = Path(rel)
                         paths.append(self.session_dir / rel_path)
                         self._routing_rel.add(rel_path.as_posix())
+                # Always include key session metadata even if omitted from routing manifest
+                for required_rel in ("subject.json", "project.json"):
+                    rel_path = Path(required_rel)
+                    full_path = self.session_dir / rel_path
+                    if full_path.exists():
+                        paths.append(full_path)
+                        self._routing_rel.add(rel_path.as_posix())
                 self._routing_paths = paths
                 LOG.info("Routing manifest loaded (%d files): %s", len(paths), self.routing_manifest_path)
             except Exception as exc:  # noqa: BLE001
