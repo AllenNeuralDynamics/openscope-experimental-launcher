@@ -61,12 +61,20 @@ def _collect_siblings(meta_path: Path) -> List[Path]:
 
 
 def _build_normalized_stem(file_type: str, original_stem: str, counter: int) -> str:
-    """Normalize without adding a counter; rely on filenames for uniqueness.
+    """Normalize stem without counters, using SLAP2 prefixes.
 
-    Deduplication is still handled later when destination collisions occur.
+    dynamic -> acquisition_
+    structure -> structure_
+    ref_stack -> refStack_
     """
     base = original_stem.replace(" ", "_")
-    return f"{file_type}_{base}"
+    prefix_map = {
+        TYPE_DYNAMIC: "acquisition",
+        TYPE_STRUCTURE: "structure",
+        TYPE_REFSTACK: "refStack",
+    }
+    prefix = prefix_map.get(file_type, file_type)
+    return f"{prefix}_{base}"
 
 
 def _write_annotation(annotation_path: Path, payload: Dict[str, Any]) -> None:
