@@ -1,8 +1,7 @@
 import json
 import logging
-from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union, Mapping
 
 def get_user_input(prompt: str, default=None, cast_func=str):
     """
