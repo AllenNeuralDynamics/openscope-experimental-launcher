@@ -74,11 +74,12 @@ def _build_normalized_stem(file_type: str, original_stem: str, counter: int) -> 
         TYPE_REFSTACK: "refStack",
     }
     prefix = prefix_map.get(file_type, file_type)
-    # For SLAP2 we want deterministic prefixes while retaining meaningful rest of the stem.
-    # Strip a duplicate prefix if present, then prepend a single prefix.
+    # For SLAP2 we want deterministic prefixes while retaining the informative suffix.
+    # Strip a duplicate prefix if present, drop the first token, then prepend a single prefix.
     doubled = f"{prefix}_"
     base_no_prefix = base[len(doubled):] if base.lower().startswith(doubled.lower()) else base
-    return f"{prefix}_{base_no_prefix}"
+    base_tail = base_no_prefix.split("_", 1)[1] if "_" in base_no_prefix else base_no_prefix
+    return f"{prefix}_{base_tail}"
 
 
 def _write_annotation(annotation_path: Path, payload: Dict[str, Any]) -> None:
