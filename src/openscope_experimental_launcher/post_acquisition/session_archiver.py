@@ -96,7 +96,15 @@ class SessionArchiver:
                         paths.append(self.session_dir / rel_path)
                         self._routing_rel.add(rel_path.as_posix())
                 # Always include key session metadata even if omitted from routing manifest
-                for required_rel in ("subject.json", "project.json"):
+                always_include = ["subject.json", "project.json"]
+                # Ensure launcher_metadata directory is transferred
+                launcher_meta_dir = self.session_dir / "launcher_metadata"
+                if launcher_meta_dir.exists():
+                    for path in launcher_meta_dir.rglob("*"):
+                        if path.is_file():
+                            rel_path = path.relative_to(self.session_dir)
+                            always_include.append(rel_path.as_posix())
+                for required_rel in always_include:
                     rel_path = Path(required_rel)
                     full_path = self.session_dir / rel_path
                     if full_path.exists():
