@@ -265,13 +265,9 @@ class TestBaseLauncher:
         experiment = BaseLauncher()
         
         with patch.object(experiment, 'stop') as mock_stop:
-            # Signal handler calls sys.exit, so we need to catch SystemExit
-            with pytest.raises(SystemExit) as excinfo:
-                experiment.signal_handler(signal.SIGINT, None)
-            
-            # Check that it exits with code 0
-            assert excinfo.value.code == 0
+            experiment.signal_handler(signal.SIGINT, None)
             mock_stop.assert_called_once()
+            assert getattr(experiment, "_sigint_received", False) is True
 
     def test_str_representation(self):
         """Test string representation of experiment."""

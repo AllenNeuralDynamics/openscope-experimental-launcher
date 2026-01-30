@@ -163,6 +163,7 @@ class BaseLauncher:
         self.params = {}
         self.start_time = None
         self.stop_time = None
+        self._sigint_received = False
         self.config = {}
         self._log_level = logging.getLogger().getEffectiveLevel()
         
@@ -1105,6 +1106,7 @@ class BaseLauncher:
             True if successful, False otherwise
         """
         signal.signal(signal.SIGINT, self.signal_handler)
+        self._sigint_received = False
 
         try:
             self.start_time = datetime.datetime.now()
@@ -1361,11 +1363,12 @@ class BaseLauncher:
     def signal_handler(self, sig, frame):  # type: ignore[override]
         """Handle SIGINT (Ctrl+C) to stop experiment cleanly."""
         logging.info("Interrupt received; stopping experiment...")
+        self._sigint_received = True
         try:
             self.stop()
         except Exception as e:
             logging.error(f"Error during interrupt stop: {e}")
-        raise SystemExit(0)
+        # Do not raise here; allow run() to finish cleanup gracefully
 
     def stop(self):
         """Stop acquisition process (if running) and finalize logging."""

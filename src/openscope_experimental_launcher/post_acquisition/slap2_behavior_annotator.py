@@ -86,38 +86,66 @@ def _pick_harp_dir(harp_dirs: List[Path], prompt_on_multiple: bool = True) -> Pa
 
 
 def _rename_files(target_dir: Path, old_stem: str, device_name: str) -> List[Path]:
+    """Normalize file names to SLAP2 convention inside <device>.harp.
+
+    - .bin files -> Behavior_<rest>.bin (strip device/old_stem prefixes)
+    - .yml files -> device.yml
+    - other files keep suffix but strip device prefix if present
+    """
     renamed: List[Path] = []
     for path in list(target_dir.iterdir()):
         if not path.is_file():
             continue
         old_base = path.stem
         suffix = "".join(path.suffixes)
-        new_base = old_base
-        if old_stem and old_base.startswith(old_stem):
-            new_base = device_name + old_base[len(old_stem) :]
-        elif not old_base.startswith(device_name):
-            new_base = f"{device_name}_{old_base}"
 
-        behavior_prefix = f"{device_name}_Behavior"
-        if new_base.startswith(behavior_prefix):
-            remainder = new_base[len(behavior_prefix) :]
-            if remainder.startswith("_"):
-                remainder = remainder[1:]
-            new_base = f"{device_name}_{remainder}" if remainder else device_name
+        # Remove leading old/device prefixes
+        base = old_base
+        for prefix in [device_name, f"{device_name}_Behavior", old_stem]:
+            if prefix and base.startswith(prefix):
+                base = base[len(prefix) :]
+                base = base.lstrip("_")
 
-        dup_device_prefix = f"{device_name}_{device_name}_"
-        if new_base.startswith(dup_device_prefix):
-            new_base = f"{device_name}_{new_base[len(dup_device_prefix):]}"
+        if suffix.lower().endswith(".bin"):
+            # Ensure Behavior_ prefix
+            if base.lower().startswith("behavior"):
+                base_body = base[8:].lstrip("_") if len(base) > 8 else ""
+            else:
+                base_body = base
+            new_base = "Behavior" if not base_body else f"Behavior_{base_body}"
+        elif suffix.lower().endswith(".yml"):
+            new_base = "device"
+        else:
+            new_base = base or old_base
 
+        # Collapse duplicate underscores
         while "__" in new_base:
             new_base = new_base.replace("__", "_")
-        new_base = new_base.rstrip("_")
+        new_base = new_base.rstrip("_") or old_base
 
         new_path = path.with_name(new_base + suffix)
         if new_path != path:
             path.rename(new_path)
         renamed.append(new_path)
     return renamed
+
+
+def _ensure_device_yaml(target_dir: Path, device_name: str) -> Path:
+    yaml_path = target_dir / "device.yml"
+    if not yaml_path.exists():
+        yaml_path.write_text(f"device: {device_name}\n", encoding="utf-8")
+    else:
+        try:
+            text = yaml_path.read_text(encoding="utf-8")
+            if "device:" not in text:
+                yaml_path.write_text(f"device: {device_name}\n", encoding="utf-8")
+            else:
+                # Ensure the device line is updated
+                new_text = re.sub(r"(?m)^device:\s*.*$", f"device: {device_name}", text)
+                yaml_path.write_text(new_text, encoding="utf-8")
+        except Exception:
+            yaml_path.write_text(f"device: {device_name}\n", encoding="utf-8")
+    return yaml_path
 
 
 def _update_yaml_device(file_paths: List[Path], old_stem: str, device_name: str) -> None:
@@ -216,6 +244,7 @@ def run(params: Dict[str, Any]) -> int:
 
     renamed_files = _rename_files(final_harp_dir, old_stem=old_stem, device_name=device_name)
     _update_yaml_device(renamed_files, old_stem=old_stem, device_name=device_name)
+    _ensure_device_yaml(final_harp_dir, device_name)
 
     file_list = [p.relative_to(session_dir).as_posix() for p in final_harp_dir.glob("*") if p.is_file()]
 
