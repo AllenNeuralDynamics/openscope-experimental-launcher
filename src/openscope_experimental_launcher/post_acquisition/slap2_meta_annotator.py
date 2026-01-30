@@ -207,7 +207,7 @@ def run(params: Dict[str, Any]) -> int:
 
         proceed = True
         if not assume_yes:
-            confirm = _prompt("Apply these moves? (y/N)", "n", assume_yes=assume_yes).lower()
+            confirm = _prompt("Apply these moves? (y/N)", "y", assume_yes=assume_yes).lower()
             proceed = confirm in {"y", "yes"}
 
         if not proceed:

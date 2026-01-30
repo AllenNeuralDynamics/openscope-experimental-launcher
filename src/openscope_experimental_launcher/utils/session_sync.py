@@ -199,8 +199,8 @@ def _extract_master_config(params: Dict[str, Any]) -> MasterConfig:
         raise ValueError("session_sync_port must be provided for session sync master")
     if not expected:
         raise ValueError("session_sync_expected_slaves must be provided for session sync master")
-    timeout = float(params.get("session_sync_timeout_sec", 120.0))
-    ack_timeout = float(params.get("session_sync_ack_timeout_sec", 30.0))
+    timeout = float(params.get("session_sync_timeout_sec", 300.0))
+    ack_timeout = float(params.get("session_sync_ack_timeout_sec", 300.0))
     if timeout <= 0 or ack_timeout <= 0:
         raise ValueError("Session sync timeouts must be positive values")
 
@@ -225,8 +225,8 @@ def _extract_slave_config(params: Dict[str, Any]) -> SlaveConfig:
         raise ValueError(
             "session_sync_master_host and session_sync_port must be provided for session sync slave"
         )
-    timeout = float(params.get("session_sync_timeout_sec", 120.0))
-    ack_timeout = float(params.get("session_sync_ack_timeout_sec", 30.0))
+    timeout = float(params.get("session_sync_timeout_sec", 300.0))
+    ack_timeout = float(params.get("session_sync_ack_timeout_sec", 300.0))
     retry_delay = float(params.get("session_sync_retry_delay_sec", 1.0))
     if timeout <= 0 or ack_timeout <= 0 or retry_delay <= 0:
         raise ValueError("Session sync slave timeouts/delays must be positive values")
