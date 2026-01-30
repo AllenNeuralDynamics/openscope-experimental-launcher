@@ -98,6 +98,7 @@ def _rename_files(target_dir: Path, old_stem: str, device_name: str) -> List[Pat
             continue
         old_base = path.stem
         suffix = "".join(path.suffixes)
+        is_yaml = suffix.lower() in {".yml", ".yaml"}
 
         # Remove leading old/device prefixes
         base = old_base
@@ -113,8 +114,9 @@ def _rename_files(target_dir: Path, old_stem: str, device_name: str) -> List[Pat
             else:
                 base_body = base
             new_base = "Behavior" if not base_body else f"Behavior_{base_body}"
-        elif suffix.lower().endswith(".yml"):
+        elif is_yaml:
             new_base = "device"
+            suffix = ".yml"
         else:
             new_base = base or old_base
 
@@ -133,18 +135,15 @@ def _rename_files(target_dir: Path, old_stem: str, device_name: str) -> List[Pat
 def _ensure_device_yaml(target_dir: Path, device_name: str) -> Path:
     yaml_path = target_dir / "device.yml"
     if not yaml_path.exists():
-        yaml_path.write_text(f"device: {device_name}\n", encoding="utf-8")
-    else:
-        try:
-            text = yaml_path.read_text(encoding="utf-8")
-            if "device:" not in text:
-                yaml_path.write_text(f"device: {device_name}\n", encoding="utf-8")
-            else:
-                # Ensure the device line is updated
-                new_text = re.sub(r"(?m)^device:\s*.*$", f"device: {device_name}", text)
-                yaml_path.write_text(new_text, encoding="utf-8")
-        except Exception:
-            yaml_path.write_text(f"device: {device_name}\n", encoding="utf-8")
+        LOG.warning("device.yml missing in %s for device %s; expected from Bonsai output", target_dir, device_name)
+        return yaml_path
+
+    try:
+        text = yaml_path.read_text(encoding="utf-8")
+        new_text = re.sub(r"(?m)^device:\s*.*$", f"device: {device_name}", text)
+        yaml_path.write_text(new_text, encoding="utf-8")
+    except Exception as exc:  # noqa: BLE001
+        LOG.warning("Failed to update device.yml in %s: %s", target_dir, exc)
     return yaml_path
 
 
@@ -224,6 +223,7 @@ def run(params: Dict[str, Any]) -> int:
         return 2
 
     harp_dirs = _list_harp_dirs(session_dir)
+    LOG.info("Found %d .harp folder(s) under %s", len(harp_dirs), session_dir)
     if not harp_dirs:
         LOG.warning("No .harp folders found under %s", session_dir)
         return 0
@@ -232,6 +232,7 @@ def run(params: Dict[str, Any]) -> int:
     if chosen_dir is None:
         LOG.warning("No .harp folder selected")
         return 0
+    LOG.info("Selected harp folder: %s", chosen_dir)
 
     old_stem = chosen_dir.stem
     target_name = f"{device_name}.harp"
@@ -239,10 +240,13 @@ def run(params: Dict[str, Any]) -> int:
     if final_harp_dir != chosen_dir:
         final_harp_dir.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(chosen_dir), final_harp_dir)
+        LOG.info("Moved harp folder %s -> %s", chosen_dir, final_harp_dir)
     else:
         final_harp_dir = chosen_dir
+        LOG.info("Using harp folder in-place: %s", final_harp_dir)
 
     renamed_files = _rename_files(final_harp_dir, old_stem=old_stem, device_name=device_name)
+    LOG.info("Renamed %d file(s) in %s", len(renamed_files), final_harp_dir)
     _update_yaml_device(renamed_files, old_stem=old_stem, device_name=device_name)
     _ensure_device_yaml(final_harp_dir, device_name)
 
