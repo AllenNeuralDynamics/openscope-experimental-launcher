@@ -74,7 +74,9 @@ def _build_normalized_stem(file_type: str, original_stem: str, counter: int) -> 
         TYPE_REFSTACK: "refStack",
     }
     prefix = prefix_map.get(file_type, file_type)
-    return f"{prefix}_{base}"
+    # For SLAP2 we want deterministic stems: acquisition_/structure_/refStack_ only.
+    # Ignore the original stem to avoid double prefixes and source-dependent names.
+    return f"{prefix}_"
 
 
 def _write_annotation(annotation_path: Path, payload: Dict[str, Any]) -> None:
