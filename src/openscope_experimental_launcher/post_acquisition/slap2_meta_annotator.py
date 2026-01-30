@@ -61,8 +61,12 @@ def _collect_siblings(meta_path: Path) -> List[Path]:
 
 
 def _build_normalized_stem(file_type: str, original_stem: str, counter: int) -> str:
+    """Normalize without adding a counter; rely on filenames for uniqueness.
+
+    Deduplication is still handled later when destination collisions occur.
+    """
     base = original_stem.replace(" ", "_")
-    return f"{file_type}_{base}_{counter:03d}"
+    return f"{file_type}_{base}"
 
 
 def _write_annotation(annotation_path: Path, payload: Dict[str, Any]) -> None:
@@ -224,6 +228,9 @@ def run(params: Dict[str, Any]) -> int:
         }
         _write_annotation(annotation_path, annotation_payload)
 
+        annotation_rel = annotation_path.relative_to(session_dir).as_posix()
+        moved_with_annotation = moved_files + [annotation_rel]
+
         entries.append(
             {
                 "source": meta_path.relative_to(session_dir).as_posix(),
@@ -232,7 +239,7 @@ def run(params: Dict[str, Any]) -> int:
                 "type": type_choice,
                 "depth": depth_value,
                 "brain_area": brain_area_value,
-                "files": moved_files,
+                "files": moved_with_annotation,
             }
         )
 
@@ -245,6 +252,18 @@ def run(params: Dict[str, Any]) -> int:
             existing_metadata["files"] = sorted(file_set)
         else:
             entries.append({"type": "launcher_metadata", "files": sorted(set(launcher_metadata_files))})
+
+    # Ensure slap2_machine.json is archived
+    machine_path = session_dir / "slap2_machine.json"
+    if machine_path.exists():
+        rel = machine_path.relative_to(session_dir).as_posix()
+        existing_machine = next((e for e in entries if e.get("type") == "slap2_machine"), None)
+        if existing_machine:
+            files = set(existing_machine.get("files", []) or [])
+            files.add(rel)
+            existing_machine["files"] = sorted(files)
+        else:
+            entries.append({"type": "slap2_machine", "files": [rel]})
 
     if entries:
         manifest_utils.write_manifest(routing_manifest_path, entries)
