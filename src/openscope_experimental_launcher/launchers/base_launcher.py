@@ -1015,6 +1015,7 @@ class BaseLauncher:
             self._resource_log_data = []
         self._resource_log_interval = self.params.get("resource_log_interval", 5)
         self._resource_logging_acq_pid = acquisition_pid
+        session_path = Path(session_folder)
         def log_loop():
             import psutil, datetime, json, time
             launcher_proc = psutil.Process(os.getpid())
@@ -1026,12 +1027,33 @@ class BaseLauncher:
                         acq_proc = psutil.Process(self._resource_logging_acq_pid)
                     except Exception:
                         acq_proc = None
+                # System-wide metrics
+                try:
+                    cpu_percent = psutil.cpu_percent(interval=None)
+                    vm = psutil.virtual_memory()
+                    disk = psutil.disk_usage(str(session_path))
+                    system_stats = {
+                        "cpu_percent": cpu_percent,
+                        "memory": {
+                            "percent": vm.percent,
+                            "used_mb": vm.used / 1024 / 1024,
+                            "available_mb": vm.available / 1024 / 1024,
+                        },
+                        "disk": {
+                            "percent": disk.percent,
+                            "free_gb": disk.free / (1024 ** 3),
+                            "total_gb": disk.total / (1024 ** 3),
+                        },
+                    }
+                except Exception:
+                    system_stats = None
                 entry = {
                     "timestamp": datetime.datetime.now().isoformat(),
                     "launcher": {
                         "cpu_percent": launcher_proc.cpu_percent(interval=None),
                         "memory_mb": launcher_proc.memory_info().rss / 1024 / 1024,
                     },
+                    "system": system_stats,
                 }
                 if acq_proc:
                     try:
