@@ -9,6 +9,7 @@ from typing import Any, Mapping, MutableMapping, Optional
 from openscope_experimental_launcher.utils import metadata_api, param_utils
 
 _DEFAULT_PROMPT = "Select project name from metadata service"
+_DEFAULT_PROTOCOL_PROMPT = "Confirm animal protocol identifier"
 
 
 def _load_params(param_source: Any, overrides: Optional[Mapping[str, Any]] = None) -> MutableMapping[str, Any]:
@@ -51,6 +52,20 @@ def _initial_project_value(params: Mapping[str, Any]) -> Optional[str]:
     return None
 
 
+def _initial_protocol_value(params: Mapping[str, Any]) -> Optional[str]:
+    module_default = params.get("metadata_protocol_name") or params.get("protocol_name")
+    if module_default:
+        return str(module_default)
+    protocol_param = params.get("protocol_id")
+    if isinstance(protocol_param, str):
+        return protocol_param
+    if isinstance(protocol_param, (list, tuple)):
+        for item in protocol_param:
+            if item:
+                return str(item)
+    return None
+
+
 def _format_payload(payload: Any) -> str:
     if isinstance(payload, (dict, list)):
         return json.dumps(payload, indent=2)
@@ -65,6 +80,7 @@ def run_pre_acquisition(param_source: Any, overrides: Optional[Mapping[str, Any]
     params: MutableMapping[str, Any] = {}
     session_folder: Optional[Path] = None
     project_name: Optional[str] = None
+    protocol_id: Optional[str] = None
     try:
         params = _load_params(param_source, overrides)
         base_url = metadata_api.resolve_base_url(params)
@@ -77,12 +93,23 @@ def run_pre_acquisition(param_source: Any, overrides: Optional[Mapping[str, Any]
 
         default_project = _initial_project_value(params)
         prompt = params.get("metadata_project_prompt", _DEFAULT_PROMPT)
-        initial_project = params.get("metadata_project_name")
-        if initial_project is None:
-            initial_project = param_utils.get_user_input(prompt, default_project)
+        initial_project = param_utils.get_user_input(prompt, default_project or "")
         if initial_project is not None:
             initial_project = str(initial_project).strip()
+            if not initial_project:
+                initial_project = None
         project_name = initial_project if initial_project else None
+
+        protocol_prompt = params.get("metadata_protocol_prompt", _DEFAULT_PROTOCOL_PROMPT)
+        default_protocol = _initial_protocol_value(params)
+        protocol_raw = param_utils.get_user_input(protocol_prompt, default_protocol or "")
+        if protocol_raw is not None:
+            protocol_id = str(protocol_raw).strip()
+            if not protocol_id:
+                protocol_id = None
+        if not protocol_id:
+            logging.error("Protocol confirmation aborted: no protocol identifier provided")
+            return 1
 
         available_projects_raw = metadata_api.fetch_json(base_url, "/api/v2/project_names", timeout=timeout)
         if not isinstance(available_projects_raw, list):
@@ -129,9 +156,14 @@ def run_pre_acquisition(param_source: Any, overrides: Optional[Mapping[str, Any]
         project_name = resolved_project
 
         output_path.write_text(
-            json.dumps({"project_name": project_name}, indent=2), encoding="utf-8"
+            json.dumps({"project_name": project_name, "protocol_id": protocol_id}, indent=2), encoding="utf-8"
         )
-        logging.info("Validated project '%s' via metadata service and stored selection at %s", project_name, output_path)
+        logging.info(
+            "Validated project '%s' and confirmed protocol '%s'; stored selection at %s",
+            project_name,
+            protocol_id,
+            output_path,
+        )
         return 0
     except metadata_api.MetadataServiceError as exc:
         if exc.status_code == 400:
@@ -148,12 +180,13 @@ def run_pre_acquisition(param_source: Any, overrides: Optional[Mapping[str, Any]
             )
             if session_folder:
                 output_path = session_folder / "project.json"
-                record = {"project_name": project_name}
+                record = {"project_name": project_name, "protocol_id": protocol_id}
                 record["metadata_response"] = payload
                 _write_payload(output_path, record)
                 logging.info(
-                    "Stored project selection for '%s' at %s despite validation warnings",
+                    "Stored project selection for '%s' (protocol '%s') at %s despite validation warnings",
                     project_name or "<unknown>",
+                    protocol_id or "<unknown>",
                     output_path,
                 )
             return 0
