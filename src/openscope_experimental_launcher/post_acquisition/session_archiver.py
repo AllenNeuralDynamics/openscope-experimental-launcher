@@ -528,8 +528,11 @@ def run_post_acquisition(
     params["network_dir"] = str(network_dir)
     params["backup_dir"] = str(backup_dir)
 
-    move_to_network = _prompt_bool(f"Copy data to network destination '{network_dir}'?", True)
-    copy_to_backup = _prompt_bool(f"Copy data to backup location '{backup_dir}'?", True)
+    move_to_network_default = bool(params.get("move_to_network", True))
+    copy_to_backup_default = bool(params.get("copy_to_backup", True))
+
+    move_to_network = _prompt_bool(f"Copy data to network destination '{network_dir}'?", move_to_network_default)
+    copy_to_backup = _prompt_bool(f"Copy data to backup location '{backup_dir}'?", copy_to_backup_default)
 
     LOG.info(
         "Transfer confirmations -> network: %s | backup: %s",
