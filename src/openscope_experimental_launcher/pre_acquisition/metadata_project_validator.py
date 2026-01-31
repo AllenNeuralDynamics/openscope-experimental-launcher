@@ -64,7 +64,7 @@ def _initial_protocol_value(params: Mapping[str, Any]) -> Optional[str]:
 
 
 def _initial_operator_value(params: Mapping[str, Any]) -> Optional[str]:
-    operator = params.get("operator") or params.get("user_id")
+    operator = params.get("user_id")
     if operator:
         return str(operator)
     return None
