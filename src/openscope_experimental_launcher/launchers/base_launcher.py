@@ -1021,6 +1021,8 @@ class BaseLauncher:
             import psutil, datetime, json, time
             launcher_proc = psutil.Process(os.getpid())
             acq_proc = None
+            last_disk_io = psutil.disk_io_counters(perdisk=True)
+            last_io_time = time.monotonic()
             while not self._resource_log_stop.is_set():
                 # Attempt to resolve acquisition process if we have a PID and not yet a handle
                 if self._resource_logging_acq_pid and acq_proc is None:
@@ -1030,13 +1032,25 @@ class BaseLauncher:
                         acq_proc = None
                 # System-wide metrics
                 try:
+                    now_monotonic = time.monotonic()
+                    elapsed = max(now_monotonic - last_io_time, 1e-6)
+
                     cpu_percent = psutil.cpu_percent(interval=None)
                     vm = psutil.virtual_memory()
                     session_disk = psutil.disk_usage(str(session_path))
+
                     disks = []
+                    current_disk_io = psutil.disk_io_counters(perdisk=True)
                     for part in psutil.disk_partitions():
                         try:
                             usage = psutil.disk_usage(part.mountpoint)
+                            io_stats = current_disk_io.get(part.device) or current_disk_io.get(part.mountpoint)
+                            read_bps = write_bps = None
+                            if io_stats and part.device in last_disk_io:
+                                last_stats = last_disk_io.get(part.device)
+                                if last_stats:
+                                    read_bps = (io_stats.read_bytes - last_stats.read_bytes) / elapsed
+                                    write_bps = (io_stats.write_bytes - last_stats.write_bytes) / elapsed
                             disks.append(
                                 {
                                     "device": part.device,
@@ -1045,10 +1059,13 @@ class BaseLauncher:
                                     "percent": usage.percent,
                                     "free_gb": usage.free / (1024 ** 3),
                                     "total_gb": usage.total / (1024 ** 3),
+                                    "read_bps": read_bps,
+                                    "write_bps": write_bps,
                                 }
                             )
                         except Exception:
                             continue
+
                     system_stats = {
                         "cpu_percent": cpu_percent,
                         "memory": {
@@ -1062,9 +1079,12 @@ class BaseLauncher:
                             "free_gb": session_disk.free / (1024 ** 3),
                             "total_gb": session_disk.total / (1024 ** 3),
                         },
-                        # New: all visible disks
+                        # New: all visible disks with I/O deltas
                         "disks": disks,
                     }
+
+                    last_disk_io = current_disk_io
+                    last_io_time = now_monotonic
                 except Exception:
                     system_stats = None
                 entry = {
