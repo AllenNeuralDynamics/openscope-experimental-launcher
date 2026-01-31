@@ -53,9 +53,13 @@ def _initial_project_value(params: Mapping[str, Any]) -> Optional[str]:
 
 
 def _initial_protocol_value(params: Mapping[str, Any]) -> Optional[str]:
-    module_default = params.get("metadata_protocol_name") or params.get("protocol_name")
-    if module_default:
-        return str(module_default)
+    protocol_param = params.get("protocol_id")
+    if isinstance(protocol_param, str):
+        return protocol_param
+    if isinstance(protocol_param, (list, tuple)):
+        for item in protocol_param:
+            if item:
+                return str(item)
     return None
 
 
