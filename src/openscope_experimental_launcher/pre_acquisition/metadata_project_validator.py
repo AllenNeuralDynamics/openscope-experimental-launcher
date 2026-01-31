@@ -10,6 +10,7 @@ from openscope_experimental_launcher.utils import metadata_api, param_utils
 
 _DEFAULT_PROMPT = "Select project name from metadata service"
 _DEFAULT_PROTOCOL_PROMPT = "Confirm animal protocol identifier"
+_DEFAULT_OPERATOR_PROMPT = "Confirm operator name"
 
 
 def _load_params(param_source: Any, overrides: Optional[Mapping[str, Any]] = None) -> MutableMapping[str, Any]:
@@ -63,6 +64,13 @@ def _initial_protocol_value(params: Mapping[str, Any]) -> Optional[str]:
     return None
 
 
+def _initial_operator_value(params: Mapping[str, Any]) -> Optional[str]:
+    operator = params.get("operator") or params.get("user_id")
+    if operator:
+        return str(operator)
+    return None
+
+
 def _format_payload(payload: Any) -> str:
     if isinstance(payload, (dict, list)):
         return json.dumps(payload, indent=2)
@@ -78,6 +86,7 @@ def run_pre_acquisition(param_source: Any, overrides: Optional[Mapping[str, Any]
     session_folder: Optional[Path] = None
     project_name: Optional[str] = None
     protocol_id: Optional[str] = None
+    operator_name: Optional[str] = None
     try:
         params = _load_params(param_source, overrides)
         base_url = metadata_api.resolve_base_url(params)
@@ -107,6 +116,16 @@ def run_pre_acquisition(param_source: Any, overrides: Optional[Mapping[str, Any]
         if not protocol_id:
             logging.error("Protocol confirmation aborted: no protocol identifier provided")
             return 1
+
+        operator_prompt = params.get("metadata_operator_prompt", _DEFAULT_OPERATOR_PROMPT)
+        default_operator = _initial_operator_value(params)
+        operator_raw = param_utils.get_user_input(operator_prompt, default_operator or "")
+        if operator_raw is not None:
+            operator_name = str(operator_raw).strip()
+            if not operator_name:
+                operator_name = None
+        if not operator_name:
+            logging.warning("Operator not provided; proceeding without operator in project.json")
 
         available_projects_raw = metadata_api.fetch_json(base_url, "/api/v2/project_names", timeout=timeout)
         if not isinstance(available_projects_raw, list):
@@ -153,12 +172,14 @@ def run_pre_acquisition(param_source: Any, overrides: Optional[Mapping[str, Any]
         project_name = resolved_project
 
         output_path.write_text(
-            json.dumps({"project_name": project_name, "protocol_id": protocol_id}, indent=2), encoding="utf-8"
+            json.dumps({"project_name": project_name, "protocol_id": protocol_id, "operator": operator_name}, indent=2),
+            encoding="utf-8",
         )
         logging.info(
-            "Validated project '%s' and confirmed protocol '%s'; stored selection at %s",
+            "Validated project '%s', confirmed protocol '%s', operator '%s'; stored selection at %s",
             project_name,
             protocol_id,
+            operator_name or "<none>",
             output_path,
         )
         return 0
@@ -177,13 +198,14 @@ def run_pre_acquisition(param_source: Any, overrides: Optional[Mapping[str, Any]
             )
             if session_folder:
                 output_path = session_folder / "project.json"
-                record = {"project_name": project_name, "protocol_id": protocol_id}
+                record = {"project_name": project_name, "protocol_id": protocol_id, "operator": operator_name}
                 record["metadata_response"] = payload
                 _write_payload(output_path, record)
                 logging.info(
-                    "Stored project selection for '%s' (protocol '%s') at %s despite validation warnings",
+                    "Stored project selection for '%s' (protocol '%s', operator '%s') at %s despite validation warnings",
                     project_name or "<unknown>",
                     protocol_id or "<unknown>",
+                    operator_name or "<none>",
                     output_path,
                 )
             return 0
