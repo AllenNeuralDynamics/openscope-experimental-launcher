@@ -1032,7 +1032,23 @@ class BaseLauncher:
                 try:
                     cpu_percent = psutil.cpu_percent(interval=None)
                     vm = psutil.virtual_memory()
-                    disk = psutil.disk_usage(str(session_path))
+                    session_disk = psutil.disk_usage(str(session_path))
+                    disks = []
+                    for part in psutil.disk_partitions():
+                        try:
+                            usage = psutil.disk_usage(part.mountpoint)
+                            disks.append(
+                                {
+                                    "device": part.device,
+                                    "mountpoint": part.mountpoint,
+                                    "fstype": part.fstype,
+                                    "percent": usage.percent,
+                                    "free_gb": usage.free / (1024 ** 3),
+                                    "total_gb": usage.total / (1024 ** 3),
+                                }
+                            )
+                        except Exception:
+                            continue
                     system_stats = {
                         "cpu_percent": cpu_percent,
                         "memory": {
@@ -1040,11 +1056,14 @@ class BaseLauncher:
                             "used_mb": vm.used / 1024 / 1024,
                             "available_mb": vm.available / 1024 / 1024,
                         },
+                        # Keep single-disk summary for backward compatibility (session folder volume)
                         "disk": {
-                            "percent": disk.percent,
-                            "free_gb": disk.free / (1024 ** 3),
-                            "total_gb": disk.total / (1024 ** 3),
+                            "percent": session_disk.percent,
+                            "free_gb": session_disk.free / (1024 ** 3),
+                            "total_gb": session_disk.total / (1024 ** 3),
                         },
+                        # New: all visible disks
+                        "disks": disks,
                     }
                 except Exception:
                     system_stats = None
