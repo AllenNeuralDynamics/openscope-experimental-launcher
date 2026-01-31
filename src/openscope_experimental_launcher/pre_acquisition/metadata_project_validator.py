@@ -10,7 +10,6 @@ from openscope_experimental_launcher.utils import metadata_api, param_utils
 
 _DEFAULT_PROMPT = "Select project name from metadata service"
 _DEFAULT_PROTOCOL_PROMPT = "Confirm animal protocol identifier"
-_DEFAULT_OPERATOR_PROMPT = "Confirm operator name"
 
 
 def _load_params(param_source: Any, overrides: Optional[Mapping[str, Any]] = None) -> MutableMapping[str, Any]:
@@ -117,15 +116,11 @@ def run_pre_acquisition(param_source: Any, overrides: Optional[Mapping[str, Any]
             logging.error("Protocol confirmation aborted: no protocol identifier provided")
             return 1
 
-        operator_prompt = params.get("metadata_operator_prompt", _DEFAULT_OPERATOR_PROMPT)
-        default_operator = _initial_operator_value(params)
-        operator_raw = param_utils.get_user_input(operator_prompt, default_operator or "")
-        if operator_raw is not None:
-            operator_name = str(operator_raw).strip()
-            if not operator_name:
-                operator_name = None
+        operator_name = _initial_operator_value(params)
+        if operator_name:
+            operator_name = operator_name.strip()
         if not operator_name:
-            logging.warning("Operator not provided; proceeding without operator in project.json")
+            logging.warning("Operator not provided at launcher initialization; proceeding without operator in project.json")
 
         available_projects_raw = metadata_api.fetch_json(base_url, "/api/v2/project_names", timeout=timeout)
         if not isinstance(available_projects_raw, list):
