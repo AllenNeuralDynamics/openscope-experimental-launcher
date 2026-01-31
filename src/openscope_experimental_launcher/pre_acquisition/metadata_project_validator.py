@@ -96,6 +96,13 @@ def run_pre_acquisition(param_source: Any, overrides: Optional[Mapping[str, Any]
             session_folder = _resolve_session_folder(params)
             output_path = _resolve_output_path(params, session_folder)
 
+        logging.info("Metadata service base url: %s (timeout: %ss)", base_url, timeout)
+        logging.info(
+            "Project metadata will be written to %s (session folder: %s)",
+            output_path,
+            session_folder or "<none>",
+        )
+
         default_project = _initial_project_value(params)
         prompt = params.get("metadata_project_prompt", _DEFAULT_PROMPT)
         initial_project = param_utils.get_user_input(prompt, default_project or "")
@@ -129,6 +136,8 @@ def run_pre_acquisition(param_source: Any, overrides: Optional[Mapping[str, Any]
         available_projects = [str(name).strip() for name in available_projects_raw if str(name).strip()]
         if not available_projects:
             raise metadata_api.MetadataServiceError("Project names endpoint returned no projects")
+
+        logging.info("Retrieved %d project names from metadata service", len(available_projects))
 
         normalized_map = {proj.lower(): proj for proj in available_projects}
 
