@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import platform
+import re
 import traceback
 from dataclasses import dataclass
 from datetime import datetime
@@ -30,8 +31,10 @@ class GitHubIssueConfig:
     api_base_url: str
     token_env: str
     labels: Tuple[str, ...]
+    report_on: Tuple[str, ...]
     include_subject_user: bool
     include_rig_config: bool
+    include_launcher_log_tail: bool
     max_output_lines: int
     max_body_chars: int
 
@@ -65,8 +68,10 @@ def load_github_issue_config(params: Dict[str, Any]) -> Optional[GitHubIssueConf
             "api_base_url": params.get("github_issue_api_base_url"),
             "token_env": params.get("github_issue_token_env"),
             "labels": params.get("github_issue_labels"),
+            "report_on": params.get("github_issue_report_on"),
             "include_subject_user": params.get("github_issue_include_subject_user"),
             "include_rig_config": params.get("github_issue_include_rig_config"),
+            "include_launcher_log_tail": params.get("github_issue_include_launcher_log_tail"),
             "max_output_lines": params.get("github_issue_max_output_lines"),
             "max_body_chars": params.get("github_issue_max_body_chars"),
         }
@@ -81,8 +86,14 @@ def load_github_issue_config(params: Dict[str, Any]) -> Optional[GitHubIssueConf
         token_env = str(cfg.get("token_env") or "GITHUB_ISSUE_TOKEN")
         labels = _as_tuple(cfg.get("labels") or ("auto-report",))
 
+        # When reporting is enabled, default to reporting the most actionable failures.
+        report_on = _as_tuple(cfg.get("report_on") or ("exception", "pre_acquisition", "post_acquisition"))
+
         include_subject_user = bool(cfg.get("include_subject_user", False))
         include_rig_config = bool(cfg.get("include_rig_config", False))
+
+        # Include launcher.log tail by default, but sanitize subject/user unless explicitly enabled.
+        include_launcher_log_tail = bool(cfg.get("include_launcher_log_tail", True))
 
         max_output_lines = int(cfg.get("max_output_lines", 80))
         max_body_chars = int(cfg.get("max_body_chars", 60000))
@@ -93,8 +104,10 @@ def load_github_issue_config(params: Dict[str, Any]) -> Optional[GitHubIssueConf
             api_base_url=api_base_url,
             token_env=token_env,
             labels=labels,
+            report_on=report_on,
             include_subject_user=include_subject_user,
             include_rig_config=include_rig_config,
+            include_launcher_log_tail=include_launcher_log_tail,
             max_output_lines=max_output_lines,
             max_body_chars=max_body_chars,
         )
@@ -110,6 +123,39 @@ def _tail_lines(lines: Iterable[str], max_lines: int) -> List[str]:
     if len(items) <= max_lines:
         return items
     return items[-max_lines:]
+
+
+_RE_SUBJECT_ID = re.compile(r"(Subject ID:\s*)([^,\n\r]+)")
+_RE_USER_ID = re.compile(r"(User ID:\s*)([^,\n\r]+)")
+_RE_JSON_SUBJECT_ID = re.compile(r"(\"subject_id\"\s*:\s*)(\"[^\"]*\"|\d+)")
+_RE_JSON_USER_ID = re.compile(r"(\"user_id\"\s*:\s*)(\"[^\"]*\"|\d+)")
+
+
+def _sanitize_log_tail(lines: List[str], *, include_subject_user: bool) -> List[str]:
+    if include_subject_user:
+        return lines
+    sanitized: List[str] = []
+    for line in lines:
+        line = _RE_SUBJECT_ID.sub(r"\1<redacted>", line)
+        line = _RE_USER_ID.sub(r"\1<redacted>", line)
+        line = _RE_JSON_SUBJECT_ID.sub(r"\1\"<redacted>\"", line)
+        line = _RE_JSON_USER_ID.sub(r"\1\"<redacted>\"", line)
+        sanitized.append(line)
+    return sanitized
+
+
+def _read_text_tail(path: str, *, max_lines: int) -> List[str]:
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            return _tail_lines(f.readlines(), max_lines)
+    except Exception:
+        return []
+
+
+def _should_report(cfg: GitHubIssueConfig, kind: str) -> bool:
+    kind_norm = (kind or "").strip().lower()
+    enabled_kinds = {k.strip().lower() for k in (cfg.report_on or tuple()) if k}
+    return kind_norm in enabled_kinds
 
 
 def _read_json_file(path: str) -> Optional[Dict[str, Any]]:
@@ -149,10 +195,11 @@ def _build_issue_body(
     rig_id: Optional[str],
     session_uuid: str,
     param_file: Optional[str],
-    exc: Exception,
-    traceback_text: str,
+    exc: Optional[Exception],
+    traceback_text: Optional[str],
     stderr_tail: List[str],
     stdout_tail: List[str],
+    launcher_log_tail: List[str],
     debug_state_path: Optional[str],
     params: Dict[str, Any],
 ) -> str:
@@ -196,7 +243,10 @@ def _build_issue_body(
     lines.append("")
     lines.append("### Exception")
     lines.append("```text")
-    lines.append(f"{exc.__class__.__name__}: {exc}")
+    if exc is None:
+        lines.append("(no exception)")
+    else:
+        lines.append(f"{exc.__class__.__name__}: {exc}")
     lines.append("```")
 
     if stderr_tail:
@@ -213,11 +263,19 @@ def _build_issue_body(
         lines.extend(stdout_tail)
         lines.append("```")
 
-    lines.append("")
-    lines.append("### Traceback")
-    lines.append("```text")
-    lines.append(traceback_text)
-    lines.append("```")
+    if launcher_log_tail:
+        lines.append("")
+        lines.append("### launcher.log (tail)")
+        lines.append("```text")
+        lines.extend(launcher_log_tail)
+        lines.append("```")
+
+    if traceback_text:
+        lines.append("")
+        lines.append("### Traceback")
+        lines.append("```text")
+        lines.append(traceback_text)
+        lines.append("```")
 
     body = "\n".join(lines)
     if len(body) > cfg.max_body_chars:
@@ -290,10 +348,19 @@ def report_exception(
     cfg = load_github_issue_config(params)
     if not cfg:
         return None
+    if not _should_report(cfg, "exception"):
+        return None
 
     traceback_text = traceback.format_exc() or "(no traceback available)"
     stderr_tail = _tail_lines(stderr_lines, cfg.max_output_lines)
     stdout_tail = _tail_lines(stdout_lines, cfg.max_output_lines)
+
+    launcher_log_tail: List[str] = []
+    if output_directory and cfg.include_launcher_log_tail:
+        log_path = os.path.join(output_directory, "launcher_metadata", "launcher.log")
+        if os.path.exists(log_path):
+            launcher_log_tail = _read_text_tail(log_path, max_lines=cfg.max_output_lines)
+            launcher_log_tail = _sanitize_log_tail(launcher_log_tail, include_subject_user=cfg.include_subject_user)
 
     debug_state_path = None
     if output_directory:
@@ -313,6 +380,7 @@ def report_exception(
         traceback_text=traceback_text,
         stderr_tail=stderr_tail,
         stdout_tail=stdout_tail,
+        launcher_log_tail=launcher_log_tail,
         debug_state_path=debug_state_path,
         params=params,
     )
@@ -325,4 +393,74 @@ def report_exception(
     if debug_state_path and issue_url:
         _update_debug_state_with_issue(debug_state_path, issue_url, issue_number)
 
+    return issue_url
+
+
+def report_stage_failure(
+    *,
+    params: Dict[str, Any],
+    launcher_type: str,
+    version: str,
+    rig_id: Optional[str],
+    session_uuid: str,
+    param_file: Optional[str],
+    stage_kind: str,
+    stage_name: str,
+    failed_steps: List[str],
+    output_directory: Optional[str] = None,
+) -> Optional[str]:
+    """Create a GitHub issue when a stage reports failure (pre/post acquisition)."""
+
+    cfg = load_github_issue_config(params)
+    if not cfg:
+        return None
+    if not _should_report(cfg, stage_kind):
+        return None
+
+    short_failed = [s for s in (failed_steps or []) if s]
+    title = f"Failure: {stage_name} pipeline in {launcher_type} ({version}) [{session_uuid or 'unknown-session'}]"
+
+    launcher_log_tail: List[str] = []
+    if output_directory and cfg.include_launcher_log_tail:
+        log_path = os.path.join(output_directory, "launcher_metadata", "launcher.log")
+        if os.path.exists(log_path):
+            launcher_log_tail = _read_text_tail(log_path, max_lines=cfg.max_output_lines)
+            launcher_log_tail = _sanitize_log_tail(launcher_log_tail, include_subject_user=cfg.include_subject_user)
+
+    # Build a body that looks similar to crash reports, but without traceback.
+    lines: List[str] = []
+    lines.append("This issue was created automatically by the launcher after a pipeline stage reported failure.")
+    lines.append("")
+    lines.append("### Context")
+    lines.append(f"- Stage: `{stage_name}`")
+    lines.append(f"- Launcher type: `{launcher_type}`")
+    lines.append(f"- Launcher version: `{version}`")
+    if rig_id:
+        lines.append(f"- Rig ID: `{rig_id}`")
+    lines.append(f"- Session UUID: `{session_uuid or 'unknown'}`")
+    lines.append(f"- OS: `{platform.platform()}`")
+    lines.append(f"- Python: `{platform.python_version()}`")
+    if param_file:
+        lines.append(f"- Param file: `{param_file}`")
+    if short_failed:
+        lines.append("")
+        lines.append("### Failed steps")
+        lines.append("```text")
+        lines.extend(short_failed)
+        lines.append("```")
+    if launcher_log_tail:
+        lines.append("")
+        lines.append("### launcher.log (tail)")
+        lines.append("```text")
+        lines.extend(launcher_log_tail)
+        lines.append("```")
+
+    body = "\n".join(lines)
+    if len(body) > cfg.max_body_chars:
+        body = body[: cfg.max_body_chars - 50] + "\n\n...(truncated)"
+
+    created = create_issue(cfg=cfg, title=title, body=body)
+    if not created:
+        return None
+    issue_url, _issue_number = created
     return issue_url

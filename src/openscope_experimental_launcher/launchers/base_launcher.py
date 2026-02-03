@@ -771,6 +771,7 @@ class BaseLauncher:
         repo_path = git_manager.get_repository_path(params)
         session_folder = params.get("output_session_folder") or self.output_session_folder
         all_success = True
+        failed_steps = []
 
         def _invoke_launcher_module(mod_name: str, merged_params: dict) -> bool:
             try:
@@ -937,6 +938,7 @@ class BaseLauncher:
                 if not ok:
                     all_success = False
                     logging.error(f"{stage_name} legacy repo_module failed: {legacy_path}")
+                    failed_steps.append(str(legacy_path))
                 else:
                     logging.info(f"{stage_name} legacy repo_module completed: {legacy_path}")
                 continue
@@ -965,6 +967,7 @@ class BaseLauncher:
             if not ok:
                 all_success = False
                 logging.error(f"{stage_name} step failed: {module_path}")
+                failed_steps.append(str(module_path))
             else:
                 logging.info(f"{stage_name} step completed: {module_path}")
 
@@ -972,6 +975,12 @@ class BaseLauncher:
             logging.info(f"All {stage_name.lower()} steps completed successfully.")
         else:
             logging.warning(f"Some {stage_name.lower()} steps failed. See logs.")
+
+        # Persist failures for downstream actions (e.g., GitHub issue reporting)
+        if not hasattr(self, "_stage_failures"):
+            self._stage_failures = {}
+        self._stage_failures[pipeline_key] = failed_steps
+
         self.params.update(params)
         return all_success
 
@@ -1178,8 +1187,30 @@ class BaseLauncher:
                 self._start_resource_logging(output_session_folder, acquisition_pid=None)
 
             # Run pre-acquisition steps
-            if not self.run_pre_acquisition():
+            pre_ok = self.run_pre_acquisition()
+            if not pre_ok:
                 logging.warning("Pre-acquisition processing failed, but continuing with experiment.")
+
+                # Optional: create a GitHub Issue for pre-acquisition failures.
+                # Best-effort and never raises.
+                try:
+                    github_issue_reporter.report_stage_failure(
+                        params=self.params or {},
+                        launcher_type=self._get_launcher_type_name(),
+                        version=getattr(self, "_version", "") or "",
+                        rig_id=(getattr(self, "rig_config", {}) or {}).get("rig_id"),
+                        session_uuid=getattr(self, "session_uuid", "") or "",
+                        param_file=getattr(self, "original_param_file", None),
+                        stage_kind="pre_acquisition",
+                        stage_name="Pre-acquisition",
+                        failed_steps=(getattr(self, "_stage_failures", {}) or {}).get(
+                            "pre_acquisition_pipeline", []
+                        )
+                        or [],
+                        output_directory=self.output_session_folder,
+                    )
+                except Exception:
+                    pass
 
             # Start the experiment (implemented by interface-specific launchers)
             experiment_success = self.start_experiment()
@@ -1204,8 +1235,30 @@ class BaseLauncher:
             self.save_end_state(self.output_session_folder)
 
             # Run post-acquisition steps
-            if not self.run_post_acquisition():
+            post_ok = self.run_post_acquisition()
+            if not post_ok:
                 logging.warning("Post-acquisition processing failed, but experiment data was collected")
+
+                # Optional: create a GitHub Issue for post-acquisition failures.
+                # Best-effort and never raises.
+                try:
+                    github_issue_reporter.report_stage_failure(
+                        params=self.params or {},
+                        launcher_type=self._get_launcher_type_name(),
+                        version=getattr(self, "_version", "") or "",
+                        rig_id=(getattr(self, "rig_config", {}) or {}).get("rig_id"),
+                        session_uuid=getattr(self, "session_uuid", "") or "",
+                        param_file=getattr(self, "original_param_file", None),
+                        stage_kind="post_acquisition",
+                        stage_name="Post-acquisition",
+                        failed_steps=(getattr(self, "_stage_failures", {}) or {}).get(
+                            "post_acquisition_pipeline", []
+                        )
+                        or [],
+                        output_directory=self.output_session_folder,
+                    )
+                except Exception:
+                    pass
 
             return True
 

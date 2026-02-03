@@ -96,18 +96,22 @@ After running an experiment, you can find the log file in the session output fol
 
 .. code-block:: bash
 
-   cat /path/to/output_session_folder/experiment.log
+  cat /path/to/output_session_folder/launcher_metadata/launcher.log
 
 Or, if centralized logging is enabled:
 
 .. code-block:: bash
 
-   cat /path/to/centralized_log_directory/experiment.log
+  cat /path/to/centralized_log_directory/YYYY/MM/DD/launcher.log
 
 GitHub Crash Reporting (Optional)
 --------------------------------
 
-The launcher can optionally create a GitHub Issue when an unexpected exception occurs.
+The launcher can optionally create a GitHub Issue when:
+
+- an unexpected exception occurs, and/or
+- pre-acquisition or post-acquisition pipelines report failure.
+
 This is **opt-in** and best-effort: reporting failures never stop the launcher from writing
 ``debug_state.json`` or returning a failure.
 
@@ -125,7 +129,9 @@ an access token via an environment variable:
        "repo": "AllenNeuralDynamics/openscope-experimental-launcher",
        "token_env": "OPENSCOPE_LAUNCHER_GITHUB_TOKEN",
        "labels": ["auto-report"],
+       "report_on": ["exception", "pre_acquisition", "post_acquisition"],
        "max_output_lines": 80,
+       "include_launcher_log_tail": true,
        "include_subject_user": false,
        "include_rig_config": false
      }
@@ -142,5 +148,7 @@ Notes
 
 - Use a fine-scoped token with permission to create issues in the target repository.
 - By default the reporter avoids including ``subject_id`` / ``user_id`` in the issue body.
+- The issue body includes a tail of ``launcher_metadata/launcher.log`` by default; if
+  ``include_subject_user`` is false those fields are redacted in the log excerpt.
 - When an issue is created successfully, its URL is written back into
   ``launcher_metadata/debug_state.json`` under ``github.issue_url``.
