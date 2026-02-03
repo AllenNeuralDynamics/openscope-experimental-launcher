@@ -65,7 +65,7 @@ You can exercise a module independently via:
 
    python run_module.py --module_type post_acquisition --module_name session_archiver --param_file params/example_metadata_pipeline.json
 
-The param file you pass must include ``session_dir`` (or override it via ``--overrides session_dir=<path>``) in addition to the archive destinations.
+The param file you pass must include ``session_dir`` in addition to the archive destinations.
 
 Outputs
 -------

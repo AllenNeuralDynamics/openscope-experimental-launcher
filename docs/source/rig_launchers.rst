@@ -21,10 +21,10 @@ Quick Start
 
 .. code-block:: python
 
-   from openscope_experimental_launcher.launchers import BaseLauncher
+    from openscope_experimental_launcher.launchers import BaseLauncher
 
-   launcher = BaseLauncher()
-   launcher.run("parameters.json")
+    launcher = BaseLauncher(param_file="parameters.json")
+    success = launcher.run()
 
 Interface Adapters
 ------------------
@@ -34,13 +34,21 @@ Adapters encapsulate only process spawning. Example adapter-based customization 
 .. code-block:: python
 
    from openscope_experimental_launcher.launchers import BaseLauncher
-   from openscope_experimental_launcher.interfaces import BonsaiInterface
+   from openscope_experimental_launcher.interfaces import bonsai_interface
 
    class WorkflowLauncher(BaseLauncher):
-       def _create_process(self, script_path, parameters):
-           return BonsaiInterface.create_process(bonsai_path=script_path, parameters=parameters)
+       def create_process(self):
+           workflow_path = self.params["script_path"]
+           bonsai_exe_path = self.params["bonsai_exe_path"]
+           args = bonsai_interface.construct_workflow_arguments(self.params)
+           return bonsai_interface.start_workflow(
+               workflow_path=workflow_path,
+               bonsai_exe_path=bonsai_exe_path,
+               arguments=args,
+               output_folder=self.output_session_folder,
+           )
 
-   WorkflowLauncher().run("workflow_params.json")
+   success = WorkflowLauncher(param_file="workflow_params.json").run()
 
 MATLAB Shared Engine Adapter
 ----------------------------
@@ -84,7 +92,9 @@ Direct implementation using ``subprocess.Popen``:
    from openscope_experimental_launcher.launchers import BaseLauncher
 
    class CustomToolLauncher(BaseLauncher):
-       def _create_process(self, script_path, parameters):
+       def create_process(self):
+           script_path = self.params["script_path"]
+           parameters = self.params.get("script_parameters", {})
            cmd = ["custom_tool", script_path]
            for k, v in parameters.items():
                cmd.extend([f"--{k}", str(v)])

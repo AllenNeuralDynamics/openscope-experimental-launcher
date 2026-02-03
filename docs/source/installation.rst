@@ -76,9 +76,8 @@ Test that the installation was successful:
    import openscope_experimental_launcher
    print(openscope_experimental_launcher.__version__)
 
-.. code-block:: python
+You can also run a minimal smoke test using the repo entry point:
 
-   # Test basic functionality
-   from openscope_experimental_launcher.launchers import BaseLauncher
-   launcher = BaseLauncher()
-   print("Installation successful!")
+.. code-block:: bash
+
+   python run_launcher.py --param_file params/example_minimalist_params.json
