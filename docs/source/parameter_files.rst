@@ -6,6 +6,10 @@ JSON parameter files define experiment-specific configuration merged with rig co
 Core Keys
 ---------
 
+``launcher`` (required when using ``run_launcher.py``)
+   Which launcher implementation to use. Valid values: ``base``, ``bonsai``, ``matlab``, ``python``.
+   This selects the corresponding ``run_from_params`` entrypoint.
+
 ``script_path`` (required)
    Path to executable / script (Python, MATLAB, Bonsai, etc.).
 

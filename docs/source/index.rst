@@ -27,16 +27,11 @@ The launcher merges rig config + JSON parameter file + runtime prompts, starts a
 Key Features
 ------------
 
-🏗️ **Modular Pipelines** – Ordered pre/post module lists drive setup and teardown.
-
-🧩 **Flattened Metadata** – No nested ``session_info``; concise ``end_state.json`` + crash-focused ``debug_state.json``.
-
-� **Rig Placeholders** – Use ``{rig_param:<key>}`` in ``script_parameters`` for dynamic injection.
-
-🗂️ **Unified Parameters** – All sources merged into ``processed_parameters.json``.
-
-
-� **Post-Acquisition Generation** – ``session_creator`` builds standards-compliant ``session.json``.
+* **Modular Pipelines** – Ordered pre/post module lists drive setup and teardown.
+* **End/Debug State** – Each run writes ``end_state.json`` and (on crash) ``debug_state.json``.
+* **Rig Placeholders** – Use ``{rig_param:<key>}`` in ``script_parameters`` for dynamic injection.
+* **Unified Parameters** – Rig config + param file + prompts are merged into ``processed_parameters.json``.
+* **Post-Acquisition Generation** – Optional modules (for example ``session_creator``) can generate artifacts like ``session.json``.
 
 Quick Start
 -----------
@@ -47,7 +42,15 @@ Quick Start
    
       pip install -e .
 
-2. **Basic Usage**:
+2. **Run via the repo entry point**:
+
+   .. code-block:: bash
+
+      python run_launcher.py --param_file params/example_minimalist_params.json
+
+   Your parameter file must include a ``launcher`` key (one of: ``base``, ``bonsai``, ``matlab``, ``python``).
+
+3. **Basic usage from Python**:
 
    .. code-block:: python
 
@@ -56,26 +59,18 @@ Quick Start
       launcher = BaseLauncher(param_file="path/to/parameters.json")
       success = launcher.run()
 
-3. **Using Project Scripts**:
+4. **Parameter File Example**:
 
-   .. code-block:: bash
-   
-      # Use project-specific launcher scripts
-      python scripts/minimalist_launcher.py scripts/example_minimalist_params.json
-      python scripts/predictive_processing_launcher.py experiment_params.json
+   .. code-block:: json
 
-3. **Parameter File Example**:
-
-   .. code-block:: json      {
-          "subject_id": "test_mouse_001",
-          "user_id": "researcher_name",
-          "script_path": "path/to/workflow.bonsai",
-          "repository_url": "https://github.com/user/repo.git",
-          "output_root_folder": "C:/experiment_data",
-          "collect_mouse_runtime_data": true,
-          "protocol_id": ["protocol_001"],
-          "pre_acquisition_pipeline": ["mouse_weight_pre_prompt"],
-          "post_acquisition_pipeline": ["session_creator", "mouse_weight_post_prompt", "experiment_notes_post_prompt"]
+      {
+        "launcher": "bonsai",
+        "subject_id": "test_mouse_001",
+        "user_id": "researcher_name",
+        "script_path": "path/to/workflow.bonsai",
+        "output_root_folder": "C:/experiment_data",
+        "pre_acquisition_pipeline": ["mouse_weight_pre_prompt"],
+        "post_acquisition_pipeline": ["session_creator"]
       }
 
 Architecture
@@ -89,7 +84,7 @@ The package uses a modular architecture with clear separation of concerns:
 * **Interfaces** (``interfaces/``): Stateless subprocess creation adapters
 * **Pipeline Modules** (``pre_acquisition/`` / ``post_acquisition/``): Ordered tasks (:doc:`modules`)
 * **Utilities** (``utils/``): Configuration, Git, prompting, logging helpers
-* **Scripts** (``scripts/``): Project-specific entry points and analysis helpers
+* **Entrypoints** (repo root): ``run_launcher.py`` and ``run_module.py`` helpers
 
 **Design Principles:**
 

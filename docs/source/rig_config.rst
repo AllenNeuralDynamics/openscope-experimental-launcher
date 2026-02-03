@@ -37,7 +37,9 @@ The rig config uses TOML format for easy reading and editing:
    # These settings should remain constant across different experiments.
    #
    # DO NOT put experiment-specific parameters here!
-   # Experiment parameters belong in JSON parameter files.   rig_id = "rig-001-behavior"
+   # Experiment parameters belong in JSON parameter files.
+
+   rig_id = "rig-001-behavior"
    output_root_folder = "C:/experiment_data"
 
 Default Settings
@@ -53,6 +55,7 @@ When first created, the rig config contains:
    this directory will be used as the base for creating timestamped SessionFolders.
    
    Defaults to ``C:/experiment_data``.
+
    .. note::
       **Folder System**: The launcher uses a two-tier folder system:
       
@@ -74,7 +77,8 @@ Adding Custom Settings
 
 You can add rig-specific hardware settings:
 
-.. code-block:: toml   # Basic required settings
+.. code-block:: toml
+
    rig_id = "ophys-rig-003"
    output_root_folder = "D:/experiment_data"
 

@@ -100,7 +100,9 @@ What Goes Where
      - Rig Config
      - JSON File
      - Runtime
-     - Notes   * - rig_id
+     - Notes
+
+   * - rig_id
      - ✅
      - ❌
      - ❌
