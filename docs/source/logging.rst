@@ -103,3 +103,44 @@ Or, if centralized logging is enabled:
 .. code-block:: bash
 
    cat /path/to/centralized_log_directory/experiment.log
+
+GitHub Crash Reporting (Optional)
+--------------------------------
+
+The launcher can optionally create a GitHub Issue when an unexpected exception occurs.
+This is **opt-in** and best-effort: reporting failures never stop the launcher from writing
+``debug_state.json`` or returning a failure.
+
+Configuration
+~~~~~~~~~~~~~
+
+Add a ``github_issue`` block to your parameter file (or rig config defaults) and provide
+an access token via an environment variable:
+
+.. code-block:: json
+
+   {
+     "github_issue": {
+       "enabled": true,
+       "repo": "AllenNeuralDynamics/openscope-experimental-launcher",
+       "token_env": "OPENSCOPE_LAUNCHER_GITHUB_TOKEN",
+       "labels": ["auto-report"],
+       "max_output_lines": 80,
+       "include_subject_user": false,
+       "include_rig_config": false
+     }
+   }
+
+Then set the token in the environment on the rig machine:
+
+.. code-block:: powershell
+
+   $Env:OPENSCOPE_LAUNCHER_GITHUB_TOKEN = "<your token>"
+
+Notes
+~~~~~
+
+- Use a fine-scoped token with permission to create issues in the target repository.
+- By default the reporter avoids including ``subject_id`` / ``user_id`` in the issue body.
+- When an issue is created successfully, its URL is written back into
+  ``launcher_metadata/debug_state.json`` under ``github.issue_url``.

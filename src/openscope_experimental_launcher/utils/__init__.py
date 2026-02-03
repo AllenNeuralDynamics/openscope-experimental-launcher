@@ -9,9 +9,11 @@ process monitoring, and post-experiment processing.
 from . import rig_config
 from . import git_manager
 from . import process_monitor
+from . import github_issue_reporter
 
 __all__ = [
     "rig_config",
     "git_manager", 
-    "process_monitor"
+    "process_monitor",
+    "github_issue_reporter",
 ]

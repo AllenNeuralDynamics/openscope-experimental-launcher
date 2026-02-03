@@ -117,6 +117,7 @@ from ..utils import git_manager
 from ..utils import param_utils 
 from ..utils import schema_validator
 from ..utils import session_sync as session_sync_utils
+from ..utils import github_issue_reporter
 from .. import __version__
 
 try:
@@ -1211,6 +1212,25 @@ class BaseLauncher:
         except Exception as e:
             if hasattr(self, 'output_session_folder') and self.output_session_folder:
                 self.save_debug_state(self.output_session_folder, e)
+
+                # Optional: create a GitHub Issue for unexpected crashes.
+                # This is best-effort and will never raise.
+                try:
+                    github_issue_reporter.report_exception(
+                        params=self.params or {},
+                        launcher_type=self._get_launcher_type_name(),
+                        version=getattr(self, "_version", "") or "",
+                        rig_id=(getattr(self, "rig_config", {}) or {}).get("rig_id"),
+                        session_uuid=getattr(self, "session_uuid", "") or "",
+                        param_file=getattr(self, "original_param_file", None),
+                        exc=e,
+                        stderr_lines=getattr(self, "stderr_data", []) or [],
+                        stdout_lines=getattr(self, "stdout_data", []) or [],
+                        output_directory=self.output_session_folder,
+                    )
+                except Exception:
+                    # Defensive: reporting must not change crash behavior.
+                    pass
             logging.exception(f"{self._get_launcher_type_name()} experiment failed: {e}")
             return False
 
