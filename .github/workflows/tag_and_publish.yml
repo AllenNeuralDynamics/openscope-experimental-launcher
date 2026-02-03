@@ -33,8 +33,13 @@ jobs:
     - name: Check if tag exists
       id: check_tag
       run: |
-        $tagExists = git tag -l "v${{ steps.get_version.outputs.version }}"
-        if ($tagExists) {
+        $tag = "v${{ steps.get_version.outputs.version }}"
+        # Check the remote, not just local tags.
+        $remoteTag = git ls-remote --tags origin "refs/tags/$tag"
+        if ($LASTEXITCODE -ne 0) {
+          throw "git ls-remote failed"
+        }
+        if ($remoteTag) {
           echo "exists=true" >> $env:GITHUB_OUTPUT
         } else {
           echo "exists=false" >> $env:GITHUB_OUTPUT
