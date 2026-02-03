@@ -131,7 +131,9 @@ an access token via an environment variable:
        "labels": ["auto-report"],
        "report_on": ["exception", "pre_acquisition", "post_acquisition"],
        "max_output_lines": 80,
-       "include_launcher_log_tail": true,
+       "include_launcher_log": true,
+       "launcher_log_mode": "full",
+       "sanitize_launcher_log": false,
        "include_subject_user": false,
        "include_rig_config": false
      }
@@ -148,7 +150,10 @@ Notes
 
 - Use a fine-scoped token with permission to create issues in the target repository.
 - By default the reporter avoids including ``subject_id`` / ``user_id`` in the issue body.
-- The issue body includes a tail of ``launcher_metadata/launcher.log`` by default; if
-  ``include_subject_user`` is false those fields are redacted in the log excerpt.
+- The issue body includes ``launcher_metadata/launcher.log`` (mode is configurable).
+  If you set ``launcher_log_mode`` to ``"tail"``, ``max_output_lines`` controls how many
+  lines are included.
+- If you set ``sanitize_launcher_log`` to true (off by default), and ``include_subject_user``
+  is false, the reporter will redact Subject/User fields in the log excerpt.
 - When an issue is created successfully, its URL is written back into
   ``launcher_metadata/debug_state.json`` under ``github.issue_url``.

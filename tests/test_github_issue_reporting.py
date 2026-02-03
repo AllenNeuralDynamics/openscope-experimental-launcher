@@ -102,7 +102,7 @@ def test_creates_issue_and_updates_debug_state(tmp_path, monkeypatch):
     assert data.get("github", {}).get("issue_number") == 1
 
 
-def test_stage_failure_creates_issue_and_redacts_subject_user(tmp_path, monkeypatch):
+def test_stage_failure_creates_issue_and_includes_full_log_no_sanitization(tmp_path, monkeypatch):
     (tmp_path / "launcher_metadata").mkdir(exist_ok=True)
     (tmp_path / "launcher_metadata" / "launcher.log").write_text(
         "Subject ID: 123, User ID: bob\nSomething else\n",
@@ -132,6 +132,8 @@ def test_stage_failure_creates_issue_and_redacts_subject_user(tmp_path, monkeypa
             "token_env": "TEST_GITHUB_TOKEN",
             "report_on": ["pre_acquisition"],
             "include_subject_user": False,
+            "sanitize_launcher_log": False,
+            "launcher_log_mode": "full",
             "max_output_lines": 10,
         }
     }
@@ -154,6 +156,60 @@ def test_stage_failure_creates_issue_and_redacts_subject_user(tmp_path, monkeypa
     assert "launcher.log" in body
     assert "Subject ID:" in body
     assert "User ID:" in body
+    assert "Subject ID: 123" in body
+    assert "User ID: bob" in body
+
+
+def test_stage_failure_can_sanitize_launcher_log_when_enabled(tmp_path, monkeypatch):
+    (tmp_path / "launcher_metadata").mkdir(exist_ok=True)
+    (tmp_path / "launcher_metadata" / "launcher.log").write_text(
+        "Subject ID: 123, User ID: bob\nSomething else\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("TEST_GITHUB_TOKEN", "ghp_FAKE")
+    captured = {}
+
+    def fake_post(url, headers=None, json=None, timeout=None):
+        captured["payload"] = json
+        return _FakeResponse(
+            201,
+            payload={"html_url": "https://github.com/x/y/issues/3", "number": 3},
+        )
+
+    monkeypatch.setattr(
+        "openscope_experimental_launcher.utils.github_issue_reporter.requests.post",
+        fake_post,
+    )
+
+    params = {
+        "github_issue": {
+            "enabled": True,
+            "repo": "AllenNeuralDynamics/openscope-experimental-launcher",
+            "token_env": "TEST_GITHUB_TOKEN",
+            "report_on": ["pre_acquisition"],
+            "include_subject_user": False,
+            "sanitize_launcher_log": True,
+            "launcher_log_mode": "full",
+            "max_output_lines": 10,
+        }
+    }
+
+    url = github_issue_reporter.report_stage_failure(
+        params=params,
+        launcher_type="bonsai",
+        version="0.0.0",
+        rig_id="test_rig",
+        session_uuid="uuid-123",
+        param_file="params.json",
+        stage_kind="pre_acquisition",
+        stage_name="Pre-acquisition",
+        failed_steps=["some_module"],
+        output_directory=str(tmp_path),
+    )
+    assert url == "https://github.com/x/y/issues/3"
+
+    body = (captured.get("payload") or {}).get("body") or ""
     assert "Subject ID: 123" not in body
     assert "User ID: bob" not in body
     assert "<redacted>" in body

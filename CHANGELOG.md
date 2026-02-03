@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Enhanced Test Coverage**: Comprehensive test suite with 158 passing tests (56% code coverage)
 - **Post-Acquisition Template**: Standardized template for creating new post-acquisition tools
 - **GitHub Issue Reporting (Optional)**: Opt-in automatic issue creation on launcher crashes and pre/post pipeline failures
+  - Includes ``launcher_metadata/launcher.log`` in the issue body (configurable full vs tail)
+  - Optional log sanitization toggle
 
 ### Changed
 - **BREAKING**: Session creation moved from launchers to post-acquisition workflow

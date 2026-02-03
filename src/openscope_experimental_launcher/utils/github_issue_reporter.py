@@ -34,7 +34,9 @@ class GitHubIssueConfig:
     report_on: Tuple[str, ...]
     include_subject_user: bool
     include_rig_config: bool
-    include_launcher_log_tail: bool
+    include_launcher_log: bool
+    launcher_log_mode: str
+    sanitize_launcher_log: bool
     max_output_lines: int
     max_body_chars: int
 
@@ -71,7 +73,9 @@ def load_github_issue_config(params: Dict[str, Any]) -> Optional[GitHubIssueConf
             "report_on": params.get("github_issue_report_on"),
             "include_subject_user": params.get("github_issue_include_subject_user"),
             "include_rig_config": params.get("github_issue_include_rig_config"),
-            "include_launcher_log_tail": params.get("github_issue_include_launcher_log_tail"),
+            "include_launcher_log": params.get("github_issue_include_launcher_log"),
+            "launcher_log_mode": params.get("github_issue_launcher_log_mode"),
+            "sanitize_launcher_log": params.get("github_issue_sanitize_launcher_log"),
             "max_output_lines": params.get("github_issue_max_output_lines"),
             "max_body_chars": params.get("github_issue_max_body_chars"),
         }
@@ -92,8 +96,14 @@ def load_github_issue_config(params: Dict[str, Any]) -> Optional[GitHubIssueConf
         include_subject_user = bool(cfg.get("include_subject_user", False))
         include_rig_config = bool(cfg.get("include_rig_config", False))
 
-        # Include launcher.log tail by default, but sanitize subject/user unless explicitly enabled.
-        include_launcher_log_tail = bool(cfg.get("include_launcher_log_tail", True))
+        # Include launcher.log by default.
+        include_launcher_log = bool(cfg.get("include_launcher_log", True))
+        launcher_log_mode = str(cfg.get("launcher_log_mode") or "full").strip().lower()
+        if launcher_log_mode not in {"full", "tail"}:
+            launcher_log_mode = "full"
+
+        # No sanitization by default (user requested full fidelity).
+        sanitize_launcher_log = bool(cfg.get("sanitize_launcher_log", False))
 
         max_output_lines = int(cfg.get("max_output_lines", 80))
         max_body_chars = int(cfg.get("max_body_chars", 60000))
@@ -107,7 +117,9 @@ def load_github_issue_config(params: Dict[str, Any]) -> Optional[GitHubIssueConf
             report_on=report_on,
             include_subject_user=include_subject_user,
             include_rig_config=include_rig_config,
-            include_launcher_log_tail=include_launcher_log_tail,
+            include_launcher_log=include_launcher_log,
+            launcher_log_mode=launcher_log_mode,
+            sanitize_launcher_log=sanitize_launcher_log,
             max_output_lines=max_output_lines,
             max_body_chars=max_body_chars,
         )
@@ -150,6 +162,29 @@ def _read_text_tail(path: str, *, max_lines: int) -> List[str]:
             return _tail_lines(f.readlines(), max_lines)
     except Exception:
         return []
+
+
+def _read_text_full(path: str) -> List[str]:
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            return f.readlines()
+    except Exception:
+        return []
+
+
+def _read_launcher_log_lines(*, cfg: GitHubIssueConfig, log_path: str) -> List[str]:
+    if not cfg.include_launcher_log:
+        return []
+    if not os.path.exists(log_path):
+        return []
+    if cfg.launcher_log_mode == "tail":
+        lines = _read_text_tail(log_path, max_lines=cfg.max_output_lines)
+    else:
+        lines = _read_text_full(log_path)
+
+    if cfg.sanitize_launcher_log and not cfg.include_subject_user:
+        lines = _sanitize_log_tail(lines, include_subject_user=False)
+    return lines
 
 
 def _should_report(cfg: GitHubIssueConfig, kind: str) -> bool:
@@ -356,11 +391,9 @@ def report_exception(
     stdout_tail = _tail_lines(stdout_lines, cfg.max_output_lines)
 
     launcher_log_tail: List[str] = []
-    if output_directory and cfg.include_launcher_log_tail:
+    if output_directory:
         log_path = os.path.join(output_directory, "launcher_metadata", "launcher.log")
-        if os.path.exists(log_path):
-            launcher_log_tail = _read_text_tail(log_path, max_lines=cfg.max_output_lines)
-            launcher_log_tail = _sanitize_log_tail(launcher_log_tail, include_subject_user=cfg.include_subject_user)
+        launcher_log_tail = _read_launcher_log_lines(cfg=cfg, log_path=log_path)
 
     debug_state_path = None
     if output_directory:
@@ -421,11 +454,9 @@ def report_stage_failure(
     title = f"Failure: {stage_name} pipeline in {launcher_type} ({version}) [{session_uuid or 'unknown-session'}]"
 
     launcher_log_tail: List[str] = []
-    if output_directory and cfg.include_launcher_log_tail:
+    if output_directory:
         log_path = os.path.join(output_directory, "launcher_metadata", "launcher.log")
-        if os.path.exists(log_path):
-            launcher_log_tail = _read_text_tail(log_path, max_lines=cfg.max_output_lines)
-            launcher_log_tail = _sanitize_log_tail(launcher_log_tail, include_subject_user=cfg.include_subject_user)
+        launcher_log_tail = _read_launcher_log_lines(cfg=cfg, log_path=log_path)
 
     # Build a body that looks similar to crash reports, but without traceback.
     lines: List[str] = []

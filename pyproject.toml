@@ -25,7 +25,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Medical Science Apps."
 ]
 readme = "README.md"
-version = "0.2.46"
+version = "0.2.47"
 
 dependencies = [
     'pandas',
