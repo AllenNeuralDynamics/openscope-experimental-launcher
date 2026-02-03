@@ -119,9 +119,15 @@ def run_pre_acquisition(param_source: Any, overrides: Optional[Mapping[str, Any]
             protocol_id = str(protocol_raw).strip()
             if not protocol_id:
                 protocol_id = None
-        if not protocol_id:
+
+        # Protocol identifier is optional by default.
+        # Set `metadata_protocol_required: true` to enforce it.
+        protocol_required = bool(params.get("metadata_protocol_required", False))
+        if protocol_required and not protocol_id:
             logging.error("Protocol confirmation aborted: no protocol identifier provided")
             return 1
+        if not protocol_id:
+            logging.warning("No protocol identifier provided; proceeding without protocol_id in project.json")
 
         operator_name = _initial_operator_value(params)
         if operator_name:
