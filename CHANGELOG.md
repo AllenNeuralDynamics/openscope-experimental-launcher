@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Metadata Project Validator**: Allow missing protocol identifier by default (set `metadata_protocol_required: true` to enforce)
+- **SLAP2 MATLAB UI Stability**: Removed the periodic UI timer refresh (reduces crash risk under heavy load)
 - **Import Errors**: Resolved aind-data-schema import compatibility issues
 - **Stream Validation**: Fixed stream duplication and validation issues in session creation
 - **Test Suite**: Updated all tests to match new architecture and file structure

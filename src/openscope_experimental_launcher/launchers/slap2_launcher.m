@@ -336,10 +336,9 @@ if isempty(storedFig) || ~isvalid(storedFig)
         'ResumeMode', false, ...
         'StartStopState', 'start', ...
         'ControlledByPython', false, ...
-        'ManualCompletionPending', false, ...
-        'UpdateTimer', []);
+        'ManualCompletionPending', false);
 
-    slap2_launcher_start_timer(storedFig);
+    slap2_launcher_refresh_info(storedFig);
 
     defaultRigPath = slap2_launcher_default_rig_path();
     if ~isempty(defaultRigPath)
@@ -457,17 +456,8 @@ end
 
 fig.UserData = data;
 slap2_launcher_refresh_session_display(fig);
-needsTimer = true;
-if isfield(data, 'UpdateTimer') && isa(data.UpdateTimer, 'timer')
-    timerObj = data.UpdateTimer;
-    needsTimer = isempty(timerObj) || ~isvalid(timerObj);
-end
 
-if needsTimer
-    slap2_launcher_start_timer(fig);
-else
-    slap2_launcher_refresh_info(fig);
-end
+slap2_launcher_refresh_info(fig);
 
 slap2_launcher_handle_rig_copy(fig);
 slap2_launcher_update_start_ready_state(fig);
@@ -1359,44 +1349,6 @@ end
 slap2_launcher_update_status(fig, char(string(message)));
 end
 
-function slap2_launcher_start_timer(fig)
-%SLAP2_LAUNCHER_START_TIMER Ensure the periodic info timer is running.
-
-if isempty(fig) || ~isvalid(fig)
-    return;
-end
-
-data = fig.UserData;
-if isfield(data, 'UpdateTimer') && isa(data.UpdateTimer, 'timer')
-    timerObj = data.UpdateTimer;
-    if ~isempty(timerObj) && isvalid(timerObj)
-        try
-            stop(timerObj);
-        catch
-        end
-        delete(timerObj);
-    end
-end
-
-timerObj = timer( ...
-    'ExecutionMode', 'fixedSpacing', ...
-    'Period', 1, ...
-    'TimerFcn', @(~, ~)slap2_launcher_timer_tick(fig), ...
-    'Tag', 'SLAP2LauncherTimer');
-
-data.UpdateTimer = timerObj;
-fig.UserData = data;
-
-slap2_launcher_refresh_info(fig);
-
-try
-    start(timerObj);
-catch timerErr
-    warning('SLAP2:MatlabLauncher:TimerFailed', ...
-        'Failed to start UI update timer: %s', timerErr.message);
-end
-end
-
 function slap2_launcher_refresh_info(fig)
 %SLAP2_LAUNCHER_REFRESH_INFO Refresh informational label text.
 
@@ -1423,11 +1375,8 @@ if isfield(data, 'SessionFolder') && ~isempty(data.SessionFolder)
     sessionFolder = data.SessionFolder;
 end
 
-elapsedStr = slap2_launcher_format_elapsed(data.StartTime);
-pythonElapsedStr = '00:00:00';
 pythonStartedStr = '(waiting)';
 if isfield(data, 'PythonStartTime') && ~isempty(data.PythonStartTime)
-    pythonElapsedStr = slap2_launcher_format_elapsed(data.PythonStartTime);
     pythonStartedStr = datestr(data.PythonStartTime, 'yyyy-mm-dd HH:MM:SS');
 end
 startedStr = '(unknown)';
@@ -1435,12 +1384,19 @@ if isfield(data, 'StartTime') && ~isempty(data.StartTime)
     startedStr = datestr(data.StartTime, 'yyyy-mm-dd HH:MM:SS');
 end
 
+lastUpdatedStr = '(unknown)';
+try
+    lastUpdatedStr = datestr(now, 'yyyy-mm-dd HH:MM:SS'); %#ok<DATST>
+catch
+    lastUpdatedStr = '(unknown)';
+end
+
 infoLines = {
     sprintf('Engine: %s', engineName), ...
-    sprintf('Started: %s', startedStr), ...
-    sprintf('GUI elapsed: %s', elapsedStr), ...
+    sprintf('Session folder: %s', sessionFolder), ...
+    sprintf('MATLAB start: %s', startedStr), ...
     sprintf('Python start: %s', pythonStartedStr), ...
-    sprintf('Python elapsed: %s', pythonElapsedStr)
+    sprintf('Last UI update: %s', lastUpdatedStr)
 };
 
 helperInfo = slap2_launcher_fetch_helper_info();
@@ -1460,12 +1416,6 @@ end
 data.InfoLabel.Text = strjoin(infoLines, newline);
 fig.UserData = data;
 drawnow limitrate;
-end
-
-function slap2_launcher_timer_tick(fig)
-%SLAP2_LAUNCHER_TIMER_TICK Periodic refresh for elapsed time display.
-
-slap2_launcher_refresh_info(fig);
 end
 
 function folder = slap2_launcher_get_session_folder()
@@ -1516,38 +1466,8 @@ if isempty(fig) || ~isvalid(fig)
     return;
 end
 
-data = fig.UserData;
-if isfield(data, 'UpdateTimer') && isa(data.UpdateTimer, 'timer')
-    timerObj = data.UpdateTimer;
-    if ~isempty(timerObj) && isvalid(timerObj)
-        try
-            stop(timerObj);
-        catch
-        end
-        delete(timerObj);
-    end
-end
-
 delete(fig);
 
-end
-
-function elapsedStr = slap2_launcher_format_elapsed(startTime)
-%SLAP2_LAUNCHER_FORMAT_ELAPSED Format elapsed time as HH:MM:SS.
-
-if nargin < 1 || isempty(startTime)
-    elapsedStr = '00:00:00';
-    return;
-end
-
-elapsedSeconds = round(seconds(datetime('now') - startTime));
-if elapsedSeconds < 0
-    elapsedSeconds = 0;
-end
-hours = floor(elapsedSeconds / 3600);
-minutes = floor(mod(elapsedSeconds, 3600) / 60);
-secondsPart = mod(elapsedSeconds, 60);
-elapsedStr = sprintf('%02d:%02d:%02d', hours, minutes, secondsPart);
 end
 
 
@@ -1777,7 +1697,7 @@ end
 function version = slap2_launcher_version()
 %SLAP2_LAUNCHER_VERSION Return the MATLAB launcher UI version string.
 
-version = '2025.12.23-6';
+version = '2025.12.23-7';
 end
 
 
