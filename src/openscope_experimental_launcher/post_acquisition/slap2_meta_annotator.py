@@ -1,7 +1,9 @@
 """Annotate and normalize SLAP2 session files before archiving.
 
 Steps:
-- Prompt operator once for shared brain area and DMD1/DMD2 depths (no per-file prompts).
+- Prompt operator for shared experiment-level annotations (asked once per run).
+- Prompt operator for DMD-level defaults (e.g. pia depth on remote focus) and
+    allow per-file overrides.
 - Discover .meta files, classify type, prompt to confirm per file.
 - Rename stems to a normalized form, move meta + sibling files into
     convention subfolders, and emit per-stem annotations and a routing
@@ -16,6 +18,8 @@ import re
 import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+import requests
 
 from openscope_experimental_launcher.utils import param_utils
 from openscope_experimental_launcher.utils import manifest_utils
@@ -51,6 +55,201 @@ SLAP2_MODES = (
     "band scan",
     "integration scan",
 )
+
+
+TARGET_NAME_RE = re.compile(r"^(Neuron|FOV)(\d+)$", re.IGNORECASE)
+
+
+def _parse_target_name(value: str | None) -> tuple[str | None, int | None]:
+    if not value:
+        return None, None
+    match = TARGET_NAME_RE.match(str(value).strip())
+    if not match:
+        return None, None
+    kind, number = match.groups()
+    try:
+        return kind.upper(), int(number)
+    except Exception:  # noqa: BLE001
+        return None, None
+
+
+def _prompt_float(
+    message: str,
+    default: float | None = None,
+    *,
+    assume_yes: bool = False,
+) -> float | None:
+    if assume_yes:
+        return default
+
+    default_str = None if default is None else str(default)
+    while True:
+        raw = _prompt(message, default_str, assume_yes=assume_yes).strip()
+        if not raw:
+            return default
+        try:
+            return float(raw)
+        except ValueError:
+            print("Invalid number. Please enter a value in microns (e.g. 150).")
+
+
+def _prompt_target_name(
+    message: str,
+    default: str | None = None,
+    *,
+    assume_yes: bool = False,
+) -> str:
+    if assume_yes:
+        return default or ""
+
+    default_kind, default_number = _parse_target_name(default)
+    kind_default = "FOV" if default_kind is None else default_kind
+    number_default = "1" if default_number is None else str(default_number)
+
+    while True:
+        kind_raw = _prompt(
+            f"{message} type? (FOV or Neuron)",
+            kind_default,
+            assume_yes=assume_yes,
+        ).strip()
+        if not kind_raw:
+            kind_raw = kind_default
+
+        kind = kind_raw.strip().upper()
+        if kind not in {"FOV", "NEURON"}:
+            print("Invalid type. Choose 'FOV' or 'Neuron'.")
+            continue
+
+        number_raw = _prompt(
+            f"{message} number?",
+            number_default,
+            assume_yes=assume_yes,
+        ).strip()
+        if not number_raw:
+            number_raw = number_default
+
+        if not number_raw.isdigit() or int(number_raw) <= 0:
+            print("Invalid number. Enter a positive integer (e.g. 1, 2, 3).")
+            continue
+
+        prefix = "FOV" if kind == "FOV" else "Neuron"
+        return f"{prefix}{int(number_raw)}"
+
+
+def _ccf_acronym_exists(acronym: str, *, timeout_s: float = 1.0) -> bool:
+    """Validate an Allen CCF structure acronym via the Allen Brain Map API.
+
+    If the API is unreachable, this function raises (callers should handle and
+    fall back to permissive behavior).
+    """
+
+    # Allen Brain Map API (public). Use acronym exact match.
+    url = "https://api.brain-map.org/api/v2/data/Structure/query.json"
+    criteria = f"[acronym$eq'{acronym}']"
+    # Use explicit (connect, read) timeouts to reduce the risk of hanging in
+    # restricted/offline lab environments.
+    response = requests.get(url, params={"criteria": criteria}, timeout=(timeout_s, timeout_s))
+    response.raise_for_status()
+    payload = response.json()
+    return int(payload.get("total_rows", 0)) > 0
+
+
+def _fetch_structures_graph1(*, timeout_s: float = 2.0) -> List[Dict[str, str]]:
+    """Fetch Structure rows for the default mouse CCF graph (graph_id=1)."""
+
+    url = "https://api.brain-map.org/api/v2/data/Structure/query.json"
+    response = requests.get(
+        url,
+        params={
+            "criteria": "[graph_id$eq1]",
+            "only": "acronym,name",
+            # total_rows is currently ~1300, so a single page is fine.
+            "num_rows": 2000,
+        },
+        timeout=(timeout_s, timeout_s),
+    )
+    response.raise_for_status()
+    payload = response.json()
+    rows = payload.get("msg")
+    if not isinstance(rows, list):
+        raise ValueError("Unexpected Structure query response")
+    out: List[Dict[str, str]] = []
+    for row in rows:
+        acronym = row.get("acronym")
+        name = row.get("name")
+        if isinstance(acronym, str) and isinstance(name, str):
+            out.append({"acronym": acronym, "name": name})
+    return out
+
+
+def _get_visual_cortex_structures(*, timeout_s: float = 2.0) -> List[Dict[str, str]]:
+    """Return a list of VIS* structures (excluding VISC* visceral area)."""
+
+    rows = _fetch_structures_graph1(timeout_s=timeout_s)
+    vis_rows = [
+        r
+        for r in rows
+        if r["acronym"].startswith("VIS") and not r["acronym"].startswith("VISC")
+    ]
+    return sorted(vis_rows, key=lambda r: r["acronym"])
+
+
+def _prompt_targeted_structure(
+    message: str,
+    default: str | None = None,
+    *,
+    assume_yes: bool = False,
+    validate_ccf: bool = True,
+    cache: Dict[str, bool] | None = None,
+) -> str:
+    if assume_yes:
+        return default or ""
+
+    if cache is None:
+        cache = {}
+
+    visual_cortex_choices: List[Dict[str, str]] | None = None
+
+    while True:
+        raw = _prompt(message, default, assume_yes=assume_yes).strip()
+        if not raw:
+            raw = default or ""
+
+        if not validate_ccf:
+            return raw
+
+        key = raw.strip()
+        if key in cache:
+            if cache[key]:
+                return raw
+            print("Not a valid Allen CCF structure acronym. Try e.g. 'VISp'.")
+            continue
+
+        try:
+            ok = _ccf_acronym_exists(key)
+        except Exception as exc:  # noqa: BLE001
+            LOG.warning(
+                "Unable to validate targeted structure against Allen CCF (continuing without validation): %s",
+                exc,
+            )
+            return raw
+
+        cache[key] = ok
+        if ok:
+            return raw
+
+        print("Not a valid Allen CCF structure acronym. Try e.g. 'VISp'.")
+        try:
+            if visual_cortex_choices is None:
+                visual_cortex_choices = _get_visual_cortex_structures(timeout_s=2.0)
+            if visual_cortex_choices:
+                print("Common VIS (visual cortex) acronyms include:")
+                for row in visual_cortex_choices[:40]:
+                    print(f"  {row['acronym']}: {row['name']}")
+                if len(visual_cortex_choices) > 40:
+                    print(f"  ... ({len(visual_cortex_choices)} total VIS* entries)")
+        except Exception as exc:  # noqa: BLE001
+            LOG.debug("Unable to fetch VIS structure suggestions: %s", exc)
 
 
 def _prompt(message: str, default: str | None = None, *, assume_yes: bool = False) -> str:
@@ -180,7 +379,11 @@ def run(params: Dict[str, Any]) -> int:
     session_dir = Path(str(session_dir_param)).expanduser().resolve()
 
     assume_yes = bool(params.get("assume_yes", False))
-    default_brain_area = str(params.get("default_brain_area", "VISp"))
+    # Back-compat: allow legacy default_brain_area to populate targeted_structure default.
+    default_targeted_structure = params.get("default_targeted_structure")
+    if default_targeted_structure is None:
+        default_targeted_structure = params.get("default_brain_area", "VISp")
+
     dynamic_dir = params.get("dynamic_dir", "dynamic_data")
     structure_dir = params.get("structure_dir", "static_data")
     ref_stack_dir = params.get("ref_stack_dir", "dynamic_data/reference_stack")
@@ -201,11 +404,16 @@ def run(params: Dict[str, Any]) -> int:
         LOG.error("Session directory does not exist: %s", session_dir)
         return 2
 
+    validate_ccf = bool(params.get("validate_targeted_structure_ccf", True))
+    ccf_cache: Dict[str, bool] = {}
+
     # Session-level defaults (prompt once)
-    brain_area_default = _prompt(
-        "Default brain area for meta files? (used as per-file default)",
-        default_brain_area,
+    targeted_structure_default = _prompt_targeted_structure(
+        "Default Targeted structure? (Allen CCF acronym; used as per-file default)",
+        str(default_targeted_structure) if default_targeted_structure else None,
         assume_yes=assume_yes,
+        validate_ccf=validate_ccf,
+        cache=ccf_cache,
     )
 
     green_target_default = params.get("default_green_channel_target")
@@ -226,6 +434,9 @@ def run(params: Dict[str, Any]) -> int:
 
     # Per-acquisition (DMD1/DMD2 pair) prompts.
     modes_by_group: Dict[str, str] = {}
+
+    # Per-DMD defaults (prompted once per DMD) used for per-file pia depth prompt.
+    pia_depth_default_by_device: Dict[str, float | None] = {}
 
     entries: List[Dict[str, Any]] = manifest_utils.read_manifest_entries(routing_manifest_path)
     counter = 1
@@ -281,13 +492,51 @@ def run(params: Dict[str, Any]) -> int:
             )
         slap2_mode_value = modes_by_group[group_key]
 
-        depth_prompt = f"Depth for {device.upper()} (microns from brain surface)?" if device else "Depth for meta (microns from brain surface)?"
-        depth_value = _prompt(depth_prompt, None, assume_yes=assume_yes)
+        # Pia depth on remote focus: prompt a DMD-level default once, then allow per-file overrides.
+        if device and device not in pia_depth_default_by_device:
+            legacy_key = "default_dmd1_depth" if device == "dmd1" else "default_dmd2_depth"
+            default_param_key = (
+                "default_pia_depth_on_remote_focus_dmd1_um"
+                if device == "dmd1"
+                else "default_pia_depth_on_remote_focus_dmd2_um"
+            )
+            default_raw = params.get(default_param_key)
+            if default_raw is None:
+                default_raw = params.get(legacy_key)
 
-        brain_area_value = _prompt(
-            f"Brain area for meta '{meta_path.relative_to(session_dir)}'?",
-            brain_area_default,
+            default_val: float | None = None
+            if default_raw not in (None, ""):
+                try:
+                    default_val = float(default_raw)
+                except Exception:  # noqa: BLE001
+                    default_val = None
+
+            pia_depth_default_by_device[device] = _prompt_float(
+                f"Default Depth of pia on remote focus for {device.upper()} (microns)?",
+                default_val,
+                assume_yes=assume_yes,
+            )
+
+        pia_default = pia_depth_default_by_device.get(device) if device else None
+        pia_depth_on_remote_focus_um = _prompt_float(
+            f"Depth of pia on remote focus for meta '{meta_path.relative_to(session_dir)}' (microns)?",
+            pia_default,
             assume_yes=assume_yes,
+        )
+
+        target_name_default = params.get("default_target_name")
+        target_name_value = _prompt_target_name(
+            f"Target name for meta '{meta_path.relative_to(session_dir)}'? (NeuronX or FOVX)",
+            str(target_name_default) if target_name_default else None,
+            assume_yes=assume_yes,
+        )
+
+        targeted_structure_value = _prompt_targeted_structure(
+            f"Targeted structure for meta '{meta_path.relative_to(session_dir)}'? (Allen CCF acronym)",
+            targeted_structure_default,
+            assume_yes=assume_yes,
+            validate_ccf=validate_ccf,
+            cache=ccf_cache,
         )
 
         normalized_stem = _build_normalized_stem(type_choice, meta_path.stem, counter)
@@ -315,7 +564,7 @@ def run(params: Dict[str, Any]) -> int:
 
         proceed = True
         if not assume_yes:
-            confirm = _prompt("Apply these moves? (y/N)", "y", assume_yes=assume_yes).lower()
+            confirm = _prompt("Apply these moves? (Y/n)", "y", assume_yes=assume_yes).lower()
             proceed = confirm in {"y", "yes"}
 
         if not proceed:
@@ -335,8 +584,9 @@ def run(params: Dict[str, Any]) -> int:
             "original_stem": meta_path.stem,
             "normalized_stem": normalized_stem,
             "type": type_choice,
-            "depth": depth_value,
-            "brain_area": brain_area_value,
+            "pia_depth_on_remote_focus_um": pia_depth_on_remote_focus_um,
+            "target_name": target_name_value,
+            "targeted_structure": targeted_structure_value,
             "intended_green_channel_target": intended_green_target,
             "intended_red_channel_target": intended_red_target,
             "slap2_mode": slap2_mode_value,
@@ -356,8 +606,9 @@ def run(params: Dict[str, Any]) -> int:
                 "dest_rel": dest_rel_dir,
                 "normalized_stem": normalized_stem,
                 "type": type_choice,
-                "depth": depth_value,
-                "brain_area": brain_area_value,
+                "pia_depth_on_remote_focus_um": pia_depth_on_remote_focus_um,
+                "target_name": target_name_value,
+                "targeted_structure": targeted_structure_value,
                 "intended_green_channel_target": intended_green_target,
                 "intended_red_channel_target": intended_red_target,
                 "slap2_mode": slap2_mode_value,

@@ -41,7 +41,7 @@ def test_prompts_experiment_once_and_mode_once_per_dmd_pair(tmp_path, monkeypatc
 
     feeder = InputFeeder(
         [
-            # Default brain area
+            # Default targeted structure
             "VISp",
             # Green target: select 1
             "1",
@@ -51,17 +51,29 @@ def test_prompts_experiment_once_and_mode_once_per_dmd_pair(tmp_path, monkeypatc
             "1",
             # Mode for acquisition_foo (shared)
             "1",
-            # Depth for DMD1
-            "100",
-            # Brain area for first meta
+            # Default pia depth for DMD1
+            "120",
+            # Pia depth override for DMD1 meta (accept default)
+            "",
+            # Target name for first meta: type (default FOV)
+            "",
+            # Target name for first meta: number
+            "1",
+            # Targeted structure for first meta
             "VISp",
             # Confirm moves
             "y",
             # Second meta: classify (dynamic)
             "1",
-            # Depth for DMD2
-            "200",
-            # Brain area for second meta
+            # Default pia depth for DMD2
+            "220",
+            # Pia depth override for DMD2 meta
+            "240",
+            # Target name for second meta: type
+            "Neuron",
+            # Target name for second meta: number
+            "2",
+            # Targeted structure for second meta
             "VISp",
             # Confirm moves
             "y",
@@ -73,6 +85,7 @@ def test_prompts_experiment_once_and_mode_once_per_dmd_pair(tmp_path, monkeypatc
     params = {
         "output_session_folder": str(session_dir),
         "assume_yes": False,
+        "validate_targeted_structure_ccf": False,
         "dynamic_dir": "dynamic_data",
         "structure_dir": "static_data",
         "ref_stack_dir": "dynamic_data/reference_stack",
@@ -100,6 +113,9 @@ def test_prompts_experiment_once_and_mode_once_per_dmd_pair(tmp_path, monkeypatc
         assert payload["intended_green_channel_target"]
         assert payload["intended_red_channel_target"]
         assert payload["slap2_mode"]
+        assert payload["pia_depth_on_remote_focus_um"] is not None
+        assert payload["target_name"]
+        assert payload["targeted_structure"]
 
 
 def test_assume_yes_uses_defaults(tmp_path, monkeypatch):
@@ -117,10 +133,14 @@ def test_assume_yes_uses_defaults(tmp_path, monkeypatch):
     params = {
         "output_session_folder": str(session_dir),
         "assume_yes": True,
-        "default_brain_area": "VISp",
+        "validate_targeted_structure_ccf": False,
+        "default_targeted_structure": "VISp",
         "default_green_channel_target": "iGluSnFR4s",
         "default_red_channel_target": "jRGECO1a",
         "default_slap2_mode": "full-field raster",
+        "default_pia_depth_on_remote_focus_dmd1_um": 111,
+        "default_pia_depth_on_remote_focus_dmd2_um": 222,
+        "default_target_name": "FOV1",
     }
 
     result = slap2_meta_annotator.run(params)
@@ -134,3 +154,6 @@ def test_assume_yes_uses_defaults(tmp_path, monkeypatch):
         assert payload["intended_green_channel_target"] == "iGluSnFR4s"
         assert payload["intended_red_channel_target"] == "jRGECO1a"
         assert payload["slap2_mode"] == "full-field raster"
+        assert payload["targeted_structure"] == "VISp"
+        assert payload["target_name"] == "FOV1"
+        assert payload["pia_depth_on_remote_focus_um"] in (111, 222)
