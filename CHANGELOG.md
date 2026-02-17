@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **GitHub Issue Reporting (Optional)**: Opt-in automatic issue creation on launcher crashes and pre/post pipeline failures
   - Includes ``launcher_metadata/launcher.log`` in the issue body (configurable full vs tail)
   - Optional log sanitization toggle
+- **SLAP2 Meta Annotation Details**: Operator prompts now capture intended green/red channel targets (once per experiment) and SLAP2 acquisition mode (once per acquisition shared across DMD1/DMD2)
 
 ### Changed
 - **BREAKING**: Session creation moved from launchers to post-acquisition workflow

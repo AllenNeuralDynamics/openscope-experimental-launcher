@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -26,6 +27,30 @@ TYPE_DYNAMIC = "dynamic"
 TYPE_STRUCTURE = "structure"
 TYPE_REFSTACK = "ref_stack"
 TYPE_UNKNOWN = "unknown"
+
+
+GREEN_CHANNEL_TARGETS = (
+    "iGluSnFR4s",
+    "iGluSnFR4f",
+    "iGluSnFR3",
+    "GFP",
+    "FORCEB",
+    "ASAP7y",
+)
+
+RED_CHANNEL_TARGETS = (
+    "jRGECO1a",
+    "RCaMP2",
+    "RCaMP3",
+    "VADER",
+)
+
+SLAP2_MODES = (
+    "full-field raster",
+    "multi-roi raster",
+    "band scan",
+    "integration scan",
+)
 
 
 def _prompt(message: str, default: str | None = None, *, assume_yes: bool = False) -> str:
@@ -43,6 +68,52 @@ def _prompt(message: str, default: str | None = None, *, assume_yes: bool = Fals
     if not value and default is not None:
         return default
     return value
+
+
+def _prompt_choice(
+    message: str,
+    choices: Tuple[str, ...],
+    *,
+    default: str | None = None,
+    assume_yes: bool = False,
+) -> str:
+    if assume_yes:
+        return default or ""
+
+    choice_lines = [f"{idx + 1}) {value}" for idx, value in enumerate(choices)]
+    prompt_message = f"{message}\n" + "\n".join(choice_lines)
+
+    default_index = None
+    if default and default in choices:
+        default_index = str(choices.index(default) + 1)
+
+    while True:
+        raw = _prompt(f"{prompt_message}\nSelect one", default_index, assume_yes=assume_yes).strip()
+        if not raw and default:
+            return default
+        if raw.isdigit():
+            idx = int(raw) - 1
+            if 0 <= idx < len(choices):
+                return choices[idx]
+        # Allow typing the value directly.
+        for value in choices:
+            if raw.lower() == value.lower():
+                return value
+        print("Invalid selection. Please choose a number from the list.")
+
+
+_DMD_SUFFIX_RE = re.compile(r"([_\- ]dmd[12])$", re.IGNORECASE)
+
+
+def _meta_group_key(meta_path: Path) -> str:
+    """Group meta files so DMD1/DMD2 variants share prompts.
+
+    Many acquisitions generate two files (DMD1/DMD2). We want to prompt once per
+    acquisition (per stem without the DMD suffix) and apply to both.
+    """
+
+    stem = meta_path.stem
+    return _DMD_SUFFIX_RE.sub("", stem)
 
 
 def _infer_type(stem_lower: str) -> str:
@@ -85,6 +156,8 @@ def _build_normalized_stem(file_type: str, original_stem: str, counter: int) -> 
 def _write_annotation(annotation_path: Path, payload: Dict[str, Any]) -> None:
     annotation_path.parent.mkdir(parents=True, exist_ok=True)
     annotation_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
 def _collect_launcher_metadata(session_dir: Path) -> List[str]:
     metadata_dir = session_dir / "launcher_metadata"
     if not metadata_dir.exists():
@@ -135,6 +208,25 @@ def run(params: Dict[str, Any]) -> int:
         assume_yes=assume_yes,
     )
 
+    green_target_default = params.get("default_green_channel_target")
+    red_target_default = params.get("default_red_channel_target")
+
+    intended_green_target = _prompt_choice(
+        "Question 1: Intended Green Channel Target",
+        GREEN_CHANNEL_TARGETS,
+        default=str(green_target_default) if green_target_default else None,
+        assume_yes=assume_yes,
+    )
+    intended_red_target = _prompt_choice(
+        "Question 2: Intended Red Channel Target",
+        RED_CHANNEL_TARGETS,
+        default=str(red_target_default) if red_target_default else None,
+        assume_yes=assume_yes,
+    )
+
+    # Per-acquisition (DMD1/DMD2 pair) prompts.
+    modes_by_group: Dict[str, str] = {}
+
     entries: List[Dict[str, Any]] = manifest_utils.read_manifest_entries(routing_manifest_path)
     counter = 1
 
@@ -145,6 +237,7 @@ def run(params: Dict[str, Any]) -> int:
 
     for meta_path in meta_files:
         stem_lower = meta_path.stem.lower()
+        group_key = _meta_group_key(meta_path)
         inferred_type = _infer_type(stem_lower)
         type_default = {
             TYPE_DYNAMIC: "1",
@@ -177,6 +270,16 @@ def run(params: Dict[str, Any]) -> int:
             device = "dmd1"
         elif "dmd2" in stem_lower:
             device = "dmd2"
+
+        if group_key not in modes_by_group:
+            default_mode = params.get("default_slap2_mode")
+            modes_by_group[group_key] = _prompt_choice(
+                f"SLAP2 Modes for '{group_key}' (shared across DMD files)",
+                SLAP2_MODES,
+                default=str(default_mode) if default_mode else None,
+                assume_yes=assume_yes,
+            )
+        slap2_mode_value = modes_by_group[group_key]
 
         depth_prompt = f"Depth for {device.upper()} (microns from brain surface)?" if device else "Depth for meta (microns from brain surface)?"
         depth_value = _prompt(depth_prompt, None, assume_yes=assume_yes)
@@ -234,6 +337,9 @@ def run(params: Dict[str, Any]) -> int:
             "type": type_choice,
             "depth": depth_value,
             "brain_area": brain_area_value,
+            "intended_green_channel_target": intended_green_target,
+            "intended_red_channel_target": intended_red_target,
+            "slap2_mode": slap2_mode_value,
             "operator": params.get("user_id") or params.get("operator"),
             "moved_files": moved_files,
             "source_rel": meta_path.relative_to(session_dir).as_posix(),
@@ -252,6 +358,9 @@ def run(params: Dict[str, Any]) -> int:
                 "type": type_choice,
                 "depth": depth_value,
                 "brain_area": brain_area_value,
+                "intended_green_channel_target": intended_green_target,
+                "intended_red_channel_target": intended_red_target,
+                "slap2_mode": slap2_mode_value,
                 "files": moved_with_annotation,
             }
         )
