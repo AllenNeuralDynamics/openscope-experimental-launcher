@@ -157,3 +157,34 @@ def test_assume_yes_uses_defaults(tmp_path, monkeypatch):
         assert payload["targeted_structure"] == "VISp"
         assert payload["target_name"] == "FOV1"
         assert payload["pia_depth_on_remote_focus_um"] in (111, 222)
+
+
+def test_assume_yes_allows_none_channel_targets(tmp_path, monkeypatch):
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+
+    _touch(session_dir / "acquisition_baz_DMD1.meta")
+
+    # No prompting should occur under assume_yes.
+    monkeypatch.setattr("builtins.input", lambda *_: (_ for _ in ()).throw(AssertionError("input called")))
+
+    params = {
+        "output_session_folder": str(session_dir),
+        "assume_yes": True,
+        "validate_targeted_structure_ccf": False,
+        "default_targeted_structure": "VISp",
+        # Intentionally omit default_green_channel_target/default_red_channel_target
+        "default_slap2_mode": "full-field raster",
+        "default_pia_depth_on_remote_focus_dmd1_um": 111,
+        "default_target_name": "FOV1",
+    }
+
+    result = slap2_meta_annotator.run(params)
+    assert result == 0
+
+    annotations = list(session_dir.rglob("*.annotation.json"))
+    assert annotations
+
+    payload = json.loads(annotations[0].read_text(encoding="utf-8"))
+    assert payload["intended_green_channel_target"] is None
+    assert payload["intended_red_channel_target"] is None

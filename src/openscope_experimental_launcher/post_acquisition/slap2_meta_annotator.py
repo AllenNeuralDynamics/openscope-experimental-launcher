@@ -49,6 +49,8 @@ RED_CHANNEL_TARGETS = (
     "VADER",
 )
 
+NONE_CHOICE = "None"
+
 SLAP2_MODES = (
     "full-field raster",
     "multi-roi raster",
@@ -419,18 +421,23 @@ def run(params: Dict[str, Any]) -> int:
     green_target_default = params.get("default_green_channel_target")
     red_target_default = params.get("default_red_channel_target")
 
-    intended_green_target = _prompt_choice(
+    intended_green_target_raw = _prompt_choice(
         "Question 1: Intended Green Channel Target",
-        GREEN_CHANNEL_TARGETS,
+        GREEN_CHANNEL_TARGETS + (NONE_CHOICE,),
         default=str(green_target_default) if green_target_default else None,
         assume_yes=assume_yes,
     )
-    intended_red_target = _prompt_choice(
+    intended_red_target_raw = _prompt_choice(
         "Question 2: Intended Red Channel Target",
-        RED_CHANNEL_TARGETS,
+        RED_CHANNEL_TARGETS + (NONE_CHOICE,),
         default=str(red_target_default) if red_target_default else None,
         assume_yes=assume_yes,
     )
+
+    intended_green_target: str | None = (
+        None if intended_green_target_raw in ("", NONE_CHOICE) else intended_green_target_raw
+    )
+    intended_red_target: str | None = None if intended_red_target_raw in ("", NONE_CHOICE) else intended_red_target_raw
 
     # Per-acquisition (DMD1/DMD2 pair) prompts.
     modes_by_group: Dict[str, str] = {}
