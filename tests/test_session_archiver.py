@@ -191,3 +191,45 @@ def test_session_archiver_handles_locked_file(tmp_path):
     assert entry["backup_copy"] is True
     assert "network_path" in entry
     assert "backup_error" not in entry
+
+
+def test_session_archiver_always_includes_instrument_json_with_routing_manifest(tmp_path):
+    session_dir = tmp_path / "session"
+    network_dir = tmp_path / "network"
+    backup_dir = tmp_path / "backup"
+    session_dir.mkdir()
+
+    # Files present in session root.
+    (session_dir / "instrument.json").write_text("{\"instrument\": true}\n", encoding="utf-8")
+    (session_dir / "file.txt").write_text("payload\n", encoding="utf-8")
+
+    # Routing manifest deliberately omits instrument.json.
+    routing_manifest_path = session_dir / "launcher_metadata" / "routing_manifest.json"
+    routing_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    routing_manifest_path.write_text(
+        json.dumps({"entries": [{"files": ["file.txt"]}]}),
+        encoding="utf-8",
+    )
+
+    manifest_path = session_dir / "launcher_metadata" / "session_archiver_manifest.json"
+
+    archiver = session_archiver.SessionArchiver(
+        session_dir=session_dir,
+        network_dir=network_dir,
+        backup_dir=backup_dir,
+        manifest_path=manifest_path,
+        routing_manifest_path=routing_manifest_path,
+        include_patterns=["*"],
+        exclude_patterns=[],
+        dry_run=False,
+        skip_completed=False,
+        enable_network_copy=True,
+        enable_backup_copy=False,
+    )
+
+    network_dir.mkdir(parents=True, exist_ok=True)
+    archiver.run()
+
+    # instrument.json must be copied to network despite being omitted from routing manifest.
+    assert (network_dir / "instrument.json").exists()
+    assert (network_dir / "instrument.json").read_text(encoding="utf-8").strip() == '{"instrument": true}'
