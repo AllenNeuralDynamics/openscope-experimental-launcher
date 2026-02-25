@@ -169,6 +169,9 @@ end
 
 originalDir = pwd;
 restoreDir = onCleanup(@() cd(originalDir)); %#ok<NASGU>
+diaryCleanup = onCleanup(@() slap2_launcher_diary_stop()); %#ok<NASGU>
+
+slap2_launcher_diary_maybe_start(sessionFolder);
 
 slap2_launcher_prepare_start_controls(fig, resumeMode);
 slap2_launcher_log( ...
@@ -198,6 +201,7 @@ slap2_launcher_log('Start confirmed; preparing to run slap2.');
 sessionFolder = slap2_launcher_current_session_folder(fig);
 if ~isempty(sessionFolder)
     assignin('base', 'SLAP2_SESSION_FOLDER', sessionFolder);
+    slap2_launcher_diary_maybe_start(sessionFolder);
     try
         cd(sessionFolder);
         slap2_launcher_log('Changed working directory to session folder: %s', sessionFolder);
@@ -235,6 +239,76 @@ slap2_launcher_log('Completion confirmed. Closing SLAP2 launcher UI.');
 
 slap2_launcher_set_python_control(fig, false);
 slap2_launcher_close_ui(fig);
+end
+
+
+function slap2_launcher_diary_maybe_start(sessionFolder)
+%SLAP2_LAUNCHER_DIARY_MAYBE_START Start diary logging if session folder is known.
+
+info = slap2_launcher_diary_state();
+if isfield(info, 'started') && info.started
+    return;
+end
+
+sessionFolder = slap2_launcher_to_text(sessionFolder);
+if isempty(sessionFolder) || ~isfolder(sessionFolder)
+    return;
+end
+
+metadataDir = fullfile(sessionFolder, 'launcher_metadata');
+if ~isfolder(metadataDir)
+    mkdir(metadataDir);
+end
+
+timestamp = datestr(now, 'yyyymmddTHHMMSS'); %#ok<DATST>
+diaryPath = fullfile(metadataDir, sprintf('matlab_diary_%s.txt', timestamp));
+
+try
+    diary(diaryPath);
+    diary on;
+catch err
+    slap2_launcher_log('Failed to start MATLAB diary at "%s": %s', diaryPath, err.message);
+    return;
+end
+
+assignin('base', 'SLAP2_LAUNCHER_DIARY_PATH', diaryPath);
+slap2_launcher_diary_state(struct('started', true, 'path', diaryPath));
+slap2_launcher_log('MATLAB diary enabled: %s', diaryPath);
+end
+
+
+function slap2_launcher_diary_stop()
+%SLAP2_LAUNCHER_DIARY_STOP Ensure diary is turned off if launcher enabled it.
+
+info = slap2_launcher_diary_state();
+if ~isfield(info, 'started') || ~info.started
+    return;
+end
+
+try
+    diary off;
+catch
+end
+
+info.started = false;
+slap2_launcher_diary_state(info);
+end
+
+
+function info = slap2_launcher_diary_state(newInfo)
+%SLAP2_LAUNCHER_DIARY_STATE Get/set diary state for this MATLAB session.
+
+persistent stored
+
+if isempty(stored)
+    stored = struct('started', false, 'path', '');
+end
+
+if nargin >= 1 && ~isempty(newInfo)
+    stored = newInfo;
+end
+
+info = stored;
 end
 
 function fig = slap2_launcher_get_ui(existingOnly)
@@ -1697,7 +1771,7 @@ end
 function version = slap2_launcher_version()
 %SLAP2_LAUNCHER_VERSION Return the MATLAB launcher UI version string.
 
-version = '2025.12.23-7';
+version = '2025.12.23-8';
 end
 
 
