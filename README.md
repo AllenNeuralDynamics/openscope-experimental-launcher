@@ -29,6 +29,23 @@ Requirements: Python 3.8+, Windows 10 or 11, rig configuration TOML, and a param
 
 The launcher creates a session folder under `output_root_folder` and writes metadata into `launcher_metadata/`.
 
+## Pipeline step failures
+
+By default, failed pre/post-acquisition pipeline steps are logged and the launcher continues.
+
+You can override failure behavior per step by adding `on_failure` to a pipeline entry (default: `continue`):
+
+```json
+{
+   "module_type": "launcher_module",
+   "module_path": "disk_space_check",
+   "on_failure": "abort",
+   "module_parameters": {"required_free_gb": 1000}
+}
+```
+
+Supported values: `continue`, `abort`, `prompt`.
+
 ## Documentation
 
 Keep this README high level; the full guides live at:

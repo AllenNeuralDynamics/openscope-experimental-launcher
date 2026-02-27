@@ -69,6 +69,19 @@ def _prompt(message: str) -> str:
         return ""
 
 
+def _prompt_enter(message: str) -> bool:
+    """Prompt the operator to press Enter.
+
+    Returns False when stdin is unavailable (non-interactive).
+    """
+
+    try:
+        input(message)
+        return True
+    except (EOFError, OSError):
+        return False
+
+
 def _prompt_yes_no(
     message: str,
     *,
@@ -104,6 +117,8 @@ def run_pre_acquisition(params: Mapping[str, Any]) -> int:
     - `required_free_gb` (float, required): Minimum free space required (GiB).
     - `disk_space_check_path` (str, optional): Path to check; defaults to `output_session_folder`.
     - `allow_override` (bool, default False): If True, prompt operator to continue anyway.
+    - `prompt_to_free_space` (bool, default True): If True and interactive, prompt the operator
+        to free disk space and re-check once when insufficient.
 
     Returns:
         int: 0 if sufficient space (or overridden); 1 otherwise.
@@ -117,6 +132,7 @@ def run_pre_acquisition(params: Mapping[str, Any]) -> int:
         return 1
 
     allow_override = bool(params.get("allow_override", False))
+    prompt_to_free_space = bool(params.get("prompt_to_free_space", True))
 
     try:
         usage = _get_disk_usage(check_path)
@@ -141,6 +157,30 @@ def run_pre_acquisition(params: Mapping[str, Any]) -> int:
         f"Required: {_format_gb(required_free_bytes)}; "
         f"Path: {check_path}"
     )
+
+    if prompt_to_free_space:
+        # Give the operator one chance to free space and retry.
+        LOG.warning("disk_space_check: %s", msg)
+        did_prompt = _prompt_enter(
+            "Insufficient disk space. Free space on the drive, then press Enter to re-check once...\n"
+        )
+        if did_prompt:
+            try:
+                usage2 = _get_disk_usage(check_path)
+                LOG.info(
+                    "disk_space_check (re-check): path=%s free=%s required=%s total=%s",
+                    os.fspath(check_path),
+                    _format_gb(usage2.free_bytes),
+                    _format_gb(required_free_bytes),
+                    _format_gb(usage2.total_bytes),
+                )
+                if usage2.free_bytes >= required_free_bytes:
+                    return 0
+                # Keep going to override/fail with updated usage info.
+                usage = usage2
+            except Exception as exc:  # noqa: BLE001
+                LOG.error("disk_space_check: failed to re-check disk usage for '%s': %s", check_path, exc)
+                return 1
 
     if not allow_override:
         LOG.error("disk_space_check: %s", msg)

@@ -63,7 +63,12 @@ def _format_mtime(path: Path) -> str:
         ts = path.stat().st_mtime
     except OSError:
         return "<unknown>"
-    return datetime.fromtimestamp(ts).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
+    try:
+        # On some Windows/Python combinations, very small timestamps can raise
+        # OSError during tz conversion. This is display-only, so be defensive.
+        return datetime.fromtimestamp(ts).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
+    except (OSError, OverflowError, ValueError):
+        return "<unknown>"
 
 
 def _resolve_session_dir(params: Mapping[str, Any]) -> Path:

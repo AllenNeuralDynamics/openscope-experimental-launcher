@@ -772,6 +772,31 @@ class BaseLauncher:
         session_folder = params.get("output_session_folder") or self.output_session_folder
         all_success = True
         failed_steps = []
+        abort_stage = False
+
+        def _failure_policy(entry: dict) -> str:
+            """Resolve per-step failure policy.
+
+            Supported values (case-insensitive):
+            - continue (default): mark stage failed but continue to next step
+            - abort: stop the stage immediately
+            - prompt: ask operator whether to continue or abort
+            """
+
+            # Convenience boolean
+            if entry.get("abort_on_fail") is True:
+                return "abort"
+
+            raw = (
+                entry.get("on_failure")
+                or entry.get("failure_policy")
+                or entry.get("fail_policy")
+                or entry.get("fail_action")
+            )
+            if raw is None:
+                return "continue"
+            value = str(raw).strip().lower()
+            return value or "continue"
 
         def _invoke_launcher_module(mod_name: str, merged_params: dict) -> bool:
             try:
@@ -968,6 +993,33 @@ class BaseLauncher:
                 all_success = False
                 logging.error(f"{stage_name} step failed: {module_path}")
                 failed_steps.append(str(module_path))
+
+                policy = _failure_policy(entry)
+                if policy == "abort":
+                    abort_stage = True
+                    logging.error(
+                        "%s aborting due to step failure policy on_failure=abort | step=%s",
+                        stage_name,
+                        module_path,
+                    )
+                    break
+                if policy == "prompt":
+                    try:
+                        resp = param_utils.get_user_input(
+                            f"{stage_name} step '{module_path}' failed. Continue anyway? (y/N)",
+                            default="n",
+                            cast_func=str,
+                        )
+                    except Exception:
+                        resp = "n"
+                    if str(resp).strip().lower() not in {"y", "yes"}:
+                        abort_stage = True
+                        logging.error(
+                            "%s aborting because operator declined to continue after failure | step=%s",
+                            stage_name,
+                            module_path,
+                        )
+                        break
             else:
                 logging.info(f"{stage_name} step completed: {module_path}")
 
@@ -975,6 +1027,11 @@ class BaseLauncher:
             logging.info(f"All {stage_name.lower()} steps completed successfully.")
         else:
             logging.warning(f"Some {stage_name.lower()} steps failed. See logs.")
+
+        # Persist abort intent for orchestration layer (e.g., abort before acquisition start)
+        if not hasattr(self, "_stage_abort"):
+            self._stage_abort = {}
+        self._stage_abort[pipeline_key] = bool(abort_stage)
 
         # Persist failures for downstream actions (e.g., GitHub issue reporting)
         if not hasattr(self, "_stage_failures"):
@@ -1211,6 +1268,10 @@ class BaseLauncher:
                     )
                 except Exception:
                     pass
+
+            if (getattr(self, "_stage_abort", {}) or {}).get("pre_acquisition_pipeline"):
+                logging.error("Pre-acquisition requested abort; not starting experiment.")
+                return False
 
             # Start the experiment (implemented by interface-specific launchers)
             experiment_success = self.start_experiment()
