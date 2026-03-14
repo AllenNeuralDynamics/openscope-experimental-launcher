@@ -66,6 +66,8 @@ def _get_first_param(
     params: Dict[str, Any],
     *keys: str,
 ) -> Any:
+    """Return the first non-empty parameter value from the provided keys."""
+
     for key in keys:
         value = params.get(key)
         if value not in (None, ""):
@@ -398,9 +400,7 @@ def run(params: Dict[str, Any]) -> int:
         params,
         "default_targeted_structure",
         "default_brain_area",
-    )
-    if default_targeted_structure is None:
-        default_targeted_structure = fixed_targeted_structure or "VISp"
+    ) or fixed_targeted_structure or "VISp"
 
     dynamic_dir = params.get("dynamic_dir", "dynamic_data")
     structure_dir = params.get("structure_dir", "static_data")
