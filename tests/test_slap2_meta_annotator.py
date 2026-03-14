@@ -3,8 +3,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from openscope_experimental_launcher.post_acquisition import slap2_meta_annotator
 
 
@@ -188,3 +186,54 @@ def test_assume_yes_allows_none_channel_targets(tmp_path, monkeypatch):
     payload = json.loads(annotations[0].read_text(encoding="utf-8"))
     assert payload["intended_green_channel_target"] is None
     assert payload["intended_red_channel_target"] is None
+
+
+def test_uses_param_pack_metadata_without_prompting_for_shared_fields(tmp_path, monkeypatch):
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+
+    _touch(session_dir / "acquisition_parampack_DMD1.meta")
+
+    feeder = InputFeeder(
+        [
+            # First meta: classify (dynamic)
+            "1",
+            # Default pia depth for DMD1
+            "150",
+            # Pia depth override for DMD1 meta (accept default)
+            "",
+            # Target name for first meta: type (default FOV)
+            "",
+            # Target name for first meta: number
+            "3",
+            # Confirm moves
+            "y",
+        ]
+    )
+
+    monkeypatch.setattr("builtins.input", feeder)
+
+    params = {
+        "output_session_folder": str(session_dir),
+        "assume_yes": False,
+        "validate_targeted_structure_ccf": False,
+        "targeted_structure": "VISam",
+        "intended_green_channel_target": "GFP",
+        "intended_red_channel_target": "None",
+        "slap2_mode": "band scan",
+    }
+
+    result = slap2_meta_annotator.run(params)
+    assert result == 0
+
+    combined_prompts = "\n".join(feeder.prompts)
+    assert "Intended Green Channel Target" not in combined_prompts
+    assert "Intended Red Channel Target" not in combined_prompts
+    assert "SLAP2 Modes" not in combined_prompts
+    assert "Targeted structure" not in combined_prompts
+
+    payload = json.loads(next(session_dir.rglob("*.annotation.json")).read_text(encoding="utf-8"))
+    assert payload["intended_green_channel_target"] == "GFP"
+    assert payload["intended_red_channel_target"] is None
+    assert payload["slap2_mode"] == "band scan"
+    assert payload["targeted_structure"] == "VISam"

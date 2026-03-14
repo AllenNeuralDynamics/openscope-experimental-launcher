@@ -62,6 +62,17 @@ SLAP2_MODES = (
 TARGET_NAME_RE = re.compile(r"^(Neuron|FOV)(\d+)$", re.IGNORECASE)
 
 
+def _get_first_param(
+    params: Dict[str, Any],
+    *keys: str,
+) -> Any:
+    for key in keys:
+        value = params.get(key)
+        if value not in (None, ""):
+            return value
+    return None
+
+
 def _parse_target_name(value: str | None) -> tuple[str | None, int | None]:
     if not value:
         return None, None
@@ -381,10 +392,15 @@ def run(params: Dict[str, Any]) -> int:
     session_dir = Path(str(session_dir_param)).expanduser().resolve()
 
     assume_yes = bool(params.get("assume_yes", False))
+    fixed_targeted_structure = _get_first_param(params, "targeted_structure")
     # Back-compat: allow legacy default_brain_area to populate targeted_structure default.
-    default_targeted_structure = params.get("default_targeted_structure")
+    default_targeted_structure = _get_first_param(
+        params,
+        "default_targeted_structure",
+        "default_brain_area",
+    )
     if default_targeted_structure is None:
-        default_targeted_structure = params.get("default_brain_area", "VISp")
+        default_targeted_structure = fixed_targeted_structure or "VISp"
 
     dynamic_dir = params.get("dynamic_dir", "dynamic_data")
     structure_dir = params.get("structure_dir", "static_data")
@@ -410,34 +426,46 @@ def run(params: Dict[str, Any]) -> int:
     ccf_cache: Dict[str, bool] = {}
 
     # Session-level defaults (prompt once)
-    targeted_structure_default = _prompt_targeted_structure(
-        "Default Targeted structure? (Allen CCF acronym; used as per-file default)",
-        str(default_targeted_structure) if default_targeted_structure else None,
-        assume_yes=assume_yes,
-        validate_ccf=validate_ccf,
-        cache=ccf_cache,
-    )
+    if fixed_targeted_structure is not None:
+        targeted_structure_default = str(fixed_targeted_structure)
+    else:
+        targeted_structure_default = _prompt_targeted_structure(
+            "Default Targeted structure? (Allen CCF acronym; used as per-file default)",
+            str(default_targeted_structure) if default_targeted_structure else None,
+            assume_yes=assume_yes,
+            validate_ccf=validate_ccf,
+            cache=ccf_cache,
+        )
 
-    green_target_default = params.get("default_green_channel_target")
-    red_target_default = params.get("default_red_channel_target")
-
-    intended_green_target_raw = _prompt_choice(
-        "Question 1: Intended Green Channel Target",
-        GREEN_CHANNEL_TARGETS + (NONE_CHOICE,),
-        default=str(green_target_default) if green_target_default else None,
-        assume_yes=assume_yes,
+    intended_green_target_raw = _get_first_param(
+        params,
+        "intended_green_channel_target",
+        "default_green_channel_target",
     )
-    intended_red_target_raw = _prompt_choice(
-        "Question 2: Intended Red Channel Target",
-        RED_CHANNEL_TARGETS + (NONE_CHOICE,),
-        default=str(red_target_default) if red_target_default else None,
-        assume_yes=assume_yes,
+    if intended_green_target_raw is None:
+        intended_green_target_raw = _prompt_choice(
+            "Question 1: Intended Green Channel Target",
+            GREEN_CHANNEL_TARGETS + (NONE_CHOICE,),
+            assume_yes=assume_yes,
+        )
+    intended_red_target_raw = _get_first_param(
+        params,
+        "intended_red_channel_target",
+        "default_red_channel_target",
     )
+    if intended_red_target_raw is None:
+        intended_red_target_raw = _prompt_choice(
+            "Question 2: Intended Red Channel Target",
+            RED_CHANNEL_TARGETS + (NONE_CHOICE,),
+            assume_yes=assume_yes,
+        )
 
     intended_green_target: str | None = (
-        None if intended_green_target_raw in ("", NONE_CHOICE) else intended_green_target_raw
+        None if intended_green_target_raw in ("", NONE_CHOICE) else str(intended_green_target_raw)
     )
-    intended_red_target: str | None = None if intended_red_target_raw in ("", NONE_CHOICE) else intended_red_target_raw
+    intended_red_target: str | None = (
+        None if intended_red_target_raw in ("", NONE_CHOICE) else str(intended_red_target_raw)
+    )
 
     # Per-acquisition (DMD1/DMD2 pair) prompts.
     modes_by_group: Dict[str, str] = {}
@@ -490,13 +518,19 @@ def run(params: Dict[str, Any]) -> int:
             device = "dmd2"
 
         if group_key not in modes_by_group:
-            default_mode = params.get("default_slap2_mode")
-            modes_by_group[group_key] = _prompt_choice(
-                f"SLAP2 Modes for '{group_key}' (shared across DMD files)",
-                SLAP2_MODES,
-                default=str(default_mode) if default_mode else None,
-                assume_yes=assume_yes,
+            default_mode = _get_first_param(
+                params,
+                "slap2_mode",
+                "default_slap2_mode",
             )
+            if default_mode is None:
+                modes_by_group[group_key] = _prompt_choice(
+                    f"SLAP2 Modes for '{group_key}' (shared across DMD files)",
+                    SLAP2_MODES,
+                    assume_yes=assume_yes,
+                )
+            else:
+                modes_by_group[group_key] = str(default_mode)
         slap2_mode_value = modes_by_group[group_key]
 
         # Pia depth on remote focus: prompt a DMD-level default once, then allow per-file overrides.
@@ -507,7 +541,11 @@ def run(params: Dict[str, Any]) -> int:
                 if device == "dmd1"
                 else "default_pia_depth_on_remote_focus_dmd2_um"
             )
-            default_raw = params.get(default_param_key)
+            default_raw = _get_first_param(
+                params,
+                default_param_key,
+                f"pia_depth_on_remote_focus_{device}_um",
+            )
             if default_raw is None:
                 default_raw = params.get(legacy_key)
 
@@ -531,20 +569,27 @@ def run(params: Dict[str, Any]) -> int:
             assume_yes=assume_yes,
         )
 
-        target_name_default = params.get("default_target_name")
+        target_name_default = _get_first_param(
+            params,
+            "default_target_name",
+            "target_name",
+        )
         target_name_value = _prompt_target_name(
             f"Target name for meta '{meta_path.relative_to(session_dir)}'? (NeuronX or FOVX)",
             str(target_name_default) if target_name_default else None,
             assume_yes=assume_yes,
         )
 
-        targeted_structure_value = _prompt_targeted_structure(
-            f"Targeted structure for meta '{meta_path.relative_to(session_dir)}'? (Allen CCF acronym)",
-            targeted_structure_default,
-            assume_yes=assume_yes,
-            validate_ccf=validate_ccf,
-            cache=ccf_cache,
-        )
+        if fixed_targeted_structure is not None:
+            targeted_structure_value = str(fixed_targeted_structure)
+        else:
+            targeted_structure_value = _prompt_targeted_structure(
+                f"Targeted structure for meta '{meta_path.relative_to(session_dir)}'? (Allen CCF acronym)",
+                targeted_structure_default,
+                assume_yes=assume_yes,
+                validate_ccf=validate_ccf,
+                cache=ccf_cache,
+            )
 
         normalized_stem = _build_normalized_stem(type_choice, meta_path.stem, counter)
         counter += 1
@@ -650,6 +695,8 @@ def run(params: Dict[str, Any]) -> int:
         LOG.info("Routing manifest written: %s", routing_manifest_path)
 
     return 0
+
+
 def run_post_acquisition(param_file: Union[str, Dict[str, Any]], overrides: Optional[Dict[str, Any]] = None) -> int:
     try:
         params = param_utils.load_parameters(param_file=param_file, overrides=overrides)
