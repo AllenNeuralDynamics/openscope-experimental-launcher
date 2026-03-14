@@ -439,6 +439,34 @@ def run(params: Dict[str, Any]) -> int:
     )
     intended_red_target: str | None = None if intended_red_target_raw in ("", NONE_CHOICE) else intended_red_target_raw
 
+    # Stage offset from origin for structure (static) acquisitions
+    static_offset_default_raw = params.get("static_stage_offset_from_origin")
+    static_offset_default: float | None = None
+    if static_offset_default_raw not in (None, ""):
+        try:
+            static_offset_default = float(static_offset_default_raw)
+        except Exception:  # noqa: BLE001
+            static_offset_default = None
+    static_stage_offset = _prompt_float(
+        "Stage offset from origin for structure (static) acquisitions (microns)?",
+        static_offset_default,
+        assume_yes=assume_yes,
+    )
+
+    # Stage offset from origin for dynamic acquisitions
+    dynamic_offset_default_raw = params.get("dynamic_stage_offset_from_origin")
+    dynamic_offset_default: float | None = None
+    if dynamic_offset_default_raw not in (None, ""):
+        try:
+            dynamic_offset_default = float(dynamic_offset_default_raw)
+        except Exception:  # noqa: BLE001
+            dynamic_offset_default = None
+    dynamic_stage_offset = _prompt_float(
+        "Stage offset from origin for dynamic acquisitions (microns)?",
+        dynamic_offset_default,
+        assume_yes=assume_yes,
+    )
+
     # Per-acquisition (DMD1/DMD2 pair) prompts.
     modes_by_group: Dict[str, str] = {}
 
@@ -587,6 +615,13 @@ def run(params: Dict[str, Any]) -> int:
             moved_files.append(dst.relative_to(session_dir).as_posix())
 
         annotation_path = dest_dir / f"{normalized_stem}.annotation.json"
+        # Select appropriate stage offset based on file type.
+        if type_choice == TYPE_STRUCTURE:
+            stage_offset_value = static_stage_offset
+        elif type_choice == TYPE_DYNAMIC:
+            stage_offset_value = dynamic_stage_offset
+        else:
+            stage_offset_value = None
         annotation_payload = {
             "original_stem": meta_path.stem,
             "normalized_stem": normalized_stem,
@@ -597,6 +632,7 @@ def run(params: Dict[str, Any]) -> int:
             "intended_green_channel_target": intended_green_target,
             "intended_red_channel_target": intended_red_target,
             "slap2_mode": slap2_mode_value,
+            "stage_offset_from_origin_um": stage_offset_value,
             "operator": params.get("user_id") or params.get("operator"),
             "moved_files": moved_files,
             "source_rel": meta_path.relative_to(session_dir).as_posix(),
@@ -619,6 +655,7 @@ def run(params: Dict[str, Any]) -> int:
                 "intended_green_channel_target": intended_green_target,
                 "intended_red_channel_target": intended_red_target,
                 "slap2_mode": slap2_mode_value,
+                "stage_offset_from_origin_um": stage_offset_value,
                 "files": moved_with_annotation,
             }
         )
