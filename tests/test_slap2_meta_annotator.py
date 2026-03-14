@@ -244,10 +244,10 @@ def test_stage_offset_by_type(tmp_path, monkeypatch):
     annotations = sorted(session_dir.rglob("*.annotation.json"))
     assert len(annotations) == 2
 
-    payloads = {
-        json.loads(a.read_text(encoding="utf-8"))["type"]: json.loads(a.read_text(encoding="utf-8"))
-        for a in annotations
-    }
+    payloads = {}
+    for a in annotations:
+        p = json.loads(a.read_text(encoding="utf-8"))
+        payloads[p["type"]] = p
 
     assert "structure" in payloads
     assert "dynamic" in payloads
