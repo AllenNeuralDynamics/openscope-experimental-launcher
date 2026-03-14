@@ -58,11 +58,6 @@ SLAP2_MODES = (
     "integration scan",
 )
 
-PROJECT_NAMES = (
-    "SCBC",
-    "OpenScopePredictiveProcessing",
-)
-
 
 TARGET_NAME_RE = re.compile(r"^(Neuron|FOV)(\d+)$", re.IGNORECASE)
 
@@ -444,15 +439,6 @@ def run(params: Dict[str, Any]) -> int:
     )
     intended_red_target: str | None = None if intended_red_target_raw in ("", NONE_CHOICE) else intended_red_target_raw
 
-    # Project name (session-level, prompted once)
-    project_name_default = params.get("project_name") or params.get("default_project_name")
-    project_name_value = _prompt_choice(
-        "Project name?",
-        PROJECT_NAMES,
-        default=str(project_name_default) if project_name_default else None,
-        assume_yes=assume_yes,
-    )
-
     # Stage offset from origin for structure (static) acquisitions
     static_offset_default_raw = params.get("static_stage_offset_from_origin")
     static_offset_default: float | None = None
@@ -646,7 +632,6 @@ def run(params: Dict[str, Any]) -> int:
             "intended_green_channel_target": intended_green_target,
             "intended_red_channel_target": intended_red_target,
             "slap2_mode": slap2_mode_value,
-            "project_name": project_name_value,
             "stage_offset_from_origin_um": stage_offset_value,
             "operator": params.get("user_id") or params.get("operator"),
             "moved_files": moved_files,
@@ -670,7 +655,6 @@ def run(params: Dict[str, Any]) -> int:
                 "intended_green_channel_target": intended_green_target,
                 "intended_red_channel_target": intended_red_target,
                 "slap2_mode": slap2_mode_value,
-                "project_name": project_name_value,
                 "stage_offset_from_origin_um": stage_offset_value,
                 "files": moved_with_annotation,
             }
