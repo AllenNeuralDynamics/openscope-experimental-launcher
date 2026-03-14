@@ -47,6 +47,12 @@ def test_prompts_experiment_once_and_mode_once_per_dmd_pair(tmp_path, monkeypatc
             "1",
             # Red target: select 1
             "1",
+            # Project name: select 1 (SCBC)
+            "1",
+            # Static stage offset from origin (microns)
+            "50",
+            # Dynamic stage offset from origin (microns)
+            "100",
             # First meta: classify (dynamic)
             "1",
             # Mode for acquisition_foo (shared)
@@ -100,6 +106,9 @@ def test_prompts_experiment_once_and_mode_once_per_dmd_pair(tmp_path, monkeypatc
     combined_prompts = "\n".join(feeder.prompts)
     assert combined_prompts.count("Intended Green Channel Target") == 1
     assert combined_prompts.count("Intended Red Channel Target") == 1
+    assert combined_prompts.count("Project name?") == 1
+    assert combined_prompts.count("Stage offset from origin for structure") == 1
+    assert combined_prompts.count("Stage offset from origin for dynamic") == 1
 
     # Ensure mode prompt occurred once for the DMD pair.
     assert combined_prompts.count("SLAP2 Modes") == 1
@@ -116,6 +125,9 @@ def test_prompts_experiment_once_and_mode_once_per_dmd_pair(tmp_path, monkeypatc
         assert payload["pia_depth_on_remote_focus_um"] is not None
         assert payload["target_name"]
         assert payload["targeted_structure"]
+        assert payload["project_name"] == "SCBC"
+        # Dynamic files should get the dynamic stage offset
+        assert payload["stage_offset_from_origin_um"] == 100.0
 
 
 def test_assume_yes_uses_defaults(tmp_path, monkeypatch):
@@ -141,6 +153,9 @@ def test_assume_yes_uses_defaults(tmp_path, monkeypatch):
         "default_pia_depth_on_remote_focus_dmd1_um": 111,
         "default_pia_depth_on_remote_focus_dmd2_um": 222,
         "default_target_name": "FOV1",
+        "project_name": "OpenScopePredictiveProcessing",
+        "static_stage_offset_from_origin": 25.0,
+        "dynamic_stage_offset_from_origin": 75.0,
     }
 
     result = slap2_meta_annotator.run(params)
@@ -157,6 +172,9 @@ def test_assume_yes_uses_defaults(tmp_path, monkeypatch):
         assert payload["targeted_structure"] == "VISp"
         assert payload["target_name"] == "FOV1"
         assert payload["pia_depth_on_remote_focus_um"] in (111, 222)
+        assert payload["project_name"] == "OpenScopePredictiveProcessing"
+        # Dynamic acquisitions get dynamic offset
+        assert payload["stage_offset_from_origin_um"] == 75.0
 
 
 def test_assume_yes_allows_none_channel_targets(tmp_path, monkeypatch):
@@ -177,6 +195,7 @@ def test_assume_yes_allows_none_channel_targets(tmp_path, monkeypatch):
         "default_slap2_mode": "full-field raster",
         "default_pia_depth_on_remote_focus_dmd1_um": 111,
         "default_target_name": "FOV1",
+        "project_name": "SCBC",
     }
 
     result = slap2_meta_annotator.run(params)
@@ -188,3 +207,55 @@ def test_assume_yes_allows_none_channel_targets(tmp_path, monkeypatch):
     payload = json.loads(annotations[0].read_text(encoding="utf-8"))
     assert payload["intended_green_channel_target"] is None
     assert payload["intended_red_channel_target"] is None
+    assert payload["project_name"] == "SCBC"
+    # No stage offset specified, so it should be None
+    assert payload["stage_offset_from_origin_um"] is None
+
+
+def test_stage_offset_by_type(tmp_path, monkeypatch):
+    """Verify static offset is used for structure files and dynamic offset for dynamic files."""
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+
+    # One structure file and one dynamic file.
+    _touch(session_dir / "structure_bar_DMD1.meta")
+    _touch(session_dir / "acquisition_baz_DMD1.meta")
+
+    monkeypatch.setattr("builtins.input", lambda *_: (_ for _ in ()).throw(AssertionError("input called")))
+
+    params = {
+        "output_session_folder": str(session_dir),
+        "assume_yes": True,
+        "validate_targeted_structure_ccf": False,
+        "default_targeted_structure": "VISp",
+        "default_green_channel_target": "GFP",
+        "default_red_channel_target": "None",
+        "default_slap2_mode": "full-field raster",
+        "default_pia_depth_on_remote_focus_dmd1_um": 100,
+        "default_target_name": "FOV1",
+        "project_name": "SCBC",
+        "static_stage_offset_from_origin": 30.0,
+        "dynamic_stage_offset_from_origin": 80.0,
+    }
+
+    result = slap2_meta_annotator.run(params)
+    assert result == 0
+
+    annotations = sorted(session_dir.rglob("*.annotation.json"))
+    assert len(annotations) == 2
+
+    payloads = {
+        json.loads(a.read_text(encoding="utf-8"))["type"]: json.loads(a.read_text(encoding="utf-8"))
+        for a in annotations
+    }
+
+    assert "structure" in payloads
+    assert "dynamic" in payloads
+
+    # Structure files get the static offset.
+    assert payloads["structure"]["stage_offset_from_origin_um"] == 30.0
+    assert payloads["structure"]["project_name"] == "SCBC"
+
+    # Dynamic files get the dynamic offset.
+    assert payloads["dynamic"]["stage_offset_from_origin_um"] == 80.0
+    assert payloads["dynamic"]["project_name"] == "SCBC"
