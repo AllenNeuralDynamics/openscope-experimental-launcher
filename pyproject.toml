@@ -60,6 +60,9 @@ matlab = [
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+openscope_experimental_launcher = ["data/*.json"]
+
 
 [tool.black]
 line-length = 79

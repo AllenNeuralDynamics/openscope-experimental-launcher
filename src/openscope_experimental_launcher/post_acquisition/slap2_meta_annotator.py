@@ -32,24 +32,8 @@ TYPE_STRUCTURE = "structure"
 TYPE_REFSTACK = "ref_stack"
 TYPE_UNKNOWN = "unknown"
 
-
-GREEN_CHANNEL_TARGETS = (
-    "iGluSnFR4s",
-    "iGluSnFR4f",
-    "iGluSnFR3",
-    "GFP",
-    "FORCEB",
-    "ASAP7y",
-)
-
-RED_CHANNEL_TARGETS = (
-    "jRGECO1a",
-    "RCaMP2",
-    "RCaMP3",
-    "VADER",
-)
-
 NONE_CHOICE = "None"
+INDICATOR_TARGETS_PATH = Path(__file__).resolve().parents[1] / "data" / "indicator_targets.json"
 
 SLAP2_MODES = (
     "full-field raster",
@@ -136,6 +120,25 @@ def _prompt_target_name(
 
         prefix = "FOV" if kind == "FOV" else "Neuron"
         return f"{prefix}{int(number_raw)}"
+
+
+def _load_indicator_targets(path: Path) -> Dict[str, List[str]]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    targets: Dict[str, List[str]] = {}
+    for key in ("green_channel_targets", "red_channel_targets"):
+        values = payload.get(key)
+        if not isinstance(values, list) or not values or not all(
+            isinstance(value, str) and value.strip() for value in values
+        ):
+            raise ValueError(f"{path} must contain a non-empty string list named '{key}'")
+        targets[key] = values
+    return targets
+
+
+def _write_indicator_targets(path: Path, targets: Dict[str, List[str]]) -> None:
+    temporary_path = path.with_suffix(f"{path.suffix}.tmp")
+    temporary_path.write_text(json.dumps(targets, indent=2) + "\n", encoding="utf-8")
+    temporary_path.replace(path)
 
 
 def _ccf_acronym_exists(acronym: str, *, timeout_s: float = 1.0) -> bool:
@@ -303,6 +306,115 @@ def _prompt_choice(
         print("Invalid selection. Please choose a number from the list.")
 
 
+def _prompt_indicator_choice(
+    message: str,
+    channel_key: str,
+    indicator_targets: Dict[str, List[str]],
+    indicator_targets_path: Path,
+    *,
+    default: Union[str, List[str], None] = None,
+    assume_yes: bool = False,
+) -> Union[str, List[str], None]:
+    if isinstance(default, list):
+        selected = [str(value) for value in default if str(value).strip()]
+    elif default and default != NONE_CHOICE:
+        selected = [str(default)]
+    else:
+        selected = []
+
+    def _result() -> Union[str, List[str], None]:
+        if not selected:
+            return None
+        if len(selected) == 1:
+            return selected[0]
+        return selected
+
+    if assume_yes:
+        return _result()
+
+    while True:
+        choices = indicator_targets[channel_key] + [NONE_CHOICE, "Done"]
+        choice_lines = [f"{idx + 1}) {value}" for idx, value in enumerate(choices)]
+        selected_display = ", ".join(selected) if selected else "None"
+        prompt_message = (
+            f"\n=== {message} ===\n"
+            + f"Currently selected: {selected_display}\n"
+            + "\n".join(choice_lines)
+            + '\nType "new" to add a new indicator to the list.'
+        )
+        done_index = str(len(choices))
+        raw = _prompt(f"{prompt_message}\nSelect an indicator or Done", done_index).strip()
+
+        if raw.isdigit():
+            index = int(raw) - 1
+            if 0 <= index < len(choices):
+                raw = choices[index]
+        for value in choices:
+            if raw.lower() == value.lower():
+                raw = value
+                break
+
+        if raw == "Done":
+            return _result()
+        if raw == NONE_CHOICE:
+            selected.clear()
+            print("Cleared indicators for this channel. Select Done to continue.")
+            continue
+        matching_target = next(
+            (value for value in indicator_targets[channel_key] if raw.lower() == value.lower()),
+            None,
+        )
+        if matching_target is not None:
+            if matching_target not in selected:
+                selected.append(matching_target)
+                print(f'Selected indicator "{matching_target}".')
+            else:
+                print(f'Indicator "{matching_target}" is already selected.')
+            continue
+
+        if raw.lower() != "new":
+            print('Invalid selection. Choose a number, type "new", or select Done.')
+            continue
+
+        while True:
+            indicator = _prompt("Indicator string").strip()
+            confirmation = _prompt("Confirm indicator string").strip()
+            if not indicator:
+                print("Indicator cannot be empty. Please enter it again.")
+                continue
+            if indicator != confirmation:
+                print("Indicator strings do not match. Please enter them again.")
+                continue
+
+            while True:
+                confirmed = _prompt(
+                    f'Add indicator "{indicator}" to this channel list? (yes/no)'
+                ).strip().lower()
+                if confirmed in {"yes", "y"}:
+                    existing = next(
+                        (
+                            value
+                            for value in indicator_targets[channel_key]
+                            if value.lower() == indicator.lower()
+                        ),
+                        None,
+                    )
+                    if existing is not None:
+                        print(f'Indicator "{existing}" is already in the list.')
+                        print("Select an indicator from the updated list.")
+                        break
+                    indicator_targets[channel_key].append(indicator)
+                    _write_indicator_targets(indicator_targets_path, indicator_targets)
+                    print(f'Added indicator "{indicator}" to the list.')
+                    print("Select an indicator from the updated list.")
+                    break
+                if confirmed in {"no", "n"}:
+                    print("Indicator was not added.")
+                    break
+                print("Please answer yes or no.")
+            break
+
+
 _DMD_SUFFIX_RE = re.compile(r"([_\- ]dmd[12])$", re.IGNORECASE)
 
 
@@ -420,24 +532,27 @@ def run(params: Dict[str, Any]) -> int:
 
     green_target_default = params.get("default_green_channel_target")
     red_target_default = params.get("default_red_channel_target")
+    indicator_targets_path = Path(
+        str(params.get("indicator_targets_path", INDICATOR_TARGETS_PATH))
+    ).expanduser().resolve()
+    indicator_targets = _load_indicator_targets(indicator_targets_path)
 
-    intended_green_target_raw = _prompt_choice(
-        "Question 1: Intended Green Channel Target",
-        GREEN_CHANNEL_TARGETS + (NONE_CHOICE,),
-        default=str(green_target_default) if green_target_default else None,
+    intended_green_target = _prompt_indicator_choice(
+        "GREEN CHANNEL: Intended Target(s)",
+        "green_channel_targets",
+        indicator_targets,
+        indicator_targets_path,
+        default=green_target_default,
         assume_yes=assume_yes,
     )
-    intended_red_target_raw = _prompt_choice(
-        "Question 2: Intended Red Channel Target",
-        RED_CHANNEL_TARGETS + (NONE_CHOICE,),
-        default=str(red_target_default) if red_target_default else None,
+    intended_red_target = _prompt_indicator_choice(
+        "RED CHANNEL: Intended Target(s)",
+        "red_channel_targets",
+        indicator_targets,
+        indicator_targets_path,
+        default=red_target_default,
         assume_yes=assume_yes,
     )
-
-    intended_green_target: str | None = (
-        None if intended_green_target_raw in ("", NONE_CHOICE) else intended_green_target_raw
-    )
-    intended_red_target: str | None = None if intended_red_target_raw in ("", NONE_CHOICE) else intended_red_target_raw
 
     # Per-acquisition (DMD1/DMD2 pair) prompts.
     modes_by_group: Dict[str, str] = {}
