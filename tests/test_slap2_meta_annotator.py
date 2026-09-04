@@ -25,6 +25,77 @@ def _touch(path: Path) -> None:
     path.write_bytes(b"test")
 
 
+def test_new_indicator_requires_matching_confirmation_and_updates_channel(tmp_path, monkeypatch, capsys):
+    targets_path = tmp_path / "indicator_targets.json"
+    targets_path.write_text(
+        json.dumps(
+            {
+                "green_channel_targets": ["GFP"],
+                "red_channel_targets": ["jRGECO1a"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    targets = slap2_meta_annotator._load_indicator_targets(targets_path)
+    feeder = InputFeeder(
+        [
+            "new",
+            "GCaMP8f",
+            "GCaMP8s",
+            "GCaMP8f",
+            "GCaMP8f",
+            "maybe",
+            "yes",
+            "2",
+            "done",
+        ]
+    )
+    monkeypatch.setattr("builtins.input", feeder)
+
+    selected = slap2_meta_annotator._prompt_indicator_choice(
+        "GREEN CHANNEL: Intended Target(s)",
+        "green_channel_targets",
+        targets,
+        targets_path,
+    )
+
+    assert selected == "GCaMP8f"
+    saved = json.loads(targets_path.read_text(encoding="utf-8"))
+    assert saved["green_channel_targets"] == ["GFP", "GCaMP8f"]
+    assert saved["red_channel_targets"] == ["jRGECO1a"]
+    combined_prompts = "\n".join(feeder.prompts)
+    assert 'Type "new" to add a new indicator to the list.' in combined_prompts
+    assert combined_prompts.count("GREEN CHANNEL: Intended Target(s)") == 3
+    assert 'Add indicator "GCaMP8f" to this channel list? (yes/no)' in combined_prompts
+    output = capsys.readouterr().out
+    assert "Indicator strings do not match" in output
+    assert "Please answer yes or no" in output
+
+
+def test_indicator_choice_returns_list_for_multiple_selections(tmp_path, monkeypatch):
+    targets_path = tmp_path / "indicator_targets.json"
+    targets_path.write_text(
+        json.dumps(
+            {
+                "green_channel_targets": ["GFP", "GCaMP8f"],
+                "red_channel_targets": ["jRGECO1a"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    targets = slap2_meta_annotator._load_indicator_targets(targets_path)
+    monkeypatch.setattr("builtins.input", InputFeeder(["1", "2", "done"]))
+
+    selected = slap2_meta_annotator._prompt_indicator_choice(
+        "GREEN CHANNEL: Intended Target(s)",
+        "green_channel_targets",
+        targets,
+        targets_path,
+    )
+
+    assert selected == ["GFP", "GCaMP8f"]
+
+
 def test_prompts_experiment_once_and_mode_once_per_dmd_pair(tmp_path, monkeypatch):
     session_dir = tmp_path / "session"
     session_dir.mkdir()
@@ -45,8 +116,12 @@ def test_prompts_experiment_once_and_mode_once_per_dmd_pair(tmp_path, monkeypatc
             "VISp",
             # Green target: select 1
             "1",
+            # Finish green target selection
+            "done",
             # Red target: select 1
             "1",
+            # Finish red target selection
+            "done",
             # First meta: classify (dynamic)
             "1",
             # Mode for acquisition_foo (shared)
@@ -98,8 +173,8 @@ def test_prompts_experiment_once_and_mode_once_per_dmd_pair(tmp_path, monkeypatc
 
     # Ensure experiment-level prompts occurred once.
     combined_prompts = "\n".join(feeder.prompts)
-    assert combined_prompts.count("Intended Green Channel Target") == 1
-    assert combined_prompts.count("Intended Red Channel Target") == 1
+    assert combined_prompts.count("GREEN CHANNEL: Intended Target(s)") == 2
+    assert combined_prompts.count("RED CHANNEL: Intended Target(s)") == 2
 
     # Ensure mode prompt occurred once for the DMD pair.
     assert combined_prompts.count("SLAP2 Modes") == 1
