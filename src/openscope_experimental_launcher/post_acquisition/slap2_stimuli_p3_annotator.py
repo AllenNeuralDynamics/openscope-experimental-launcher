@@ -98,6 +98,7 @@ def run(params: Dict[str, Any]) -> int:
 
     prompt_on_multiple = bool(params.get("prompt_on_multiple", True))
     manifest_name = params.get("manifest_name", "routing_manifest.json")
+    extra_csv_names = {n.lower() for n in params.get("stimulus_csv_names", [])}
 
     behavior_root_param = params.get("behavior_root")
     if behavior_root_param:
@@ -137,7 +138,7 @@ def run(params: Dict[str, Any]) -> int:
 
     def _is_stimulus_csv(path: Path) -> bool:
         name = path.name.lower()
-        return name.startswith("orientations_") or name == "predictive_processing_session.csv"
+        return name.startswith("orientations_") or name == "predictive_processing_session.csv" or name in extra_csv_names
 
     csv_paths = []
     search_roots = {parent_dir, session_dir}
