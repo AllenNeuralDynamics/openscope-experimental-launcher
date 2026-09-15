@@ -346,6 +346,16 @@ class BonsaiLauncher(BaseLauncher):
 
             return False
 
+    def check_experiment_success(self) -> bool:
+        """Return True if Bonsai exited cleanly or with an acceptable exit code."""
+        rc = getattr(self.process, "returncode", None) if self.process else None
+        if rc == 0:
+            return True
+        acceptable = self.params.get("bonsai_acceptable_exit_codes", [])
+        if rc in acceptable:
+            return True
+        return False
+
     # No _start_output_readers override; inherit BaseLauncher behavior for stdout/stderr logging.
 
 def run_from_params(param_file, *, log_level=None):
