@@ -251,7 +251,13 @@ class BonsaiLauncher(BaseLauncher):
 
             failure_reason = None
             if rc not in (None, 0):
-                failure_reason = f"exit code {rc}"
+                acceptable = self.params.get("bonsai_acceptable_exit_codes", [])
+                if rc in acceptable:
+                    logging.warning(
+                        "Bonsai exited with acceptable exit code %s — treating as success", rc
+                    )
+                else:
+                    failure_reason = f"exit code {rc}"
             elif fail_on_stderr and getattr(self, "stderr_data", None):
                 failure_reason = "stderr output detected"
             elif compiled_patterns:
