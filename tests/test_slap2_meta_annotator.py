@@ -25,6 +25,17 @@ def _touch(path: Path) -> None:
     path.write_bytes(b"test")
 
 
+def test_default_indicator_targets_are_colocated_with_plugin():
+    module_path = Path(slap2_meta_annotator.__file__)
+
+    assert slap2_meta_annotator.INDICATOR_TARGETS_PATH.parent == module_path.parent
+    targets = slap2_meta_annotator._load_indicator_targets(
+        slap2_meta_annotator.INDICATOR_TARGETS_PATH
+    )
+    assert targets["green_channel_targets"]
+    assert targets["red_channel_targets"]
+
+
 def test_new_indicator_requires_matching_confirmation_and_updates_channel(tmp_path, monkeypatch, capsys):
     targets_path = tmp_path / "indicator_targets.json"
     targets_path.write_text(

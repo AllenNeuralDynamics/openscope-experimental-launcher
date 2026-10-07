@@ -33,7 +33,7 @@ TYPE_REFSTACK = "ref_stack"
 TYPE_UNKNOWN = "unknown"
 
 NONE_CHOICE = "None"
-INDICATOR_TARGETS_PATH = Path(__file__).resolve().parents[1] / "data" / "indicator_targets.json"
+INDICATOR_TARGETS_PATH = Path(__file__).with_name("indicator_targets.json")
 
 SLAP2_MODES = (
     "full-field raster",

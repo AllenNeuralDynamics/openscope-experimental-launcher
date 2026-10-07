@@ -61,7 +61,7 @@ matlab = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-openscope_experimental_launcher = ["data/*.json"]
+"openscope_experimental_launcher.post_acquisition.slap2_meta_annotator" = ["indicator_targets.json"]
 
 
 [tool.black]
