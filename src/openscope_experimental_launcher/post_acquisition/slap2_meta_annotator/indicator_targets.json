@@ -1,0 +1,16 @@
+{
+  "green_channel_targets": [
+    "iGluSnFR4s",
+    "iGluSnFR4f",
+    "iGluSnFR3",
+    "GFP",
+    "FORCEB",
+    "ASAP7y"
+  ],
+  "red_channel_targets": [
+    "jRGECO1a",
+    "RCaMP2",
+    "RCaMP3",
+    "VADER"
+  ]
+}
