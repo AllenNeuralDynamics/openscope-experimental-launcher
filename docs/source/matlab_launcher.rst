@@ -87,6 +87,25 @@ Most workflows only need a handful of parameters:
       checkout, added to the MATLAB path only while annotating. Omit it if
       GIAnT-MATLAB is already on the path.
 
+   ``params/matlab_slap2.json`` pins GIAnT-MATLAB through the launcher's
+   repository settings, so every session uses a known version and records its
+   commit in the launcher metadata:
+
+   .. code-block:: json
+
+      "repository_url": "https://github.com/AllenNeuralDynamics/GIAnT-MATLAB.git",
+      "repository_commit_hash": "<full commit hash>",
+      "local_repository_path": "C:\\OpenScopeRepositories",
+      "script_parameters": {
+          "post_acquisition_annotation": true,
+          "giant_path": "{local_repository_path}\\GIAnT-MATLAB"
+      }
+
+   The launcher clones or checks out that commit before the session starts.
+   Annotation files carry a schema version, and GIAnT imports them only when
+   it matches. So when GIAnT changes its annotation schema, update the pinned
+   commit here as well.
+
 ``matlab_entrypoint_kwargs`` (object)
    Additional name/value pairs appended after ``script_parameters``. These are
    rarely needed now that ``script_parameters`` handles rig-specific values.

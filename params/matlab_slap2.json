@@ -4,9 +4,13 @@
     "output_root_folder": "C:\\OpenScopeLocalSessions",
     "matlab_engine_name": "slap2_launcher",
     "matlab_entrypoint": "slap2_launcher",
+    "repository_url": "https://github.com/AllenNeuralDynamics/GIAnT-MATLAB.git",
+    "repository_commit_hash": "19587cfb91e833385d5c8777aeb1514feab80ea4",
+    "local_repository_path": "C:\\OpenScopeRepositories",
     "script_parameters": {
         "rig_description_path": "C:\\Users\\ScanImage\\Documents\\slap2\\configuration.json",
-        "post_acquisition_annotation": true
+        "post_acquisition_annotation": true,
+        "giant_path": "{local_repository_path}\\GIAnT-MATLAB"
     },
     "pre_acquisition_pipeline": [
     {
