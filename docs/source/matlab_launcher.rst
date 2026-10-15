@@ -69,6 +69,24 @@ Most workflows only need a handful of parameters:
    this block to pass rig paths or other configuration (for example,
    ``{"rig_description_path": "{rig_param:rig_description_path}"}``).
 
+   ``slap2_launcher`` also recognizes these keys:
+
+   ``post_acquisition_annotation`` (bool, default ``false``)
+      After the operator presses **End SLAP2 acquisition**, run GIAnT's
+      ``postAcquisitionAnnotation`` on the session folder so somata can be
+      annotated while the targeted cells are known. The operator picks one
+      acquisition tiff per DMD (the newest is preselected), draws ROIs, and
+      presses **Done**. ROIs are saved to ``postacq_annotations.h5`` next to the
+      acquisition files, before the post-acquisition pipeline (and archiving)
+      runs. GIAnT's ``annotateROIs``/``SILo`` later register them to the
+      motion-corrected data. Cancelling or an annotation error is logged and
+      does not fail the session.
+
+   ``giant_path`` (string, optional)
+      Folder of the `GIAnT-MATLAB <https://github.com/AllenNeuralDynamics/GIAnT-MATLAB>`_
+      checkout, added to the MATLAB path only while annotating. Omit it if
+      GIAnT-MATLAB is already on the path.
+
 ``matlab_entrypoint_kwargs`` (object)
    Additional name/value pairs appended after ``script_parameters``. These are
    rarely needed now that ``script_parameters`` handles rig-specific values.

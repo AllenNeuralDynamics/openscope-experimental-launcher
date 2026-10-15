@@ -5,7 +5,8 @@
     "matlab_engine_name": "slap2_launcher",
     "matlab_entrypoint": "slap2_launcher",
     "script_parameters": {
-        "rig_description_path": "C:\\Users\\ScanImage\\Documents\\slap2\\configuration.json"
+        "rig_description_path": "C:\\Users\\ScanImage\\Documents\\slap2\\configuration.json",
+        "post_acquisition_annotation": true
     },
     "pre_acquisition_pipeline": [
     {
