@@ -1,52 +1,74 @@
 {
+    "launcher_version": ">=0.2.7",
     "launcher": "matlab",
-  "launcher_version": ">=0.0.0",
-    "output_root_folder": "C:\\OpenScopeLocalSessions",
+    "output_root_folder": "F:/slap2Data",
     "matlab_engine_name": "slap2_launcher",
     "matlab_entrypoint": "slap2_launcher",
     "repository_url": "https://github.com/AllenNeuralDynamics/GIAnT-MATLAB.git",
     "repository_commit_hash": "19587cfb91e833385d5c8777aeb1514feab80ea4",
-    "local_repository_path": "C:\\OpenScopeRepositories",
+    "local_repository_path": "C:/OpenScopeRepositories",
     "script_parameters": {
-        "rig_description_path": "C:\\Users\\ScanImage\\Documents\\slap2\\configuration.json",
+        "rig_description_path": "C:/Users/ScanImage/Documents/slap2/configuration.json",
         "post_acquisition_annotation": true,
-        "giant_path": "{local_repository_path}\\GIAnT-MATLAB"
+        "giant_path": "{local_repository_path}/GIAnT-MATLAB"
     },
     "pre_acquisition_pipeline": [
-    {
-    "module_type": "launcher_module",
-    "module_path": "metadata_subject_fetch",
-    "module_parameters": {
-        "metadata_subject_id": "{subject_id}"
-            }
-    },    
-    {
-      "module_type": "launcher_module",
-      "module_path": "experiment_notes_editor",
-      "module_parameters": {
-        "experiment_notes_launch_editor": true,
-        "experiment_notes_filename": "notes/experiment_notes.txt"
-      }
-    }
-    ],
-    "post_acquisition_pipeline": [
-    {
-      "module_type": "launcher_module",
-      "module_path": "experiment_notes_finalize",
-      "module_parameters": {
-        "experiment_notes_filename": "notes/experiment_notes.txt",
-        "experiment_notes_confirm_prompt": "Confirm experiment notes are saved; press Enter to finish."
-      }
-    }, 
-     {
+        {
             "module_type": "launcher_module",
-            "module_path": "session_archiver",
+            "module_path": "instrument_json_fetch",
             "module_parameters": {
-            "network_dir": "\\\\allen\\aind\\scratch\\OpenScope\\Slap2\\Data\\{subject_id}\\{session_uuid}\\slap2",
-            "backup_dir": "C:\\BonsaiDataPredictiveProcessing\\Archive\\{subject_id}\\{session_uuid}",
-            "max_retries": 3
+                "instrument_json_source_root": "C:/Users/ScanImage/Documents/GitHub/slap2_processing"
+            }
+        },
+        {
+            "module_type": "launcher_module",
+            "module_path": "experiment_notes_editor",
+            "module_parameters": {
+                "experiment_notes_launch_editor": true,
+                "experiment_notes_filename": "{output_session_folder}\\notes\\experiment_notes.txt"
+            }
+        },
+        {
+            "module_type": "launcher_module",
+            "module_path": "disk_space_check",
+            "on_failure": "abort",
+            "module_parameters": {
+                "required_free_gb": 1000
             }
         }
     ],
-    "description": "SLAP2 configuration usingthe MATLAB shared-engine launcher locally."
+    "post_acquisition_pipeline": [
+        {
+            "module_type": "launcher_module",
+            "module_path": "slap2_meta_annotator",
+            "module_parameters": {
+                "source_dir": "{output_session_folder}",
+                "manifest_path": "{output_session_folder}\\launcher_metadata\\routing_manifest.json"
+            }
+        },
+        {
+            "module_type": "launcher_module",
+            "module_path": "experiment_notes_finalize",
+            "module_parameters": {
+                "experiment_notes_filename": "{output_session_folder}\\notes\\experiment_notes.txt",
+                "experiment_notes_confirm_prompt": "Confirm experiment notes are saved; press Enter to finish.",
+                "manifest_path": "{output_session_folder}\\launcher_metadata\\routing_manifest.json"
+            }
+        },
+        {
+            "module_type": "launcher_module",
+            "module_path": "session_archiver",
+            "module_parameters": {
+                "session_dir": "{output_session_folder}",
+                "network_dir": "\\\\allen\\aind\\scratch\\OpenScope\\Slap2\\Data\\{subject_id}\\{session_uuid}\\slap2",
+                "backup_dir": "C:\\BonsaiDataPredictiveProcessing\\Archive\\{subject_id}\\{session_uuid}\\slap2",
+                "routing_manifest": "{output_session_folder}\\launcher_metadata\\routing_manifest.json",
+                "remove_empty_dirs": false,
+                "skip_completed": true,
+                "max_retries": 3,
+                "copy_to_backup": false
+            }
+        }
+    ],
+    "description": "Standalone SLAP2 session with the MATLAB shared-engine launcher, based on the openscope-params indicator_testing SLAP2 pack (without session sync). Runs GIAnT post-acquisition soma annotation after End SLAP2 acquisition, with GIAnT-MATLAB pinned by repository_commit_hash."
 }

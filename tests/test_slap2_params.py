@@ -15,9 +15,8 @@ def _load_slap2_launcher(tmp_path):
     params.update({"subject_id": "mouse1", "user_id": "tester"})
     param_json = tmp_path / "params.json"
     param_json.write_text(json.dumps(params))
-    # session_archiver's schema requires session_dir, which only exists at run time
-    with patch("openscope_experimental_launcher.utils.rig_config.get_rig_config", return_value={"rig_id": "test_rig"}), \
-            patch("openscope_experimental_launcher.launchers.base_launcher.schema_validator.validate_param_file"):
+    # loading runs the same schema validation as selecting the pack on the rig
+    with patch("openscope_experimental_launcher.utils.rig_config.get_rig_config", return_value={"rig_id": "test_rig"}):
         launcher = BaseLauncher(param_file=str(param_json))
     launcher._expand_parameter_placeholders(launcher.params)  # as run() does before launching
     return launcher
