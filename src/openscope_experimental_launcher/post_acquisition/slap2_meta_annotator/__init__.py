@@ -504,26 +504,25 @@ def _classify_meta(
     dynamic_prefixes: Tuple[str, ...],
     structure_prefixes: Tuple[str, ...],
     ref_stack_prefixes: Tuple[str, ...],
-    stack_split_memory: Dict[str, str],
-    fallback_memory: Dict[str, str],
     assume_yes: bool,
 ) -> str:
     """Classify a .meta file as TYPE_DYNAMIC/TYPE_STRUCTURE/TYPE_REFSTACK or "skip".
 
     Decision ladder:
       1. .meta contents (enableStack): 0 -> dynamic, machine truth, silent.
-      2. enableStack == 1 -> a z-stack; the filename prefix (or a remembered
-         operator answer) picks structure vs. reference stack; else ONE
-         contextual two-choice prompt.
-      3. Contents unreadable -> filename prefix; unknown prefixes use a
-         remembered answer or ONE contextual prompt (no default — invalid
-         input re-prompts rather than silently classifying as dynamic).
-    Under assume_yes, files that would need a prompt are skipped loudly:
-    guessing a classification can misfile data.
+      2. enableStack == 1 -> a z-stack; the filename prefix picks structure
+         vs. reference stack; else ONE contextual two-choice prompt.
+      3. Contents unreadable -> filename prefix; unknown names get a
+         contextual prompt (no default — invalid input re-prompts rather than
+         silently classifying as dynamic).
+    Files needing a prompt are asked about individually (only DMD pairs of
+    the SAME acquisition share a classification, handled by the caller):
+    a shared name prefix does not imply a shared type. Under assume_yes,
+    files that would need a prompt are skipped loudly: guessing a
+    classification can misfile data.
     """
     rel = meta_path.relative_to(session_dir)
     stem_lower = meta_path.stem.lower()
-    prefix_key = stem_lower.split("_", 1)[0]
 
     def _prefix_type() -> str:
         if stem_lower.startswith(dynamic_prefixes):
@@ -555,15 +554,6 @@ def _classify_meta(
                 "trusting the contents and asking the operator",
                 rel,
             )
-        if prefix_key in stack_split_memory:
-            choice = stack_split_memory[prefix_key]
-            LOG.info(
-                "Classified %s as %s (reusing earlier answer for '%s*' files)",
-                rel,
-                choice,
-                prefix_key,
-            )
-            return choice
         if assume_yes:
             LOG.warning(
                 "Cannot classify %s without operator input (z-stack with "
@@ -583,24 +573,13 @@ def _classify_meta(
             ("structure stack", "reference stack"),
             assume_yes=assume_yes,
         )
-        choice = TYPE_STRUCTURE if selected == "structure stack" else TYPE_REFSTACK
-        stack_split_memory[prefix_key] = choice
-        return choice
+        return TYPE_STRUCTURE if selected == "structure stack" else TYPE_REFSTACK
 
     # Contents unreadable -> filename prefix fallback.
     inferred = _prefix_type()
     if inferred != TYPE_UNKNOWN:
         LOG.info("Classified %s as %s (filename prefix)", rel, inferred)
         return inferred
-    if prefix_key in fallback_memory:
-        choice = fallback_memory[prefix_key]
-        LOG.info(
-            "Classified %s as %s (reusing earlier answer for '%s*' files)",
-            rel,
-            choice,
-            prefix_key,
-        )
-        return choice
     if assume_yes:
         LOG.warning(
             "Cannot classify %s without operator input (contents unreadable, "
@@ -623,15 +602,12 @@ def _classify_meta(
         ("dynamic", "structure stack", "reference stack", "skip"),
         assume_yes=assume_yes,
     )
-    choice = {
+    return {
         "dynamic": TYPE_DYNAMIC,
         "structure stack": TYPE_STRUCTURE,
         "reference stack": TYPE_REFSTACK,
         "skip": "skip",
     }[selected]
-    if choice != "skip":
-        fallback_memory[prefix_key] = choice
-    return choice
 
 
 def _review_classifications(
@@ -909,11 +885,9 @@ def run(params: Dict[str, Any]) -> int:
     # Per-acquisition (DMD1/DMD2 pair) prompts.
     modes_by_group: Dict[str, str] = {}
 
-    # Classification caches: DMD pairs share one classification; operator
-    # answers for unknown stem prefixes are remembered within the session.
+    # Classification caches: DMD pairs of the same acquisition share one
+    # classification (same stem group); nothing else is assumed shared.
     type_by_group: Dict[str, str] = {}
-    stack_split_memory: Dict[str, str] = {}
-    fallback_memory: Dict[str, str] = {}
     dynamic_prefixes = _normalize_prefixes(
         params.get("dynamic_stem_prefixes"), _BUILTIN_DYNAMIC_PREFIXES
     )
@@ -953,8 +927,6 @@ def run(params: Dict[str, Any]) -> int:
                 dynamic_prefixes=dynamic_prefixes,
                 structure_prefixes=structure_prefixes,
                 ref_stack_prefixes=ref_stack_prefixes,
-                stack_split_memory=stack_split_memory,
-                fallback_memory=fallback_memory,
                 assume_yes=assume_yes,
             )
             type_by_group[group_key] = type_choice
@@ -965,6 +937,7 @@ def run(params: Dict[str, Any]) -> int:
         classifications = _review_classifications(classifications, session_dir)
 
     # ---- Processing pass: move files and write annotations ----
+    skipped_meta_files: List[Path] = []
     for meta_path in meta_files:
         stem_lower = meta_path.stem.lower()
         group_key = _meta_group_key(meta_path)
@@ -972,6 +945,7 @@ def run(params: Dict[str, Any]) -> int:
 
         if type_choice == "skip":
             LOG.info("Skipping meta file: %s", meta_path)
+            skipped_meta_files.append(meta_path)
             continue
 
         device = None
@@ -1130,6 +1104,20 @@ def run(params: Dict[str, Any]) -> int:
     if entries:
         manifest_utils.write_manifest(routing_manifest_path, entries)
         LOG.info("Routing manifest written: %s", routing_manifest_path)
+
+    if skipped_meta_files:
+        skipped_list = "\n".join(
+            f"  {p.relative_to(session_dir)}" for p in skipped_meta_files
+        )
+        message = (
+            "UNCLASSIFIED LEFTOVERS: %d .meta file(s) were skipped and remain "
+            "in place, unannotated, and NOT listed in the routing manifest — "
+            "they will not be copied to the network archive:\n%s\n"
+            "Re-run the annotator interactively (or fix the file names / "
+            "declare stem prefixes in the param pack) to classify them."
+        )
+        LOG.warning(message, len(skipped_meta_files), skipped_list)
+        print("\n" + message % (len(skipped_meta_files), skipped_list))
 
     return 0
 def run_post_acquisition(param_file: Union[str, Dict[str, Any]], overrides: Optional[Dict[str, Any]] = None) -> int:

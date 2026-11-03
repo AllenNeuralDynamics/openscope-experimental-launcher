@@ -468,24 +468,21 @@ def test_content_classification_stack_uses_prefix(tmp_path, monkeypatch):
 
 
 def test_content_classification_stack_with_unknown_name_prompts_with_context(tmp_path, monkeypatch):
-    """A z-stack with an unrecognized name asks a contextual two-way question;
-    the answer is remembered for later files sharing the prefix."""
+    """A z-stack with an unrecognized name asks a contextual two-way question
+    for EACH such acquisition — a shared name prefix does not imply a shared
+    type."""
     session_dir = tmp_path / "session"
     session_dir.mkdir()
     _write_meta_hdf5(session_dir / "oddstack_a_DMD1.meta", 1.0)
     _write_meta_hdf5(session_dir / "oddstack_b_DMD1.meta", 1.0)
 
-    feeder = InputFeeder(["1"])  # structure stack; second file reuses the answer
+    feeder = InputFeeder(["1", "2"])  # structure stack, then reference stack
     monkeypatch.setattr("builtins.input", feeder)
 
-    stack_memory: dict = {}
-    fallback_memory: dict = {}
     kwargs = dict(
         dynamic_prefixes=slap2_meta_annotator._BUILTIN_DYNAMIC_PREFIXES,
         structure_prefixes=slap2_meta_annotator._BUILTIN_STRUCTURE_PREFIXES,
         ref_stack_prefixes=slap2_meta_annotator._BUILTIN_REF_STACK_PREFIXES,
-        stack_split_memory=stack_memory,
-        fallback_memory=fallback_memory,
         assume_yes=False,
     )
     first = slap2_meta_annotator._classify_meta(
@@ -495,14 +492,15 @@ def test_content_classification_stack_with_unknown_name_prompts_with_context(tmp
         session_dir / "oddstack_b_DMD1.meta", session_dir, **kwargs
     )
 
+    # Each acquisition was asked individually and could differ.
     assert first == slap2_meta_annotator.TYPE_STRUCTURE
-    assert second == slap2_meta_annotator.TYPE_STRUCTURE
+    assert second == slap2_meta_annotator.TYPE_REFSTACK
     combined = "\n".join(feeder.prompts)
-    # Contextual explanation, not a bare numeric prompt; asked exactly once.
+    # Contextual explanation, not a bare numeric prompt.
     assert "Operator input needed to classify" in combined
     assert "z-stack" in combined
     assert "static_data/" in combined
-    assert combined.count("Operator input needed") == 1
+    assert combined.count("Operator input needed") == 2
 
 
 def test_fallback_unknown_prefix_prompts_and_reprompts_on_invalid(tmp_path, monkeypatch):
@@ -522,8 +520,6 @@ def test_fallback_unknown_prefix_prompts_and_reprompts_on_invalid(tmp_path, monk
         dynamic_prefixes=slap2_meta_annotator._BUILTIN_DYNAMIC_PREFIXES,
         structure_prefixes=slap2_meta_annotator._BUILTIN_STRUCTURE_PREFIXES,
         ref_stack_prefixes=slap2_meta_annotator._BUILTIN_REF_STACK_PREFIXES,
-        stack_split_memory={},
-        fallback_memory={},
         assume_yes=False,
     )
 
@@ -533,8 +529,9 @@ def test_fallback_unknown_prefix_prompts_and_reprompts_on_invalid(tmp_path, monk
     assert combined.count("Select one") >= 2  # re-prompted after invalid input
 
 
-def test_assume_yes_skips_unclassifiable_files(tmp_path, monkeypatch):
-    """Headless runs never guess: unclassifiable files are skipped loudly."""
+def test_assume_yes_skips_unclassifiable_files(tmp_path, monkeypatch, capsys):
+    """Headless runs never guess: unclassifiable files are skipped loudly and
+    summarized in an unclassified-leftovers warning at the end."""
     session_dir = tmp_path / "session"
     session_dir.mkdir()
     (session_dir / "weird_thing_DMD1.meta").write_bytes(b"not hdf5")
@@ -545,6 +542,11 @@ def test_assume_yes_skips_unclassifiable_files(tmp_path, monkeypatch):
     # File untouched, no annotation created.
     assert (session_dir / "weird_thing_DMD1.meta").exists()
     assert not list(session_dir.rglob("*.annotation.json"))
+    # Session-level leftovers summary names the file and the consequence.
+    output = capsys.readouterr().out
+    assert "UNCLASSIFIED LEFTOVERS" in output
+    assert "weird_thing_DMD1.meta" in output
+    assert "not be copied" in output
 
 
 def test_activity_prefix_is_known_dynamic(tmp_path, monkeypatch):
