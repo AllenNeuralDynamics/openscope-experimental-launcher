@@ -190,7 +190,7 @@ def test_prompts_experiment_once_and_mode_once_per_dmd_pair(tmp_path, monkeypatc
     # Ensure mode prompt occurred once for the DMD pair.
     assert combined_prompts.count("SLAP2 Modes") == 1
 
-    # Verify annotations exist and include the new fields.
+    # Verify annotations exist and are in the unified GUI/ETL schema.
     annotations = list(session_dir.rglob("*.annotation.json"))
     assert len(annotations) == 2
 
@@ -200,8 +200,20 @@ def test_prompts_experiment_once_and_mode_once_per_dmd_pair(tmp_path, monkeypatc
         assert payload["intended_red_channel_target"]
         assert payload["slap2_mode"]
         assert payload["pia_depth_on_remote_focus_um"] is not None
-        assert payload["target_name"]
+        assert "target_name" not in payload
         assert payload["targeted_structure"]
+
+    # target_name answers are parsed into neuron_id / fov_index.
+    by_stem = {}
+    for p in annotations:
+        payload = json.loads(p.read_text(encoding="utf-8"))
+        by_stem[payload["original_stem"]] = payload
+    dmd1_payload = by_stem["acquisition_foo_DMD1"]
+    dmd2_payload = by_stem["acquisition_foo_DMD2"]
+    assert dmd1_payload["fov_index"] == 1  # answered FOV 1
+    assert dmd1_payload["neuron_id"] is None
+    assert dmd2_payload["neuron_id"] == 2  # answered Neuron 2
+    assert dmd2_payload["fov_index"] == -1  # unfilled sentinel
 
 
 def test_assume_yes_uses_defaults(tmp_path, monkeypatch):
@@ -237,11 +249,13 @@ def test_assume_yes_uses_defaults(tmp_path, monkeypatch):
 
     for annotation_path in annotations:
         payload = json.loads(annotation_path.read_text(encoding="utf-8"))
-        assert payload["intended_green_channel_target"] == "iGluSnFR4s"
-        assert payload["intended_red_channel_target"] == "jRGECO1a"
+        assert payload["intended_green_channel_target"] == ["iGluSnFR4s"]
+        assert payload["intended_red_channel_target"] == ["jRGECO1a"]
         assert payload["slap2_mode"] == "full-field raster"
         assert payload["targeted_structure"] == "VISp"
-        assert payload["target_name"] == "FOV1"
+        assert "target_name" not in payload
+        assert payload["fov_index"] == 1  # parsed from default_target_name FOV1
+        assert payload["neuron_id"] is None
         assert payload["pia_depth_on_remote_focus_um"] in (111, 222)
 
 
@@ -272,5 +286,140 @@ def test_assume_yes_allows_none_channel_targets(tmp_path, monkeypatch):
     assert annotations
 
     payload = json.loads(annotations[0].read_text(encoding="utf-8"))
-    assert payload["intended_green_channel_target"] is None
-    assert payload["intended_red_channel_target"] is None
+    assert payload["intended_green_channel_target"] == []
+    assert payload["intended_red_channel_target"] == []
+
+
+def test_dynamic_annotation_schema_matches_editor(tmp_path, monkeypatch):
+    """Annotator output must contain the metadata editor / ETL field set.
+
+    Mirrors _apply_dynamic_defaults in slap2_onprem_handling's
+    metadata_editor: loading an annotator-produced dynamic annotation in the
+    editor must add no keys.
+    """
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    _touch(session_dir / "acquisition_qux_DMD1.meta")
+    monkeypatch.setattr("builtins.input", lambda *_: (_ for _ in ()).throw(AssertionError("input called")))
+
+    params = {
+        "output_session_folder": str(session_dir),
+        "assume_yes": True,
+        "validate_targeted_structure_ccf": False,
+        "user_id": "operator1",
+    }
+    assert slap2_meta_annotator.run(params) == 0
+
+    payload = json.loads(
+        next(session_dir.rglob("*.annotation.json")).read_text(encoding="utf-8")
+    )
+
+    editor_dynamic_fields = {
+        "stage_offset": None,
+        "pia_depth_on_remote_focus_um": None,
+        "intended_red_channel_target": [],
+        "intended_green_channel_target": [],
+        "neuron_id": None,
+        "fov_index": -1,
+        "targeted_structure": "",
+        "hwp_laser_power": -1.0,
+        "slap2_mode": "",
+        "acquisition_type": "",
+        "operator": "operator1",
+        "dendrite_planes_raster": [],
+        "dendrite_planes_integration": [],
+        "axon_planes_raster": [],
+        "axon_planes_integration": [],
+        "soma_planes_raster": [],
+        "soma_planes_integration": [],
+    }
+    for key, expected_default in editor_dynamic_fields.items():
+        assert key in payload, f"missing editor/ETL field: {key}"
+        assert payload[key] == expected_default, f"{key}: {payload[key]!r}"
+
+    # Structural bookkeeping retained.
+    for key in ("original_stem", "normalized_stem", "type", "moved_files", "source_rel", "dest_dir"):
+        assert key in payload
+    assert "target_name" not in payload
+    # No silent VISp default.
+    assert payload["targeted_structure"] == ""
+
+
+def test_static_annotation_schema_matches_editor(tmp_path, monkeypatch):
+    """Structure files get the editor's static field set (no fov_index/
+    acquisition_type/planes/slap2_mode; hwp_laser_power defaults to None)."""
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    _touch(session_dir / "structure_stack_DMD1.meta")
+    monkeypatch.setattr("builtins.input", lambda *_: (_ for _ in ()).throw(AssertionError("input called")))
+
+    params = {
+        "output_session_folder": str(session_dir),
+        "assume_yes": True,
+        "validate_targeted_structure_ccf": False,
+        "default_target_name": "Neuron3",
+    }
+    assert slap2_meta_annotator.run(params) == 0
+
+    payload = json.loads(
+        next(session_dir.rglob("static_data/*.annotation.json")).read_text(encoding="utf-8")
+    )
+
+    for key in (
+        "stage_offset",
+        "pia_depth_on_remote_focus_um",
+        "intended_red_channel_target",
+        "intended_green_channel_target",
+        "neuron_id",
+        "targeted_structure",
+        "hwp_laser_power",
+        "operator",
+    ):
+        assert key in payload, f"missing editor/ETL static field: {key}"
+    assert payload["hwp_laser_power"] is None
+    assert payload["neuron_id"] == 3  # parsed from default_target_name Neuron3
+    for absent in ("fov_index", "acquisition_type", "slap2_mode", "target_name",
+                   "dendrite_planes_raster"):
+        assert absent not in payload, f"unexpected field on static annotation: {absent}"
+
+
+def test_ref_stack_annotation_keeps_legacy_payload(tmp_path, monkeypatch):
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    _touch(session_dir / "refStack_overview_DMD1.meta")
+    monkeypatch.setattr("builtins.input", lambda *_: (_ for _ in ()).throw(AssertionError("input called")))
+
+    params = {
+        "output_session_folder": str(session_dir),
+        "assume_yes": True,
+        "validate_targeted_structure_ccf": False,
+    }
+    assert slap2_meta_annotator.run(params) == 0
+
+    payload = json.loads(
+        next(session_dir.rglob("reference_stack/*.annotation.json")).read_text(encoding="utf-8")
+    )
+    assert payload["type"] == "ref_stack"
+    assert "target_name" in payload  # legacy payload untouched
+    assert "fov_index" not in payload
+
+
+def test_no_hardcoded_visp_default(tmp_path, monkeypatch):
+    """Without an explicit pack default, targeted_structure must be blank —
+    never silently stamped with 'VISp'."""
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    _touch(session_dir / "acquisition_blank_DMD1.meta")
+    monkeypatch.setattr("builtins.input", lambda *_: (_ for _ in ()).throw(AssertionError("input called")))
+
+    params = {
+        "output_session_folder": str(session_dir),
+        "assume_yes": True,
+        "validate_targeted_structure_ccf": False,
+    }
+    assert slap2_meta_annotator.run(params) == 0
+
+    payload = json.loads(
+        next(session_dir.rglob("*.annotation.json")).read_text(encoding="utf-8")
+    )
+    assert payload["targeted_structure"] == ""

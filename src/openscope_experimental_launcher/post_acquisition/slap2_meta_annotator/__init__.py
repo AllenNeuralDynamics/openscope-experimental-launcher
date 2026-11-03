@@ -466,6 +466,101 @@ def _build_normalized_stem(file_type: str, original_stem: str, counter: int) -> 
     return f"{prefix}_{base_tail}"
 
 
+def _normalize_channel_targets(value) -> List[str]:
+    """Normalize an intended-channel-target value to a list of strings.
+
+    Matches the metadata editor's convention: [] = not yet filled,
+    ["None"] = explicit "deliberately no indicator". Accepts the legacy
+    single-string form, a list, or None.
+    """
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple)):
+        return [str(v).strip() for v in value if str(v).strip()]
+    s = str(value).strip()
+    return [s] if s else []
+
+
+def _build_annotation_payload(
+    file_type: str,
+    *,
+    original_stem: str,
+    normalized_stem: str,
+    moved_files: List[str],
+    source_rel: str,
+    dest_rel_dir: str,
+    pia_depth_on_remote_focus_um: float | None,
+    target_name_value: str | None,
+    targeted_structure_value: str,
+    intended_green_target,
+    intended_red_target,
+    slap2_mode_value: str,
+    operator: str | None,
+) -> Dict[str, Any]:
+    """Build an annotation payload in the unified GUI/ETL schema.
+
+    The field sets mirror the metadata editor's _apply_dynamic_defaults /
+    _apply_static_defaults (which in turn mirror what
+    generate_acquisition_json consumes), plus this module's structural
+    bookkeeping keys. target_name is not stored: the FOV/Neuron answer is
+    parsed into the neuron_id / fov_index fields the ETL actually reads.
+    Human-required fields with no known value are left at detectable
+    defaults (fov_index -1, targeted_structure "", indicators []) for the
+    metadata editor's save-time validation to enforce.
+    """
+    bookkeeping = {
+        "original_stem": original_stem,
+        "normalized_stem": normalized_stem,
+        "type": file_type,
+        "moved_files": moved_files,
+        "source_rel": source_rel,
+        "dest_dir": dest_rel_dir,
+    }
+
+    if file_type == TYPE_REFSTACK:
+        # Ref-stack annotations keep the legacy structural payload: the
+        # metadata editor never loads them and the ETL does not read
+        # per-file ref-stack metadata.
+        return {
+            **bookkeeping,
+            "pia_depth_on_remote_focus_um": pia_depth_on_remote_focus_um,
+            "target_name": target_name_value,
+            "targeted_structure": targeted_structure_value,
+            "intended_green_channel_target": intended_green_target,
+            "intended_red_channel_target": intended_red_target,
+            "slap2_mode": slap2_mode_value,
+            "operator": operator,
+        }
+
+    kind, number = _parse_target_name(target_name_value)
+    neuron_id = number if kind == "NEURON" else None
+    fov_index = number if kind == "FOV" else -1
+
+    payload: Dict[str, Any] = {
+        "stage_offset": None,
+        "pia_depth_on_remote_focus_um": pia_depth_on_remote_focus_um,
+        "intended_red_channel_target": _normalize_channel_targets(intended_red_target),
+        "intended_green_channel_target": _normalize_channel_targets(intended_green_target),
+        "neuron_id": neuron_id,
+        "targeted_structure": targeted_structure_value or "",
+        "operator": operator or "",
+        **bookkeeping,
+    }
+
+    if file_type == TYPE_DYNAMIC:
+        payload["fov_index"] = fov_index
+        payload["hwp_laser_power"] = -1.0
+        payload["slap2_mode"] = slap2_mode_value or ""
+        payload["acquisition_type"] = ""
+        for structure in ("dendrite", "axon", "soma"):
+            payload[f"{structure}_planes_raster"] = []
+            payload[f"{structure}_planes_integration"] = []
+    else:  # TYPE_STRUCTURE -> static annotation schema
+        payload["hwp_laser_power"] = None
+
+    return payload
+
+
 def _write_annotation(annotation_path: Path, payload: Dict[str, Any]) -> None:
     annotation_path.parent.mkdir(parents=True, exist_ok=True)
     annotation_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -494,9 +589,12 @@ def run(params: Dict[str, Any]) -> int:
 
     assume_yes = bool(params.get("assume_yes", False))
     # Back-compat: allow legacy default_brain_area to populate targeted_structure default.
+    # No hardcoded fallback: a plausible-looking default (e.g. "VISp") stamped
+    # into every annotation can ship wrong metadata unnoticed; blank values
+    # are enforced later by the metadata editor's save-time validation.
     default_targeted_structure = params.get("default_targeted_structure")
     if default_targeted_structure is None:
-        default_targeted_structure = params.get("default_brain_area", "VISp")
+        default_targeted_structure = params.get("default_brain_area")
 
     dynamic_dir = params.get("dynamic_dir", "dynamic_data")
     structure_dir = params.get("structure_dir", "static_data")
@@ -702,21 +800,21 @@ def run(params: Dict[str, Any]) -> int:
             moved_files.append(dst.relative_to(session_dir).as_posix())
 
         annotation_path = dest_dir / f"{normalized_stem}.annotation.json"
-        annotation_payload = {
-            "original_stem": meta_path.stem,
-            "normalized_stem": normalized_stem,
-            "type": type_choice,
-            "pia_depth_on_remote_focus_um": pia_depth_on_remote_focus_um,
-            "target_name": target_name_value,
-            "targeted_structure": targeted_structure_value,
-            "intended_green_channel_target": intended_green_target,
-            "intended_red_channel_target": intended_red_target,
-            "slap2_mode": slap2_mode_value,
-            "operator": params.get("user_id") or params.get("operator"),
-            "moved_files": moved_files,
-            "source_rel": meta_path.relative_to(session_dir).as_posix(),
-            "dest_dir": dest_rel_dir,
-        }
+        annotation_payload = _build_annotation_payload(
+            type_choice,
+            original_stem=meta_path.stem,
+            normalized_stem=normalized_stem,
+            moved_files=moved_files,
+            source_rel=meta_path.relative_to(session_dir).as_posix(),
+            dest_rel_dir=dest_rel_dir,
+            pia_depth_on_remote_focus_um=pia_depth_on_remote_focus_um,
+            target_name_value=target_name_value,
+            targeted_structure_value=targeted_structure_value,
+            intended_green_target=intended_green_target,
+            intended_red_target=intended_red_target,
+            slap2_mode_value=slap2_mode_value,
+            operator=params.get("user_id") or params.get("operator"),
+        )
         _write_annotation(annotation_path, annotation_payload)
 
         annotation_rel = annotation_path.relative_to(session_dir).as_posix()
