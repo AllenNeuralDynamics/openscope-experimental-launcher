@@ -88,6 +88,7 @@ def _confirm_yes(prompt: str, prompt_func, *, allow_no: bool, max_attempts: Opti
 
 
 def _try_close_pid(pid: int) -> None:
+    # Kept as a thin alias for back-compat; see utils.notes_editor.
     notes_editor.try_close_pid(pid)
 
 
@@ -121,7 +122,10 @@ def run_post_acquisition(param_file: Any = None, overrides: Optional[Mapping[str
         if params.get("experiment_notes_autoclose_editor", True):
             pid = _extract_editor_pid(notes_path, encoding)
             if pid:
-                _try_close_pid(pid)
+                expected_image = notes_editor.expected_image_from_command(
+                    params.get("experiment_notes_editor_command", notes_editor.DEFAULT_EDITOR_IMAGE)
+                )
+                notes_editor.try_close_pid(pid, expected_image=expected_image)
 
         manifest_param = params.get("manifest_path")
         if manifest_param:

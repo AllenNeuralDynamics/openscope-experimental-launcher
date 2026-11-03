@@ -681,13 +681,17 @@ def run(params: Dict[str, Any]) -> int:
         return 2
 
     # Item 15: close the on-rig notes editor (if the notes step left one
-    # open) before any interactive work. Best-effort, never fatal.
+    # open) before any interactive work. Best-effort, never fatal; only a
+    # process still running the expected editor image is ever terminated.
     if bool(params.get("close_notes_editor", True)):
         notes_filename = params.get("experiment_notes_filename", "experiment_notes.txt")
         notes_path = Path(str(notes_filename)).expanduser()
         if not notes_path.is_absolute():
             notes_path = session_dir / notes_path
-        if notes_editor.close_notes_editor(notes_path):
+        expected_image = notes_editor.expected_image_from_command(
+            params.get("experiment_notes_editor_command", notes_editor.DEFAULT_EDITOR_IMAGE)
+        )
+        if notes_editor.close_notes_editor(notes_path, expected_image=expected_image):
             LOG.info("Closed experiment notes editor before annotation.")
 
     # ---- Prefill values from pack parameters (no metadata prompts) --------

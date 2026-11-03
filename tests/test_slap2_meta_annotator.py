@@ -892,7 +892,7 @@ def test_annotator_closes_notes_editor_before_prompting(tmp_path, monkeypatch):
     _touch(session_dir / "acquisition_foo_DMD1.meta")
 
     closed: list[int] = []
-    monkeypatch.setattr(notes_editor, "try_close_pid", closed.append)
+    monkeypatch.setattr(notes_editor, "try_close_pid", lambda pid, **kw: closed.append(pid))
     monkeypatch.setattr("builtins.input", lambda *_: (_ for _ in ()).throw(AssertionError("input called")))
 
     assert slap2_meta_annotator.run(_base_params(session_dir)) == 0
@@ -910,7 +910,7 @@ def test_notes_editor_close_can_be_disabled(tmp_path, monkeypatch):
     _touch(session_dir / "acquisition_foo_DMD1.meta")
 
     closed: list[int] = []
-    monkeypatch.setattr(notes_editor, "try_close_pid", closed.append)
+    monkeypatch.setattr(notes_editor, "try_close_pid", lambda pid, **kw: closed.append(pid))
     monkeypatch.setattr("builtins.input", lambda *_: (_ for _ in ()).throw(AssertionError("input called")))
 
     assert slap2_meta_annotator.run(_base_params(session_dir, close_notes_editor=False)) == 0
