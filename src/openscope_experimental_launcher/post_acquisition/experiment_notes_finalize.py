@@ -2,13 +2,12 @@
 from __future__ import annotations
 
 import logging
-import subprocess
-import sys
 from pathlib import Path
 from typing import Any, Mapping, Optional
 
 from openscope_experimental_launcher.utils import param_utils
 from openscope_experimental_launcher.utils import manifest_utils
+from openscope_experimental_launcher.utils import notes_editor
 
 LOG = logging.getLogger(__name__)
 
@@ -40,17 +39,9 @@ def _resolve_notes_path(params: Mapping[str, Any]) -> Path:
 
 
 def _extract_editor_pid(notes_path: Path, encoding: str) -> Optional[int]:
-    try:
-        text = notes_path.read_text(encoding=encoding)
-    except Exception:  # noqa: BLE001
-        return None
-    for line in text.splitlines():
-        if line.startswith("# EditorPID:"):
-            try:
-                return int(line.split(":", 1)[1].strip())
-            except Exception:  # noqa: BLE001
-                return None
-    return None
+    # Kept as a thin alias; the implementation moved to utils.notes_editor so
+    # other steps (e.g. slap2_meta_annotator) can close the editor too.
+    return notes_editor.extract_editor_pid(notes_path, encoding)
 
 
 def _show_preview(notes_path: Path, encoding: str, preview_limit: Optional[int]) -> None:
@@ -97,14 +88,7 @@ def _confirm_yes(prompt: str, prompt_func, *, allow_no: bool, max_attempts: Opti
 
 
 def _try_close_pid(pid: int) -> None:
-    try:
-        if not sys.platform.startswith("win"):
-            LOG.info("Not attempting to close notes editor PID %s on non-Windows platform", pid)
-            return
-        subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], check=False, capture_output=True)
-        LOG.info("Attempted to close notes editor PID %s", pid)
-    except Exception as exc:  # noqa: BLE001
-        LOG.warning("Could not close notes editor PID %s: %s", pid, exc)
+    notes_editor.try_close_pid(pid)
 
 
 def run_post_acquisition(param_file: Any = None, overrides: Optional[Mapping[str, Any]] = None) -> int:
