@@ -11,11 +11,30 @@ The launcher merges rig configuration with a JSON parameter file, prompts for mi
 
 ## Install
 
+Reproducible install (recommended — uses the committed `uv.lock` so every
+machine gets identical dependency versions):
+
 ```bash
-pip install -e .
+uv sync                      # launcher only
+uv sync --extra slap2        # SLAP2 rigs: adds the metadata editor (slap2_onprem_handling)
+uv sync --extra dev          # development: adds test/lint tooling
 ```
 
-Requirements: Python 3.8+, Windows 10 or 11, rig configuration TOML, and a parameter JSON file.
+Plain pip continues to work (unlocked — versions resolve fresh):
+
+```bash
+pip install -e .
+pip install -e ".[slap2]"    # SLAP2 rigs
+```
+
+To update the pinned `slap2_onprem_handling` commit after it changes upstream:
+
+```bash
+uv lock --upgrade-package slap2_onprem_handling
+```
+
+Requirements: Python 3.8+ (3.10+ for the `slap2` extra), Windows 10 or 11,
+rig configuration TOML, and a parameter JSON file.
 
 ## Run a Session
 
