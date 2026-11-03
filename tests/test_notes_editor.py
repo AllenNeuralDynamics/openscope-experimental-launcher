@@ -1,6 +1,11 @@
 """Tests for the shared experiment-notes editor helpers."""
 from __future__ import annotations
 
+import subprocess
+import sys
+
+import pytest
+
 from openscope_experimental_launcher.utils import notes_editor
 
 
@@ -42,3 +47,25 @@ def test_close_notes_editor_no_pid_is_noop(tmp_path, monkeypatch):
     monkeypatch.setattr(notes_editor, "try_close_pid", closed.append)
     assert notes_editor.close_notes_editor(notes) is False
     assert closed == []
+
+
+@pytest.mark.skipif(not sys.platform.startswith("win"), reason="taskkill is Windows-only")
+def test_close_notes_editor_terminates_real_process(tmp_path):
+    """End-to-end (Item 18.4): a real dummy process named in the notes header
+    is actually terminated, and a dead/stale PID is tolerated."""
+    proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    try:
+        notes = tmp_path / "experiment_notes.txt"
+        notes.write_text(f"# EditorPID: {proc.pid}\nnotes body\n", encoding="utf-8")
+
+        assert notes_editor.close_notes_editor(notes) is True
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            pytest.fail("notes editor process was not terminated")
+
+        # Second close on the now-dead PID must not raise.
+        assert notes_editor.close_notes_editor(notes) is True
+    finally:
+        if proc.poll() is None:
+            proc.kill()
