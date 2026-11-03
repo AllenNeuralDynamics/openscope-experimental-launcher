@@ -666,3 +666,19 @@ def test_review_shows_classification_and_allows_manual_override(tmp_path, monkey
     # The operator's override won: the file was archived as a structure stack.
     assert list(session_dir.rglob("static_data/*.annotation.json"))
     assert not list(session_dir.rglob("dynamic_data/*.annotation.json"))
+
+
+def test_group_resolves_via_readable_partner(tmp_path, monkeypatch):
+    """If one DMD file of a pair is unreadable with an odd name but its
+    partner's contents resolve, the pair is classified silently."""
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    # DMD1 unreadable, DMD2 a readable dynamic acquisition — same group.
+    (session_dir / "odd_pair_DMD1.meta").write_bytes(b"not hdf5")
+    _write_meta_hdf5(session_dir / "odd_pair_DMD2.meta", 0.0)
+
+    monkeypatch.setattr("builtins.input", lambda *_: (_ for _ in ()).throw(AssertionError("input called")))
+
+    assert slap2_meta_annotator.run(_base_params(session_dir)) == 0
+    annotations = list(session_dir.rglob("dynamic_data/*.annotation.json"))
+    assert len(annotations) == 2  # both members classified dynamic, no prompts

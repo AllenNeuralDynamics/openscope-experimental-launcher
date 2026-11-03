@@ -441,16 +441,6 @@ def _meta_group_key(meta_path: Path) -> str:
     return _DMD_SUFFIX_RE.sub("", stem)
 
 
-def _infer_type(stem_lower: str) -> str:
-    if stem_lower.startswith(_BUILTIN_DYNAMIC_PREFIXES):
-        return TYPE_DYNAMIC
-    if stem_lower.startswith(_BUILTIN_STRUCTURE_PREFIXES):
-        return TYPE_STRUCTURE
-    if stem_lower.startswith(_BUILTIN_REF_STACK_PREFIXES):
-        return TYPE_REFSTACK
-    return TYPE_UNKNOWN
-
-
 # Built-in stem prefixes per type. The stem prefix is a FREE STRING typed by
 # the operator in the SLAP2 software ("acquisition_" is only the default), so
 # these sets can never be complete — param packs can extend them via the
@@ -505,7 +495,8 @@ def _classify_meta(
     structure_prefixes: Tuple[str, ...],
     ref_stack_prefixes: Tuple[str, ...],
     assume_yes: bool,
-) -> str:
+    silent_only: bool = False,
+) -> Optional[str]:
     """Classify a .meta file as TYPE_DYNAMIC/TYPE_STRUCTURE/TYPE_REFSTACK or "skip".
 
     Decision ladder:
@@ -515,11 +506,11 @@ def _classify_meta(
       3. Contents unreadable -> filename prefix; unknown names get a
          contextual prompt (no default — invalid input re-prompts rather than
          silently classifying as dynamic).
-    Files needing a prompt are asked about individually (only DMD pairs of
-    the SAME acquisition share a classification, handled by the caller):
-    a shared name prefix does not imply a shared type. Under assume_yes,
-    files that would need a prompt are skipped loudly: guessing a
-    classification can misfile data.
+    With silent_only=True, returns None instead of prompting (callers use
+    this to try every member of a DMD pair before asking the operator).
+    Files needing a prompt are asked about individually: a shared name prefix
+    does not imply a shared type. Under assume_yes, files that would need a
+    prompt are skipped loudly: guessing a classification can misfile data.
     """
     rel = meta_path.relative_to(session_dir)
     stem_lower = meta_path.stem.lower()
@@ -548,6 +539,8 @@ def _classify_meta(
                 inferred,
             )
             return inferred
+        if silent_only:
+            return None
         if inferred == TYPE_DYNAMIC:
             LOG.warning(
                 "Filename of %s looks dynamic but .meta contents say z-stack; "
@@ -580,6 +573,8 @@ def _classify_meta(
     if inferred != TYPE_UNKNOWN:
         LOG.info("Classified %s as %s (filename prefix)", rel, inferred)
         return inferred
+    if silent_only:
+        return None
     if assume_yes:
         LOG.warning(
             "Cannot classify %s without operator input (contents unreadable, "
@@ -884,10 +879,6 @@ def run(params: Dict[str, Any]) -> int:
 
     # Per-acquisition (DMD1/DMD2 pair) prompts.
     modes_by_group: Dict[str, str] = {}
-
-    # Classification caches: DMD pairs of the same acquisition share one
-    # classification (same stem group); nothing else is assumed shared.
-    type_by_group: Dict[str, str] = {}
     dynamic_prefixes = _normalize_prefixes(
         params.get("dynamic_stem_prefixes"), _BUILTIN_DYNAMIC_PREFIXES
     )
@@ -910,27 +901,40 @@ def run(params: Dict[str, Any]) -> int:
         return 0
 
     # ---- Classification pass: classify every file automatically first ----
-    classifications: Dict[Path, str] = {}
+    # Files are grouped per acquisition (DMD1/DMD2 pair); a group is
+    # classified by its first member that resolves silently (contents or
+    # recognized prefix), so one unreadable/oddly-named partner never forces
+    # a prompt when the other can answer. Only unresolved groups prompt.
+    groups: Dict[str, List[Path]] = {}
     for meta_path in meta_files:
-        group_key = _meta_group_key(meta_path)
-        if group_key in type_by_group:
-            type_choice = type_by_group[group_key]
-            LOG.info(
-                "Classified %s as %s (same acquisition group as its DMD partner)",
-                meta_path.relative_to(session_dir),
-                type_choice,
-            )
-        else:
+        groups.setdefault(_meta_group_key(meta_path), []).append(meta_path)
+
+    classify_kwargs = dict(
+        dynamic_prefixes=dynamic_prefixes,
+        structure_prefixes=structure_prefixes,
+        ref_stack_prefixes=ref_stack_prefixes,
+        assume_yes=assume_yes,
+    )
+
+    classifications: Dict[Path, str] = {}
+    for group_key, members in groups.items():
+        type_choice: Optional[str] = None
+        for member in members:
             type_choice = _classify_meta(
-                meta_path,
-                session_dir,
-                dynamic_prefixes=dynamic_prefixes,
-                structure_prefixes=structure_prefixes,
-                ref_stack_prefixes=ref_stack_prefixes,
-                assume_yes=assume_yes,
+                member, session_dir, silent_only=True, **classify_kwargs
             )
-            type_by_group[group_key] = type_choice
-        classifications[meta_path] = type_choice
+            if type_choice is not None:
+                break
+        if type_choice is None:
+            type_choice = _classify_meta(members[0], session_dir, **classify_kwargs)
+        for member in members:
+            if member not in classifications:
+                classifications[member] = type_choice
+                LOG.info(
+                    "Classification for %s: %s",
+                    member.relative_to(session_dir),
+                    type_choice,
+                )
 
     # ---- Review: show the result, let the operator confirm or reclassify ----
     if not assume_yes:
