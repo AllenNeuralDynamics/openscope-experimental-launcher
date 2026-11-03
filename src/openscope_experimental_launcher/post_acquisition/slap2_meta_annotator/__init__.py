@@ -291,10 +291,22 @@ def _prompt_choice(
     if default and default in choices:
         default_index = str(choices.index(default) + 1)
 
+    consecutive_blank = 0
     while True:
         raw = _prompt(f"{prompt_message}\nSelect one", default_index, assume_yes=assume_yes).strip()
         if not raw and default:
             return default
+        if not raw:
+            # _prompt returns "" when stdin is unavailable (EOF/closed): bail
+            # out after a few blanks instead of looping forever in headless runs.
+            consecutive_blank += 1
+            if consecutive_blank >= 3:
+                raise RuntimeError(
+                    "Operator input required but no input is available "
+                    f"(prompt: {message!r}). Run interactively or set assume_yes."
+                )
+        else:
+            consecutive_blank = 0
         if raw.isdigit():
             idx = int(raw) - 1
             if 0 <= idx < len(choices):
@@ -430,13 +442,255 @@ def _meta_group_key(meta_path: Path) -> str:
 
 
 def _infer_type(stem_lower: str) -> str:
-    if stem_lower.startswith("acquisition_"):
+    if stem_lower.startswith(_BUILTIN_DYNAMIC_PREFIXES):
         return TYPE_DYNAMIC
-    if stem_lower.startswith("structure_"):
+    if stem_lower.startswith(_BUILTIN_STRUCTURE_PREFIXES):
         return TYPE_STRUCTURE
-    if stem_lower.startswith("refstack_"):
+    if stem_lower.startswith(_BUILTIN_REF_STACK_PREFIXES):
         return TYPE_REFSTACK
     return TYPE_UNKNOWN
+
+
+# Built-in stem prefixes per type. The stem prefix is a FREE STRING typed by
+# the operator in the SLAP2 software ("acquisition_" is only the default), so
+# these sets can never be complete — param packs can extend them via the
+# dynamic/structure/ref_stack_stem_prefixes module parameters, and the
+# .meta contents (enableStack) are consulted first wherever possible.
+_BUILTIN_DYNAMIC_PREFIXES = ("acquisition_", "activity_")
+_BUILTIN_STRUCTURE_PREFIXES = ("structure_",)
+_BUILTIN_REF_STACK_PREFIXES = ("refstack_",)
+
+
+def _normalize_prefixes(value: Any, builtin: Tuple[str, ...]) -> Tuple[str, ...]:
+    """Combine built-in stem prefixes with pack-declared extras."""
+    if not value:
+        return builtin
+    if isinstance(value, str):
+        value = [value]
+    extras = tuple(str(v).strip().lower() for v in value if str(v).strip())
+    return builtin + extras
+
+
+def _read_enable_stack(meta_path: Path) -> Optional[bool]:
+    """Read the enableStack flag from a SLAP2 .meta file.
+
+    .meta files are MATLAB 7.3 MAT-files, i.e. HDF5, with a top-level
+    `enableStack` scalar recording machine truth about whether the
+    acquisition was a z-stack (1) or a functional/dynamic acquisition (0).
+    Returns True/False, or None when the value cannot be determined (h5py
+    unavailable, unreadable file, missing key) — callers then fall back to
+    filename-prefix classification.
+    """
+    try:
+        import h5py  # noqa: PLC0415 - degrade gracefully when unavailable
+    except ImportError:
+        LOG.debug("h5py not available; skipping .meta content classification")
+        return None
+    try:
+        with h5py.File(meta_path, "r") as fh:
+            value = fh["enableStack"][()]
+        flat = getattr(value, "flat", None)
+        scalar = float(flat[0]) if flat is not None else float(value)
+        return bool(scalar)
+    except Exception as exc:  # noqa: BLE001 - any read issue -> fallback
+        LOG.debug("Could not read enableStack from %s: %s", meta_path, exc)
+        return None
+
+
+def _classify_meta(
+    meta_path: Path,
+    session_dir: Path,
+    *,
+    dynamic_prefixes: Tuple[str, ...],
+    structure_prefixes: Tuple[str, ...],
+    ref_stack_prefixes: Tuple[str, ...],
+    stack_split_memory: Dict[str, str],
+    fallback_memory: Dict[str, str],
+    assume_yes: bool,
+) -> str:
+    """Classify a .meta file as TYPE_DYNAMIC/TYPE_STRUCTURE/TYPE_REFSTACK or "skip".
+
+    Decision ladder:
+      1. .meta contents (enableStack): 0 -> dynamic, machine truth, silent.
+      2. enableStack == 1 -> a z-stack; the filename prefix (or a remembered
+         operator answer) picks structure vs. reference stack; else ONE
+         contextual two-choice prompt.
+      3. Contents unreadable -> filename prefix; unknown prefixes use a
+         remembered answer or ONE contextual prompt (no default — invalid
+         input re-prompts rather than silently classifying as dynamic).
+    Under assume_yes, files that would need a prompt are skipped loudly:
+    guessing a classification can misfile data.
+    """
+    rel = meta_path.relative_to(session_dir)
+    stem_lower = meta_path.stem.lower()
+    prefix_key = stem_lower.split("_", 1)[0]
+
+    def _prefix_type() -> str:
+        if stem_lower.startswith(dynamic_prefixes):
+            return TYPE_DYNAMIC
+        if stem_lower.startswith(structure_prefixes):
+            return TYPE_STRUCTURE
+        if stem_lower.startswith(ref_stack_prefixes):
+            return TYPE_REFSTACK
+        return TYPE_UNKNOWN
+
+    enable_stack = _read_enable_stack(meta_path)
+
+    if enable_stack is False:
+        LOG.info("Classified %s as dynamic (.meta contents: enableStack=0)", rel)
+        return TYPE_DYNAMIC
+
+    if enable_stack is True:
+        inferred = _prefix_type()
+        if inferred in (TYPE_STRUCTURE, TYPE_REFSTACK):
+            LOG.info(
+                "Classified %s as %s (.meta contents: z-stack; filename prefix)",
+                rel,
+                inferred,
+            )
+            return inferred
+        if inferred == TYPE_DYNAMIC:
+            LOG.warning(
+                "Filename of %s looks dynamic but .meta contents say z-stack; "
+                "trusting the contents and asking the operator",
+                rel,
+            )
+        if prefix_key in stack_split_memory:
+            choice = stack_split_memory[prefix_key]
+            LOG.info(
+                "Classified %s as %s (reusing earlier answer for '%s*' files)",
+                rel,
+                choice,
+                prefix_key,
+            )
+            return choice
+        if assume_yes:
+            LOG.warning(
+                "Cannot classify %s without operator input (z-stack with "
+                "unrecognized name) and assume_yes is set; skipping the file",
+                rel,
+            )
+            return "skip"
+        selected = _prompt_choice(
+            (
+                f"\nOperator input needed to classify '{rel}'.\n"
+                "The file's contents show it is a z-stack acquisition "
+                "(enableStack=1), but its filename does not say which kind of "
+                "stack it is. Your answer decides where it is archived:\n"
+                "structure stacks go to static_data/ (anatomy), reference "
+                "stacks go to dynamic_data/reference_stack/."
+            ),
+            ("structure stack", "reference stack"),
+            assume_yes=assume_yes,
+        )
+        choice = TYPE_STRUCTURE if selected == "structure stack" else TYPE_REFSTACK
+        stack_split_memory[prefix_key] = choice
+        return choice
+
+    # Contents unreadable -> filename prefix fallback.
+    inferred = _prefix_type()
+    if inferred != TYPE_UNKNOWN:
+        LOG.info("Classified %s as %s (filename prefix)", rel, inferred)
+        return inferred
+    if prefix_key in fallback_memory:
+        choice = fallback_memory[prefix_key]
+        LOG.info(
+            "Classified %s as %s (reusing earlier answer for '%s*' files)",
+            rel,
+            choice,
+            prefix_key,
+        )
+        return choice
+    if assume_yes:
+        LOG.warning(
+            "Cannot classify %s without operator input (contents unreadable, "
+            "unrecognized filename) and assume_yes is set; skipping the file",
+            rel,
+        )
+        return "skip"
+    selected = _prompt_choice(
+        (
+            f"\nOperator input needed to classify '{rel}'.\n"
+            "The .meta contents could not be read and the filename does not "
+            "start with a recognized prefix (acquisition_/activity_/"
+            "structure_/refStack_), so the acquisition type is unknown. Your "
+            "answer decides where the files are archived and which metadata "
+            "they need: dynamic -> dynamic_data/ (functional imaging), "
+            "structure stack -> static_data/ (anatomy), reference stack -> "
+            "dynamic_data/reference_stack/, or skip to leave the files in "
+            "place unannotated."
+        ),
+        ("dynamic", "structure stack", "reference stack", "skip"),
+        assume_yes=assume_yes,
+    )
+    choice = {
+        "dynamic": TYPE_DYNAMIC,
+        "structure stack": TYPE_STRUCTURE,
+        "reference stack": TYPE_REFSTACK,
+        "skip": "skip",
+    }[selected]
+    if choice != "skip":
+        fallback_memory[prefix_key] = choice
+    return choice
+
+
+def _review_classifications(
+    classifications: Dict[Path, str],
+    session_dir: Path,
+) -> Dict[Path, str]:
+    """Show the automatic classification and let the operator confirm or redo.
+
+    Displays every .meta file with its automatically determined type and
+    destination, then offers: (1) confirm and proceed, or (2) reclassify each
+    file manually (1/2/3/4 prompts, current classification as the default).
+    Loops until the operator confirms.
+    """
+    digit_by_type = {
+        TYPE_DYNAMIC: "1",
+        TYPE_STRUCTURE: "2",
+        TYPE_REFSTACK: "3",
+        "skip": "4",
+    }
+    type_by_digit = {
+        "1": TYPE_DYNAMIC,
+        "2": TYPE_STRUCTURE,
+        "3": TYPE_REFSTACK,
+        "4": "skip",
+    }
+
+    while True:
+        print("\nAutomatic classification of .meta files:")
+        for meta_path in sorted(classifications):
+            rel = meta_path.relative_to(session_dir)
+            print(f"  {classifications[meta_path]:<10} {rel}")
+        print(
+            "(dynamic -> dynamic_data/, structure -> static_data/, "
+            "ref_stack -> dynamic_data/reference_stack/, skip -> left in place)"
+        )
+
+        selected = _prompt_choice(
+            "Review the classification above; files are moved and annotated accordingly",
+            (
+                "confirm: the classification looks good",
+                "reclassify: choose each file's type manually",
+            ),
+        )
+        if selected.startswith("confirm"):
+            return classifications
+
+        for meta_path in sorted(classifications):
+            rel = meta_path.relative_to(session_dir)
+            current = classifications[meta_path]
+            default_digit = digit_by_type.get(current, "4")
+            while True:
+                raw = _prompt(
+                    f"Classify '{rel}' (1=dynamic, 2=structure, 3=ref_stack, 4=skip)",
+                    default_digit,
+                ).strip()
+                if raw in type_by_digit:
+                    classifications[meta_path] = type_by_digit[raw]
+                    break
+                print("Invalid selection. Enter 1, 2, 3, or 4.")
 
 
 def _collect_siblings(meta_path: Path) -> List[Path]:
@@ -655,6 +909,21 @@ def run(params: Dict[str, Any]) -> int:
     # Per-acquisition (DMD1/DMD2 pair) prompts.
     modes_by_group: Dict[str, str] = {}
 
+    # Classification caches: DMD pairs share one classification; operator
+    # answers for unknown stem prefixes are remembered within the session.
+    type_by_group: Dict[str, str] = {}
+    stack_split_memory: Dict[str, str] = {}
+    fallback_memory: Dict[str, str] = {}
+    dynamic_prefixes = _normalize_prefixes(
+        params.get("dynamic_stem_prefixes"), _BUILTIN_DYNAMIC_PREFIXES
+    )
+    structure_prefixes = _normalize_prefixes(
+        params.get("structure_stem_prefixes"), _BUILTIN_STRUCTURE_PREFIXES
+    )
+    ref_stack_prefixes = _normalize_prefixes(
+        params.get("ref_stack_stem_prefixes"), _BUILTIN_REF_STACK_PREFIXES
+    )
+
     # Per-DMD defaults (prompted once per DMD) used for per-file pia depth prompt.
     pia_depth_default_by_device: Dict[str, float | None] = {}
 
@@ -666,34 +935,43 @@ def run(params: Dict[str, Any]) -> int:
         LOG.warning("No .meta files found under %s", session_dir)
         return 0
 
+    # ---- Classification pass: classify every file automatically first ----
+    classifications: Dict[Path, str] = {}
+    for meta_path in meta_files:
+        group_key = _meta_group_key(meta_path)
+        if group_key in type_by_group:
+            type_choice = type_by_group[group_key]
+            LOG.info(
+                "Classified %s as %s (same acquisition group as its DMD partner)",
+                meta_path.relative_to(session_dir),
+                type_choice,
+            )
+        else:
+            type_choice = _classify_meta(
+                meta_path,
+                session_dir,
+                dynamic_prefixes=dynamic_prefixes,
+                structure_prefixes=structure_prefixes,
+                ref_stack_prefixes=ref_stack_prefixes,
+                stack_split_memory=stack_split_memory,
+                fallback_memory=fallback_memory,
+                assume_yes=assume_yes,
+            )
+            type_by_group[group_key] = type_choice
+        classifications[meta_path] = type_choice
+
+    # ---- Review: show the result, let the operator confirm or reclassify ----
+    if not assume_yes:
+        classifications = _review_classifications(classifications, session_dir)
+
+    # ---- Processing pass: move files and write annotations ----
     for meta_path in meta_files:
         stem_lower = meta_path.stem.lower()
         group_key = _meta_group_key(meta_path)
-        inferred_type = _infer_type(stem_lower)
-        type_default = {
-            TYPE_DYNAMIC: "1",
-            TYPE_STRUCTURE: "2",
-            TYPE_REFSTACK: "3",
-        }.get(inferred_type, "1")
-        type_choice_raw = _prompt(
-            f"Classify meta '{meta_path.relative_to(session_dir)}' (1=dynamic, 2=structure, 3=ref_stack, 4=skip)",
-            type_default,
-            assume_yes=assume_yes,
-        ).strip().lower()
-
-        choice_map = {
-            "1": TYPE_DYNAMIC,
-            "2": TYPE_STRUCTURE,
-            "3": TYPE_REFSTACK,
-            "4": "skip",
-        }
-        type_choice = choice_map.get(type_choice_raw, TYPE_DYNAMIC)
+        type_choice = classifications[meta_path]
 
         if type_choice == "skip":
             LOG.info("Skipping meta file: %s", meta_path)
-            continue
-        if type_choice not in {TYPE_DYNAMIC, TYPE_STRUCTURE, TYPE_REFSTACK}:
-            LOG.warning("Unknown type for %s; skipping", meta_path)
             continue
 
         device = None
@@ -781,15 +1059,6 @@ def run(params: Dict[str, Any]) -> int:
         LOG.info("Planned moves for %s -> %s", meta_path.stem, dest_rel_dir)
         for src, dst in planned:
             LOG.info("  %s -> %s", src.relative_to(session_dir), dst.relative_to(session_dir))
-
-        proceed = True
-        if not assume_yes:
-            confirm = _prompt("Apply these moves? (Y/n)", "y", assume_yes=assume_yes).lower()
-            proceed = confirm in {"y", "yes"}
-
-        if not proceed:
-            LOG.info("Operator declined moves for %s; skipping", meta_path)
-            continue
 
         moved_files: List[str] = []
         for src, dst in planned:

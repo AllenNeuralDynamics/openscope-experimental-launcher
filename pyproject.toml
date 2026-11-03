@@ -29,6 +29,7 @@ version = "0.2.57"
 
 dependencies = [
     'pandas',
+    'h5py',  # SLAP2 .meta content classification (MATLAB 7.3 = HDF5)
     'aind-data-schema==1.4.0',
     'aind-data-schema-models',
     'psutil',

@@ -133,7 +133,8 @@ def test_prompts_experiment_once_and_mode_once_per_dmd_pair(tmp_path, monkeypatc
             "1",
             # Finish red target selection
             "done",
-            # First meta: classify (dynamic)
+            # (classification is silent: acquisition_ prefix is recognized)
+            # Review step: confirm automatic classification
             "1",
             # Mode for acquisition_foo (shared)
             "1",
@@ -147,11 +148,7 @@ def test_prompts_experiment_once_and_mode_once_per_dmd_pair(tmp_path, monkeypatc
             "1",
             # Targeted structure for first meta
             "VISp",
-            # Confirm moves
-            "y",
-            # Second meta: classify (dynamic)
-            "1",
-            # Default pia depth for DMD2
+            # Second meta: default pia depth for DMD2
             "220",
             # Pia depth override for DMD2 meta
             "240",
@@ -161,8 +158,6 @@ def test_prompts_experiment_once_and_mode_once_per_dmd_pair(tmp_path, monkeypatc
             "2",
             # Targeted structure for second meta
             "VISp",
-            # Confirm moves
-            "y",
         ]
     )
 
@@ -423,3 +418,249 @@ def test_no_hardcoded_visp_default(tmp_path, monkeypatch):
         next(session_dir.rglob("*.annotation.json")).read_text(encoding="utf-8")
     )
     assert payload["targeted_structure"] == ""
+
+
+def _write_meta_hdf5(path: Path, enable_stack: float) -> None:
+    """Write a minimal HDF5 .meta stand-in with an enableStack scalar."""
+    h5py = pytest.importorskip("h5py")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with h5py.File(path, "w") as fh:
+        fh.create_dataset("enableStack", data=[enable_stack])
+
+
+def _base_params(session_dir: Path, **overrides):
+    params = {
+        "output_session_folder": str(session_dir),
+        "assume_yes": True,
+        "validate_targeted_structure_ccf": False,
+    }
+    params.update(overrides)
+    return params
+
+
+def test_content_classification_dynamic_regardless_of_name(tmp_path, monkeypatch):
+    """enableStack=0 classifies as dynamic silently, whatever the stem says."""
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    _write_meta_hdf5(session_dir / "mysteryname_foo_DMD1.meta", 0.0)
+
+    monkeypatch.setattr("builtins.input", lambda *_: (_ for _ in ()).throw(AssertionError("input called")))
+
+    assert slap2_meta_annotator.run(_base_params(session_dir)) == 0
+    annotations = list(session_dir.rglob("dynamic_data/*.annotation.json"))
+    assert len(annotations) == 1
+    payload = json.loads(annotations[0].read_text(encoding="utf-8"))
+    assert payload["type"] == "dynamic"
+
+
+def test_content_classification_stack_uses_prefix(tmp_path, monkeypatch):
+    """enableStack=1 + structure_/refStack_ prefix classifies silently."""
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    _write_meta_hdf5(session_dir / "structure_overview_DMD1.meta", 1.0)
+    _write_meta_hdf5(session_dir / "refStack_nav_DMD1.meta", 1.0)
+
+    monkeypatch.setattr("builtins.input", lambda *_: (_ for _ in ()).throw(AssertionError("input called")))
+
+    assert slap2_meta_annotator.run(_base_params(session_dir)) == 0
+    assert list(session_dir.rglob("static_data/*.annotation.json"))
+    assert list(session_dir.rglob("reference_stack/*.annotation.json"))
+
+
+def test_content_classification_stack_with_unknown_name_prompts_with_context(tmp_path, monkeypatch):
+    """A z-stack with an unrecognized name asks a contextual two-way question;
+    the answer is remembered for later files sharing the prefix."""
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    _write_meta_hdf5(session_dir / "oddstack_a_DMD1.meta", 1.0)
+    _write_meta_hdf5(session_dir / "oddstack_b_DMD1.meta", 1.0)
+
+    feeder = InputFeeder(["1"])  # structure stack; second file reuses the answer
+    monkeypatch.setattr("builtins.input", feeder)
+
+    stack_memory: dict = {}
+    fallback_memory: dict = {}
+    kwargs = dict(
+        dynamic_prefixes=slap2_meta_annotator._BUILTIN_DYNAMIC_PREFIXES,
+        structure_prefixes=slap2_meta_annotator._BUILTIN_STRUCTURE_PREFIXES,
+        ref_stack_prefixes=slap2_meta_annotator._BUILTIN_REF_STACK_PREFIXES,
+        stack_split_memory=stack_memory,
+        fallback_memory=fallback_memory,
+        assume_yes=False,
+    )
+    first = slap2_meta_annotator._classify_meta(
+        session_dir / "oddstack_a_DMD1.meta", session_dir, **kwargs
+    )
+    second = slap2_meta_annotator._classify_meta(
+        session_dir / "oddstack_b_DMD1.meta", session_dir, **kwargs
+    )
+
+    assert first == slap2_meta_annotator.TYPE_STRUCTURE
+    assert second == slap2_meta_annotator.TYPE_STRUCTURE
+    combined = "\n".join(feeder.prompts)
+    # Contextual explanation, not a bare numeric prompt; asked exactly once.
+    assert "Operator input needed to classify" in combined
+    assert "z-stack" in combined
+    assert "static_data/" in combined
+    assert combined.count("Operator input needed") == 1
+
+
+def test_fallback_unknown_prefix_prompts_and_reprompts_on_invalid(tmp_path, monkeypatch):
+    """Unreadable contents + unknown name: contextual prompt, invalid input
+    re-prompts, and the answer is never silently defaulted to dynamic."""
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    meta = session_dir / "weird_thing_DMD1.meta"
+    meta.write_bytes(b"not hdf5")
+
+    feeder = InputFeeder(["99", "2"])  # invalid, then structure stack
+    monkeypatch.setattr("builtins.input", feeder)
+
+    result = slap2_meta_annotator._classify_meta(
+        meta,
+        session_dir,
+        dynamic_prefixes=slap2_meta_annotator._BUILTIN_DYNAMIC_PREFIXES,
+        structure_prefixes=slap2_meta_annotator._BUILTIN_STRUCTURE_PREFIXES,
+        ref_stack_prefixes=slap2_meta_annotator._BUILTIN_REF_STACK_PREFIXES,
+        stack_split_memory={},
+        fallback_memory={},
+        assume_yes=False,
+    )
+
+    assert result == slap2_meta_annotator.TYPE_STRUCTURE
+    combined = "\n".join(feeder.prompts)
+    assert "could not be read" in combined
+    assert combined.count("Select one") >= 2  # re-prompted after invalid input
+
+
+def test_assume_yes_skips_unclassifiable_files(tmp_path, monkeypatch):
+    """Headless runs never guess: unclassifiable files are skipped loudly."""
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    (session_dir / "weird_thing_DMD1.meta").write_bytes(b"not hdf5")
+
+    monkeypatch.setattr("builtins.input", lambda *_: (_ for _ in ()).throw(AssertionError("input called")))
+
+    assert slap2_meta_annotator.run(_base_params(session_dir)) == 0
+    # File untouched, no annotation created.
+    assert (session_dir / "weird_thing_DMD1.meta").exists()
+    assert not list(session_dir.rglob("*.annotation.json"))
+
+
+def test_activity_prefix_is_known_dynamic(tmp_path, monkeypatch):
+    """Canonical sessions use activity_* stems (real S3 data finding)."""
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    _touch(session_dir / "activity_20251210_134942_DMD1.meta")  # not HDF5 -> prefix path
+
+    monkeypatch.setattr("builtins.input", lambda *_: (_ for _ in ()).throw(AssertionError("input called")))
+
+    assert slap2_meta_annotator.run(_base_params(session_dir)) == 0
+    assert list(session_dir.rglob("dynamic_data/*.annotation.json"))
+
+
+def test_pack_declared_prefixes_classify_silently(tmp_path, monkeypatch):
+    """Projects can declare their naming convention via module parameters."""
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    _touch(session_dir / "myproj_cell1_DMD1.meta")
+
+    monkeypatch.setattr("builtins.input", lambda *_: (_ for _ in ()).throw(AssertionError("input called")))
+
+    params = _base_params(session_dir, dynamic_stem_prefixes=["myproj_"])
+    assert slap2_meta_annotator.run(params) == 0
+    assert list(session_dir.rglob("dynamic_data/*.annotation.json"))
+
+
+def test_dmd_pair_shares_one_classification(tmp_path, monkeypatch):
+    """A DMD1/DMD2 pair is classified once (one prompt for the pair)."""
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    _write_meta_hdf5(session_dir / "oddstack_x_DMD1.meta", 1.0)
+    _write_meta_hdf5(session_dir / "oddstack_x_DMD2.meta", 1.0)
+
+    feeder = InputFeeder(
+        [
+            # session-level prompts: targeted structure, green, red
+            "VISp",
+            "1",
+            "done",
+            "1",
+            "done",
+            # classification: ONE prompt for the pair -> reference stack
+            "2",
+            # review: confirm
+            "1",
+            # processing (same prompts for every non-skip type):
+            # mode for the pair
+            "1",
+            # DMD1: pia default, pia override, target type, number, structure
+            "100",
+            "",
+            "",
+            "1",
+            "VISp",
+            # DMD2: pia default, pia override, target type, number, structure
+            "100",
+            "",
+            "",
+            "1",
+            "VISp",
+        ]
+    )
+    monkeypatch.setattr("builtins.input", feeder)
+
+    assert slap2_meta_annotator.run(_base_params(session_dir, assume_yes=False)) == 0
+    combined = "\n".join(feeder.prompts)
+    assert combined.count("Operator input needed") == 1
+    assert len(list(session_dir.rglob("reference_stack/*.annotation.json"))) == 2
+
+
+def test_review_shows_classification_and_allows_manual_override(tmp_path, monkeypatch, capsys):
+    """The review step displays the automatic classification; choosing
+    'reclassify' walks each file with the current type as the default."""
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    _touch(session_dir / "acquisition_foo_DMD1.meta")  # auto: dynamic
+
+    feeder = InputFeeder(
+        [
+            # session-level prompts
+            "VISp",
+            "1",
+            "done",
+            "1",
+            "done",
+            # review: choose manual reclassification
+            "2",
+            # per-file prompt (default 1=dynamic): override to structure
+            "2",
+            # review again: confirm
+            "1",
+            # processing prompts: mode, pia default, pia override,
+            # target type, target number, targeted structure
+            "1",
+            "120",
+            "",
+            "",
+            "1",
+            "VISp",
+        ]
+    )
+    monkeypatch.setattr("builtins.input", feeder)
+
+    params = {
+        "output_session_folder": str(session_dir),
+        "assume_yes": False,
+        "validate_targeted_structure_ccf": False,
+    }
+    assert slap2_meta_annotator.run(params) == 0
+
+    # The summary table was shown with the automatic type.
+    output = capsys.readouterr().out
+    assert "Automatic classification of .meta files:" in output
+    assert "dynamic" in output
+
+    # The operator's override won: the file was archived as a structure stack.
+    assert list(session_dir.rglob("static_data/*.annotation.json"))
+    assert not list(session_dir.rglob("dynamic_data/*.annotation.json"))
