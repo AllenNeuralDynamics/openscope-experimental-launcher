@@ -32,6 +32,7 @@ dependencies = [
     'h5py',  # SLAP2 .meta content classification (MATLAB 7.3 = HDF5)
     'aind-data-schema==1.4.0',
     'aind-data-schema-models',
+    'packaging',  # enforce the packs' launcher_version PEP 440 specifiers
     'psutil',
     'pywin32; sys_platform == "win32"',  # Only install on Windows
     'PyYAML',
