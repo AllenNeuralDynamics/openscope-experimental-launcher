@@ -65,7 +65,7 @@ matlab = [
 # aind-data-schema==1.4.0 pin. Pinned to a branch here; uv.lock resolves it
 # to an exact commit — update with: uv lock --upgrade-package slap2_onprem_handling
 slap2 = [
-    'slap2_onprem_handling @ git+https://github.com/AllenNeuralDynamics/slap2_onprem_handling@metadata_editor_integration ; python_version >= "3.10"'
+    'slap2_onprem_handling @ git+https://github.com/AllenNeuralDynamics/slap2_onprem_handling@main ; python_version >= "3.10"'
 ]
 
 [tool.setuptools.packages.find]

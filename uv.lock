@@ -2613,7 +2613,7 @@ requires-dist = [
     { name = "pywin32", marker = "sys_platform == 'win32'" },
     { name = "pyyaml" },
     { name = "requests" },
-    { name = "slap2-onprem-handling", marker = "python_full_version >= '3.10' and extra == 'slap2'", git = "https://github.com/AllenNeuralDynamics/slap2_onprem_handling?rev=metadata_editor_integration" },
+    { name = "slap2-onprem-handling", marker = "python_full_version >= '3.10' and extra == 'slap2'", git = "https://github.com/AllenNeuralDynamics/slap2_onprem_handling?rev=main" },
     { name = "sphinx", marker = "extra == 'dev'" },
     { name = "toml" },
 ]
@@ -4413,7 +4413,7 @@ wheels = [
 [[package]]
 name = "slap2-onprem-handling"
 version = "0.4.0"
-source = { git = "https://github.com/AllenNeuralDynamics/slap2_onprem_handling?rev=metadata_editor_integration#4c6b2e15f39a174c6147fba05ffd1d72ab9f52fc" }
+source = { git = "https://github.com/AllenNeuralDynamics/slap2_onprem_handling?rev=main#4c6b2e15f39a174c6147fba05ffd1d72ab9f52fc" }
 dependencies = [
     { name = "requests", version = "2.34.2", source = { registry = "https://pypi.org/simple" } },
 ]
