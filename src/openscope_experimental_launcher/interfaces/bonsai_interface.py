@@ -12,6 +12,82 @@ import xml.etree.ElementTree as ET
 from typing import Dict, List, Optional, Any
 
 
+def get_bonsai_version(bonsai_exe_path: str) -> Optional[str]:
+    """Determine the version of the Bonsai that will run.
+
+    Tries, in order of truthfulness:
+    1. The ``Bonsai.exe`` binary's product version (the bits that actually
+       execute), via pywin32 on Windows.
+    2. The ``Bonsai.config`` next to the executable (the version the
+       bootstrapper declares/installs).
+
+    Best-effort: returns a dotted version string, or None (with a logged
+    warning) when neither source is readable. Never raises.
+    """
+    if not bonsai_exe_path:
+        return None
+
+    version = _read_exe_product_version(bonsai_exe_path)
+    if version:
+        logging.info("Bonsai version %s (from %s)", version, bonsai_exe_path)
+        return version
+
+    config_path = os.path.join(os.path.dirname(bonsai_exe_path), "Bonsai.config")
+    version = _read_bonsai_config_version(config_path)
+    if version:
+        logging.info("Bonsai version %s (from %s)", version, config_path)
+        return version
+
+    logging.warning(
+        "Could not determine the Bonsai version from %s or %s; "
+        "bonsai_version will not be recorded for this session.",
+        bonsai_exe_path,
+        config_path,
+    )
+    return None
+
+
+def _read_exe_product_version(exe_path: str) -> Optional[str]:
+    """Read the product version from a Windows executable's version resource."""
+    if not os.path.isfile(exe_path):
+        return None
+    try:
+        import win32api  # pywin32; Windows-only
+
+        info = win32api.GetFileVersionInfo(exe_path, "\\")
+        parts = [
+            info["ProductVersionMS"] >> 16,
+            info["ProductVersionMS"] & 0xFFFF,
+            info["ProductVersionLS"] >> 16,
+            info["ProductVersionLS"] & 0xFFFF,
+        ]
+        # PE versions are a.b.c.d; Bonsai releases are a.b.c — drop trailing zeros
+        # but keep at least major.minor.
+        while len(parts) > 2 and parts[-1] == 0:
+            parts.pop()
+        return ".".join(str(p) for p in parts)
+    except Exception as exc:  # noqa: BLE001
+        logging.debug("Could not read version resource from %s: %s", exe_path, exc)
+        return None
+
+
+def _read_bonsai_config_version(config_path: str) -> Optional[str]:
+    """Read the Bonsai package version declared in a Bonsai.config file."""
+    if not os.path.isfile(config_path):
+        return None
+    try:
+        root = ET.parse(config_path).getroot()
+        for element in root.iter():
+            if element.tag.rsplit("}", 1)[-1] == "Package" and element.get("id") == "Bonsai":
+                version = (element.get("version") or "").strip()
+                if version:
+                    return version
+        return None
+    except Exception as exc:  # noqa: BLE001
+        logging.debug("Could not parse %s: %s", config_path, exc)
+        return None
+
+
 def setup_bonsai_environment(params: Dict[str, Any]) -> bool:
     """
     Set up Bonsai environment including installation if needed.

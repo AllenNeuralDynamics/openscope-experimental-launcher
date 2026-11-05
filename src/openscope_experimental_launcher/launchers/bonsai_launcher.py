@@ -6,6 +6,7 @@ Windows-specific optimizations.
 """
 
 import os
+import json
 import logging
 import subprocess
 import time
@@ -121,6 +122,36 @@ class BonsaiLauncher(BaseLauncher):
         logging.info(f"Using Bonsai workflow: {candidate}")
         return candidate
 
+    def _record_bonsai_version(self, bonsai_exe_path: Optional[str]) -> None:
+        """Record the running Bonsai's version for acquisition metadata.
+
+        processed_parameters.json is written by save_launcher_metadata BEFORE
+        the Bonsai environment exists (setup may install Bonsai), so after a
+        successful setup the version is added to self.params and the already-
+        written file is refreshed. The SLAP2 acquisition ETL reads
+        'bonsai_version' from that file; sessions without it report "Unknown".
+        Best-effort: failures are logged and never block the experiment.
+        """
+        try:
+            version = bonsai_interface.get_bonsai_version(bonsai_exe_path)
+            if not version:
+                return
+            self.params['bonsai_version'] = version
+
+            if not self.output_session_folder:
+                return
+            processed_params_file = os.path.join(
+                self.output_session_folder, "launcher_metadata", "processed_parameters.json"
+            )
+            if os.path.isfile(processed_params_file):
+                with open(processed_params_file, 'w') as f:
+                    json.dump(self.params, f, indent=2, default=str)
+                logging.info(
+                    "Recorded bonsai_version=%s in %s", version, processed_params_file
+                )
+        except Exception as e:  # noqa: BLE001
+            logging.warning(f"Could not record the Bonsai version: {e}")
+
     def _assign_to_job_object(self):
         """Assign Bonsai process to Windows job object."""
         if not (WINDOWS_MODULES_AVAILABLE and self.hJob and self.process):
@@ -151,6 +182,9 @@ class BonsaiLauncher(BaseLauncher):
         # Setup Bonsai environment (including installation if needed)
         if not bonsai_interface.setup_bonsai_environment(bonsai_params):
             raise RuntimeError("Failed to setup Bonsai environment")
+
+        # Record the Bonsai version that will run (for acquisition metadata).
+        self._record_bonsai_version(bonsai_params.get('bonsai_exe_path'))
           # Get workflow path
         workflow_path = self._get_script_path()
         

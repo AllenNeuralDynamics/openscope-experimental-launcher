@@ -4413,7 +4413,7 @@ wheels = [
 [[package]]
 name = "slap2-onprem-handling"
 version = "0.4.0"
-source = { git = "https://github.com/AllenNeuralDynamics/slap2_onprem_handling?rev=main#4c6b2e15f39a174c6147fba05ffd1d72ab9f52fc" }
+source = { git = "https://github.com/AllenNeuralDynamics/slap2_onprem_handling?rev=main#ad3b106a51b4d680d9d7aeb7b4fbd3789a34ae9c" }
 dependencies = [
     { name = "requests", version = "2.34.2", source = { registry = "https://pypi.org/simple" } },
 ]
