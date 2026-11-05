@@ -680,14 +680,17 @@ def run(params: Dict[str, Any]) -> int:
         LOG.error("Session directory does not exist: %s", session_dir)
         return 2
 
+    # Notes file location (used for the editor close below and registered in
+    # the routing manifest when the file exists).
+    notes_filename = params.get("experiment_notes_filename", "experiment_notes.txt")
+    notes_path = Path(str(notes_filename)).expanduser()
+    if not notes_path.is_absolute():
+        notes_path = session_dir / notes_path
+
     # Item 15: close the on-rig notes editor (if the notes step left one
     # open) before any interactive work. Best-effort, never fatal; only a
     # process still running the expected editor image is ever terminated.
     if bool(params.get("close_notes_editor", True)):
-        notes_filename = params.get("experiment_notes_filename", "experiment_notes.txt")
-        notes_path = Path(str(notes_filename)).expanduser()
-        if not notes_path.is_absolute():
-            notes_path = session_dir / notes_path
         expected_image = notes_editor.expected_image_from_command(
             params.get("experiment_notes_editor_command", notes_editor.DEFAULT_EDITOR_IMAGE)
         )
@@ -958,6 +961,23 @@ def run(params: Dict[str, Any]) -> int:
             existing_machine["files"] = sorted(files)
         else:
             entries.append({"type": "slap2_machine", "files": [rel]})
+
+    # Ensure the experiment notes are archived. The notes-finalize step may
+    # run BEFORE this annotator (so the operator confirms notes prior to the
+    # GUI) and deliberately does not create the manifest, so register here.
+    if notes_path.exists():
+        try:
+            rel_notes = notes_path.relative_to(session_dir).as_posix()
+        except ValueError:
+            rel_notes = None  # notes stored outside the session folder
+        if rel_notes:
+            existing_notes = next((e for e in entries if e.get("type") == "experiment_notes"), None)
+            if existing_notes:
+                files = set(existing_notes.get("files", []) or [])
+                files.add(rel_notes)
+                existing_notes["files"] = sorted(files)
+            else:
+                entries.append({"type": "experiment_notes", "files": [rel_notes]})
 
     if entries:
         manifest_utils.write_manifest(routing_manifest_path, entries)

@@ -107,19 +107,75 @@ def try_close_pid(pid: int, expected_image: Optional[str] = DEFAULT_EDITOR_IMAGE
         LOG.warning("Could not close notes editor PID %s: %s", pid, exc)
 
 
+def _find_editor_pids_by_cmdline(notes_path: Path, expected_image: str) -> list[int]:
+    """Find editor processes by image name + notes file on the command line.
+
+    Windows 11's notepad.exe is a thin alias: the PID the launcher records
+    exits immediately after handing the file to the Store Notepad under a
+    DIFFERENT pid, so the recorded EditorPID is useless. Recover by scanning
+    for live processes whose image matches the expected editor and whose
+    command line references the notes file. Best-effort; returns [] when
+    psutil is unavailable or nothing matches.
+    """
+    try:
+        import psutil
+    except ImportError:
+        LOG.info("psutil not available; cannot scan for the notes editor by command line.")
+        return []
+
+    notes_name = Path(notes_path).name.lower()
+    notes_full = str(notes_path).lower()
+    pids: list[int] = []
+    for proc in psutil.process_iter(["pid", "name", "cmdline"]):
+        try:
+            name = (proc.info.get("name") or "")
+            if name.lower() != expected_image.lower():
+                continue
+            cmdline = " ".join(proc.info.get("cmdline") or []).lower()
+            if notes_full in cmdline or notes_name in cmdline:
+                pids.append(proc.info["pid"])
+        except Exception:  # noqa: BLE001  (process may vanish mid-iteration)
+            continue
+    return pids
+
+
 def close_notes_editor(
     notes_path: Path,
     encoding: str = "utf-8",
     expected_image: Optional[str] = DEFAULT_EDITOR_IMAGE,
 ) -> bool:
-    """Close the notes editor recorded in *notes_path*, if any.
+    """Close the editor that has *notes_path* open, if any.
 
-    Best-effort, never raises. Returns True when a PID was found and a close
-    was attempted, False otherwise (missing file, no PID line, bad PID). The
-    close only terminates a process whose image name matches *expected_image*.
+    Tries the ``# EditorPID:`` recorded in the notes header first; when that
+    process is already gone (e.g. Windows 11 notepad hands off to the Store
+    app under a different pid) falls back to scanning for live processes
+    running the expected editor image with the notes file on their command
+    line. Best-effort, never raises. Returns True when an editor process was
+    found and a close was attempted.
     """
-    pid = extract_editor_pid(notes_path, encoding)
-    if pid is None:
+    if not Path(notes_path).exists():
         return False
-    try_close_pid(pid, expected_image=expected_image)
-    return True
+
+    attempted = False
+
+    pid = extract_editor_pid(notes_path, encoding)
+    if pid is not None:
+        image = _query_image_name(pid)
+        if image is not None and (
+            expected_image is None or image.lower() == expected_image.lower()
+        ):
+            try_close_pid(pid, expected_image=expected_image)
+            attempted = True
+
+    if not attempted and expected_image and sys.platform.startswith("win"):
+        for found_pid in _find_editor_pids_by_cmdline(notes_path, expected_image):
+            LOG.info(
+                "Recorded EditorPID was stale; found %s (PID %s) holding %s via command line.",
+                expected_image,
+                found_pid,
+                notes_path,
+            )
+            try_close_pid(found_pid, expected_image=expected_image)
+            attempted = True
+
+    return attempted

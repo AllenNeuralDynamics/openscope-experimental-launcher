@@ -893,6 +893,7 @@ def test_annotator_closes_notes_editor_before_prompting(tmp_path, monkeypatch):
 
     closed: list[int] = []
     monkeypatch.setattr(notes_editor, "try_close_pid", lambda pid, **kw: closed.append(pid))
+    monkeypatch.setattr(notes_editor, "_query_image_name", lambda pid: "notepad.exe")
     monkeypatch.setattr("builtins.input", lambda *_: (_ for _ in ()).throw(AssertionError("input called")))
 
     assert slap2_meta_annotator.run(_base_params(session_dir)) == 0
@@ -915,3 +916,27 @@ def test_notes_editor_close_can_be_disabled(tmp_path, monkeypatch):
 
     assert slap2_meta_annotator.run(_base_params(session_dir, close_notes_editor=False)) == 0
     assert closed == []
+
+
+def test_notes_file_registered_in_manifest(tmp_path, monkeypatch):
+    """The annotator registers the notes file itself: when finalize runs
+    FIRST (confirm-before-GUI ordering) no manifest exists yet for finalize
+    to register into."""
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    notes = session_dir / "notes" / "experiment_notes.txt"
+    notes.parent.mkdir(parents=True)
+    notes.write_text("notes\n", encoding="utf-8")
+    _write_meta_hdf5(session_dir / "acquisition_foo_DMD1.meta", 0.0)
+
+    monkeypatch.setattr("builtins.input", lambda *_: (_ for _ in ()).throw(AssertionError("input called")))
+
+    params = _base_params(
+        session_dir,
+        close_notes_editor=False,
+        experiment_notes_filename=str(notes),
+    )
+    assert slap2_meta_annotator.run(params) == 0
+
+    manifest_path = session_dir / "launcher_metadata" / "routing_manifest.json"
+    assert "notes/experiment_notes.txt" in _manifest_files(manifest_path)

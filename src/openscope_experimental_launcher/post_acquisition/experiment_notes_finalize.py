@@ -120,12 +120,11 @@ def run_post_acquisition(param_file: Any = None, overrides: Optional[Mapping[str
             return 1
 
         if params.get("experiment_notes_autoclose_editor", True):
-            pid = _extract_editor_pid(notes_path, encoding)
-            if pid:
-                expected_image = notes_editor.expected_image_from_command(
-                    params.get("experiment_notes_editor_command", notes_editor.DEFAULT_EDITOR_IMAGE)
-                )
-                notes_editor.try_close_pid(pid, expected_image=expected_image)
+            expected_image = notes_editor.expected_image_from_command(
+                params.get("experiment_notes_editor_command", notes_editor.DEFAULT_EDITOR_IMAGE)
+            )
+            if notes_editor.close_notes_editor(notes_path, encoding, expected_image=expected_image):
+                LOG.info("Closed the experiment notes editor.")
 
         manifest_param = params.get("manifest_path")
         if manifest_param:
@@ -136,17 +135,28 @@ def run_post_acquisition(param_file: Any = None, overrides: Optional[Mapping[str
             manifest_path = session_dir / "launcher_metadata" / "routing_manifest.json"
 
         try:
-            rel_notes = notes_path.relative_to(session_dir).as_posix()
-            entries = manifest_utils.read_manifest_entries(manifest_path)
-            existing = next((e for e in entries if e.get("type") == "experiment_notes"), None)
-            if existing:
-                files = set(existing.get("files", []) or [])
-                files.add(rel_notes)
-                existing["files"] = sorted(files)
+            if not manifest_path.exists():
+                # Never CREATE a manifest here: a manifest gates the archiver's
+                # network copy, and one containing only the notes would exclude
+                # the session data (this step may run before the annotator,
+                # which registers the notes file itself when it writes the
+                # manifest).
+                LOG.info(
+                    "No routing manifest at %s yet; notes registration left to the annotator.",
+                    manifest_path,
+                )
             else:
-                entries.append({"type": "experiment_notes", "files": [rel_notes]})
-            manifest_utils.write_manifest(manifest_path, entries)
-            LOG.info("Experiment notes registered in routing manifest: %s", manifest_path)
+                rel_notes = notes_path.relative_to(session_dir).as_posix()
+                entries = manifest_utils.read_manifest_entries(manifest_path)
+                existing = next((e for e in entries if e.get("type") == "experiment_notes"), None)
+                if existing:
+                    files = set(existing.get("files", []) or [])
+                    files.add(rel_notes)
+                    existing["files"] = sorted(files)
+                else:
+                    entries.append({"type": "experiment_notes", "files": [rel_notes]})
+                manifest_utils.write_manifest(manifest_path, entries)
+                LOG.info("Experiment notes registered in routing manifest: %s", manifest_path)
         except Exception as exc:  # noqa: BLE001
             LOG.warning("Could not register experiment notes in manifest %s: %s", manifest_path, exc)
 
