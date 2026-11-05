@@ -135,6 +135,8 @@ slap2_launcher_set_python_control(fig, true);
 [resumeMode, varargin] = slap2_launcher_extract_resume_flag(varargin);
 [resumeStage, varargin] = slap2_launcher_extract_resume_stage(varargin);
 [rigDescriptionPath, varargin] = slap2_launcher_extract_named_arg(varargin, 'rig_description_path');
+[postAcqAnnotation, varargin] = slap2_launcher_extract_named_arg(varargin, 'post_acquisition_annotation');
+[giantPath, varargin] = slap2_launcher_extract_named_arg(varargin, 'giant_path');
 
 slap2_launcher_log( ...
     'Python requested SLAP2 execution (resume=%s, stage=%s).', ...
@@ -235,10 +237,70 @@ slap2_launcher_log('Waiting for SLAP2_LAUNCHER_COMPLETED confirmation from opera
 slap2_launcher_wait_for_flag(fig, 'SLAP2_LAUNCHER_COMPLETED', ...
     'SLAP2:MatlabLauncher:CompletionNotConfirmed', ...
     'End SLAP2 acquisition was not confirmed before continuing.');
-slap2_launcher_log('Completion confirmed. Closing SLAP2 launcher UI.');
+slap2_launcher_log('Completion confirmed.');
 
+if slap2_launcher_to_logical(postAcqAnnotation)
+    annotationFolder = slap2_launcher_current_session_folder(fig);
+    if isempty(annotationFolder)
+        annotationFolder = sessionFolder;
+    end
+    slap2_launcher_run_post_acquisition_annotation(fig, annotationFolder, giantPath);
+end
+
+slap2_launcher_log('Closing SLAP2 launcher UI.');
 slap2_launcher_set_python_control(fig, false);
 slap2_launcher_close_ui(fig);
+end
+
+
+function slap2_launcher_run_post_acquisition_annotation(fig, sessionFolder, giantPath)
+%SLAP2_LAUNCHER_RUN_POST_ACQUISITION_ANNOTATION Let the operator annotate somata.
+%   Runs GIAnT's postAcquisitionAnnotation on the acquisition files in the
+%   session folder, saving postacq_annotations.h5 next to them so it is
+%   archived with the session. GIAnT is added to the path only for this call
+%   (giant_path script parameter) unless it is already on the path. Failures
+%   are logged and never propagated: annotation is optional and must not
+%   fail an otherwise complete acquisition.
+
+sessionFolder = slap2_launcher_to_text(sessionFolder);
+if isempty(sessionFolder) || ~isfolder(sessionFolder)
+    slap2_launcher_log('Post-acquisition annotation skipped: session folder "%s" not found.', sessionFolder);
+    return;
+end
+
+originalPath = path;
+restorePath = onCleanup(@() path(originalPath)); %#ok<NASGU>
+giantPath = slap2_launcher_to_text(giantPath);
+if ~isempty(giantPath)
+    if isfolder(giantPath)
+        addpath(genpath(giantPath));
+    else
+        slap2_launcher_log('giant_path "%s" not found; relying on the MATLAB path.', giantPath);
+    end
+end
+if exist('postAcquisitionAnnotation', 'file') ~= 2
+    slap2_launcher_update_status(fig, 'Post-acquisition annotation skipped: GIAnT-MATLAB not found.');
+    slap2_launcher_log(['Post-acquisition annotation skipped: postAcquisitionAnnotation not on the ' ...
+        'MATLAB path. Set the giant_path script parameter to the GIAnT-MATLAB folder.']);
+    return;
+end
+
+slap2_launcher_update_status(fig, ['Annotate somata in the ROI windows, then press Done in each ' ...
+    'window to continue.']);
+slap2_launcher_log('Starting post-acquisition annotation in %s.', sessionFolder);
+try
+    fnAnn = postAcquisitionAnnotation(sessionFolder);
+    if isempty(fnAnn)
+        slap2_launcher_log('Post-acquisition annotation cancelled by operator.');
+    else
+        slap2_launcher_log('Post-acquisition annotations saved to %s.', fnAnn);
+    end
+catch err
+    warning('SLAP2:MatlabLauncher:AnnotationFailed', ...
+        'Post-acquisition annotation failed: %s', err.message);
+    slap2_launcher_log('Post-acquisition annotation failed: %s', err.message);
+end
+slap2_launcher_update_status(fig, 'Post-acquisition annotation finished.');
 end
 
 

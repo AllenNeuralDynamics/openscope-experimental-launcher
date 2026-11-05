@@ -29,8 +29,10 @@ version = "0.2.57"
 
 dependencies = [
     'pandas',
+    'h5py',  # SLAP2 .meta content classification (MATLAB 7.3 = HDF5)
     'aind-data-schema==1.4.0',
     'aind-data-schema-models',
+    'packaging',  # enforce the packs' launcher_version PEP 440 specifiers
     'psutil',
     'pywin32; sys_platform == "win32"',  # Only install on Windows
     'PyYAML',
@@ -56,12 +58,18 @@ dev = [
 matlab = [
     'matlabengine'
 ]
+# SLAP2 rig installs: the slap2_meta_annotator opens the metadata editor GUI
+# from slap2_onprem_handling (in-process import; pipeline modules always run
+# in the launcher's own environment). The base install of that package is
+# deliberately light (requests only) and has no conflict with the launcher's
+# aind-data-schema==1.4.0 pin. Pinned to a branch here; uv.lock resolves it
+# to an exact commit — update with: uv lock --upgrade-package slap2_onprem_handling
+slap2 = [
+    'slap2_onprem_handling @ git+https://github.com/AllenNeuralDynamics/slap2_onprem_handling@metadata_editor_integration ; python_version >= "3.10"'
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.setuptools.package-data]
-"openscope_experimental_launcher.post_acquisition.slap2_meta_annotator" = ["indicator_targets.json"]
 
 
 [tool.black]
