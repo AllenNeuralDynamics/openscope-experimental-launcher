@@ -102,6 +102,34 @@ def test_recycled_pid_running_other_image_is_not_killed(tmp_path):
 
 
 @pytest.mark.skipif(not sys.platform.startswith("win"), reason="process scan is Windows-only")
+def test_tabbed_notepad_is_not_killed_but_operator_is_told(tmp_path, capsys):
+    """Windows 11 Notepad hosts every file as a tab in one shared process
+    whose cmdline references none of them: it must never be force-killed
+    (unrelated unsaved tabs), and the operator must be asked to close the
+    notes tab manually."""
+    notes = tmp_path / "experiment_notes.txt"
+
+    # Recorded EditorPID is dead (the Win11 alias stub).
+    stub = subprocess.Popen([sys.executable, "-c", "pass"])
+    stub.wait(timeout=30)
+    notes.write_text(f"# EditorPID: {stub.pid}\nnotes\n", encoding="utf-8")
+
+    # The shared editor process: right image, but the notes file is NOT on
+    # its command line (python.exe stands in; this pytest process qualifies).
+    image = Path(sys.executable).name
+    shared = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    try:
+        assert notes_editor.close_notes_editor(notes, expected_image=image) is False
+        assert shared.poll() is None, "shared tabbed-editor process must not be killed"
+        out = capsys.readouterr().out
+        assert "could not be identified" in out
+        assert "close the experiment-notes tab yourself" in out
+    finally:
+        if shared.poll() is None:
+            shared.kill()
+
+
+@pytest.mark.skipif(not sys.platform.startswith("win"), reason="process scan is Windows-only")
 def test_dead_recorded_pid_falls_back_to_cmdline_scan(tmp_path):
     """Windows 11 notepad hands the file to a NEW pid and the recorded one
     exits; the close must find the real editor by image + command line."""

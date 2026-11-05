@@ -139,6 +139,21 @@ def _find_editor_pids_by_cmdline(notes_path: Path, expected_image: str) -> list[
     return pids
 
 
+def _any_process_with_image(expected_image: str) -> bool:
+    """Whether any live process runs *expected_image* (best-effort)."""
+    try:
+        import psutil
+    except ImportError:
+        return False
+    for proc in psutil.process_iter(["name"]):
+        try:
+            if (proc.info.get("name") or "").lower() == expected_image.lower():
+                return True
+        except Exception:  # noqa: BLE001
+            continue
+    return False
+
+
 def close_notes_editor(
     notes_path: Path,
     encoding: str = "utf-8",
@@ -152,6 +167,12 @@ def close_notes_editor(
     running the expected editor image with the notes file on their command
     line. Best-effort, never raises. Returns True when an editor process was
     found and a close was attempted.
+
+    LIMITATION: Windows 11 Notepad hosts ALL open files as tabs inside one
+    shared process whose command line references none of them. That process
+    is deliberately never killed — it may hold unrelated unsaved tabs — so
+    when it is detected, a console hint asks the operator to close the notes
+    tab themselves.
     """
     if not Path(notes_path).exists():
         return False
@@ -177,5 +198,17 @@ def close_notes_editor(
             )
             try_close_pid(found_pid, expected_image=expected_image)
             attempted = True
+
+    if not attempted and expected_image and sys.platform.startswith("win"):
+        if _any_process_with_image(expected_image):
+            message = (
+                f"{expected_image} is running but the window holding the "
+                f"experiment notes could not be identified (Windows 11 Notepad "
+                "keeps all files as tabs in one shared process, which will not "
+                "be force-closed because it may hold unrelated unsaved work). "
+                "Please save and close the experiment-notes tab yourself."
+            )
+            LOG.warning(message)
+            print("\nNOTE: " + message)
 
     return attempted

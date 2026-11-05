@@ -43,7 +43,7 @@
             "module_path": "experiment_notes_finalize",
             "module_parameters": {
                 "experiment_notes_filename": "{output_session_folder}\\notes\\experiment_notes.txt",
-                "experiment_notes_confirm_prompt": "Confirm experiment notes are saved; press Enter to continue to the metadata editor.",
+                "experiment_notes_confirm_prompt": "Save the experiment notes and close their Notepad tab/window, then press Enter to continue to the metadata editor.",
                 "manifest_path": "{output_session_folder}\\launcher_metadata\\routing_manifest.json"
             }
         },
