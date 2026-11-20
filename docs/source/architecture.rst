@@ -48,7 +48,7 @@ System Architecture Diagram
        BaseLauncher [label="BaseLauncher\n(core orchestration)", fillcolor=lightblue, style="filled,bold"];
        InterfaceAdapter [label="Interface Adapter\n(Bonsai / MATLAB / Python / Custom)", fillcolor=white, style="filled"];
    PreModules [label="Pre-Acquisition Modules\n(mouse weight prompts, etc.)"];
-       PostModules [label="Post-Acquisition Modules\n(session_creator, notes, etc.)"];
+      PostModules [label="Post-Acquisition Modules\n(notes, archive, upload, etc.)"];
        AcquisitionProc [label="Acquisition Process\n(external executable)"];
 
        # Utilities
@@ -92,7 +92,7 @@ Launcher Flow Overview
 5. **Acquisition Subprocess:**
    - The launcher starts the main experiment process (Bonsai, MATLAB, Python, etc.) with the merged parameters. The subprocess writes data and logs to the session folder.
 6. **Post-Acquisition Pipeline:**
-   - After acquisition, the launcher runs each post-acquisition module in order, again passing the merged parameter file. These modules can generate session files, enhance metadata, and write results to the session folder.
+   - After acquisition, the launcher runs each post-acquisition module in order, again passing the merged parameter file. These modules can finalize metadata, archive data, dispatch uploads, and write results to the session folder.
 
 **All steps (launcher, pre-acquisition modules, acquisition subprocess, post-acquisition modules) write logs, metadata, and data to the session folder.**
 
@@ -104,7 +104,7 @@ Repository Folder Structure
     - ``launchers/``: Core ``BaseLauncher`` and optional custom subclasses
     - ``interfaces/``: Lightweight interface adapters for spawning external processes
    - ``pre_acquisition/``: Modular pre-acquisition pipeline modules (mouse weight prompts, etc.)
-    - ``post_acquisition/``: Modular post-acquisition pipeline modules (session creation, notes, enhancement, etc.)
+   - ``post_acquisition/``: Modular post-acquisition pipeline modules (notes, annotation, archival, upload, etc.)
     - ``utils/``: Shared utilities (configuration, git, logging, etc.)
   
 - ``params/``: Example and project-specific parameter files (JSON)

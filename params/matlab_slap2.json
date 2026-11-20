@@ -59,6 +59,7 @@
         {
             "module_type": "launcher_module",
             "module_path": "session_archiver",
+            "on_failure": "abort",
             "module_parameters": {
                 "session_dir": "{output_session_folder}",
                 "network_dir": "\\\\allen\\aind\\scratch\\OpenScope\\Slap2\\Data\\{subject_id}\\{session_uuid}\\slap2",
@@ -68,6 +69,14 @@
                 "skip_completed": true,
                 "max_retries": 3,
                 "copy_to_backup": false
+            }
+        },
+        {
+            "module_type": "launcher_module",
+            "module_path": "slap2_uploader",
+            "on_failure": "abort",
+            "module_parameters": {
+                "automatic_upload": true
             }
         }
     ],

@@ -171,10 +171,20 @@ Post-Acquisition Modules
     Requires ``session_dir`` (point it at ``{output_session_folder}``), plus ``network_dir`` and ``backup_dir``. Other
     knobs include ``include_patterns``, ``exclude_patterns``, ``skip_completed``, ``checksum_algo``, and ``max_retries``;
     all support placeholder expansion.
-- **session_creator**: Builds standards-compliant ``session.json`` metadata, typically using AIND schema helpers.
+- **slap2_uploader**: Runs last after a successful ``session_archiver`` step. When ``automatic_upload`` is true it resolves
+    the actual destination from ``launcher_metadata/session_archiver_manifest.json``, verifies the successful acquisition and
+    archived SLAP2 inputs, generates current AIND metadata, and asks the transfer service to accept the upload. Its complete
+    record is written to ``launcher_metadata/upload.log`` under the archived session root. A successful module result means
+    dispatch was accepted; it does not mean transfer or downstream processing has finished.
+
+    ``upload_transfer_settings`` is an optional mapping or JSON file path passed
+    to the supported ``slap2_onprem_handling`` upload API. Relative paths resolve
+    from the original parameter-pack directory. Partial settings are merged over
+    packaged defaults and can configure generic Code Ocean capsule/pipeline
+    ``run_params``, monitor fields, and ``capture_settings``. Set ``user_email``
+    separately, or rely on ``AIND_TRANSFER_USER_EMAIL``. The launcher deliberately
+    does not duplicate downstream schemas.
 - **stimulus_table_predictive_processing**: Normalizes Predictive Processing stimulus tables for downstream analysis.
-- **session_enhancer_bonsai**, **session_enhancer_predictive_processing**, **session_enhancer_slap2**: Enrich session metadata
-    with workflow-specific fields after acquisition.
 - **mouse_weight_post_prompt**: Mirrors the pre prompt to capture the animal's weight after the run.
 - **experiment_notes_post_prompt**: Legacy notes prompt retained for compatibility; the ``experiment_notes_editor`` /
     ``experiment_notes_finalize`` pair is now the recommended workflow.
@@ -188,7 +198,7 @@ Add your module filename (without `.py`) to the appropriate list:
 
      {
          "pre_acquisition_pipeline": ["mouse_weight_pre_prompt"],
-         "post_acquisition_pipeline": ["session_creator", "analysis_post_step"]
+         "post_acquisition_pipeline": ["experiment_notes_finalize", "analysis_post_step"]
      }
 
 Testing Modules

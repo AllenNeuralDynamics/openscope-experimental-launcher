@@ -46,7 +46,7 @@ Basic Example
           "RecordCameras": "{rig_param:RecordCameras}"
        },
        "pre_acquisition_pipeline": ["mouse_weight_pre_prompt"],
-       "post_acquisition_pipeline": ["session_creator"]
+          "post_acquisition_pipeline": ["experiment_notes_finalize"]
     }
 
 MATLAB Shared Engine Example
@@ -113,7 +113,55 @@ Launcher creates a timestamped session folder under ``output_root_folder`` conta
 * end_state.json
 * debug_state.json (only if crash)
 
-Post-acquisition tools (e.g. ``session_creator``) derive ``session.json`` from these.
+Post-acquisition tools use these files to finalize, archive, and upload the session.
+
+Automatic SLAP2 Upload
+----------------------
+
+The normal production entry relies on the rig's ``AIND_TRANSFER_USER_EMAIL``
+and the on-prem package's processing defaults:
+
+.. code-block:: json
+
+   {
+      "module_type": "launcher_module",
+      "module_path": "slap2_uploader",
+      "on_failure": "abort",
+      "module_parameters": {"automatic_upload": true}
+   }
+
+Only experiment-specific overrides need to be included. They are passed to
+``slap2_onprem_handling`` rather than interpreted by the launcher:
+
+.. code-block:: json
+
+   {
+      "module_parameters": {
+         "automatic_upload": true,
+         "user_email": "operator@alleninstitute.org",
+         "upload_transfer_settings": {
+            "run_params": {
+               "named_parameters": {"peakth": 7}
+            },
+            "capture_settings": {
+               "custom_metadata": {"workflow": "online-upload"}
+            }
+         }
+      }
+   }
+
+``upload_transfer_settings`` may instead be a JSON file path. Relative paths
+are resolved from the directory containing the original parameter pack. Its
+contents are partial overrides recursively merged over the on-prem package's
+defaults, and can select either a Code Ocean capsule or pipeline.
+
+Place this entry immediately after ``session_archiver`` and configure the
+archiver with ``"on_failure": "abort"``. This prevents transfer submission
+after any partial archive; the uploader also retains its own archive-manifest
+and network-copy checks as defense in depth. The upload log is written to
+``launcher_metadata/upload.log`` in the archived session. Success means the
+transfer service accepted the job, not that transfer or Code Ocean processing
+has completed.
 
 Reference
 ---------

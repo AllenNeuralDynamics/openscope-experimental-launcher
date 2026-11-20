@@ -8,10 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Configurable SLAP2 Transfer Processing**: The final upload module accepts
+  inline or parameter-pack-relative JSON ``upload_transfer_settings`` for
+  partial Code Ocean capsule/pipeline and capture overrides.
 - **Operator Gate Pre-Acquisition**: New `wait_for_user_input` module to pause until an operator confirms readiness
-- **Modular Session Creation**: Moved session.json creation from launchers to post-acquisition for better extensibility
-- **Session Creator**: New `SessionCreator` class for standardized session.json generation
-- **Session Enhancer Framework**: Launcher-specific enhancement system (e.g., `session_enhancer_bonsai.py`)
 - **Improved Metadata Organization**: Runtime state files now organized in `launcher_metadata/` directory
 - **Enhanced Test Coverage**: Comprehensive test suite with 158 passing tests (56% code coverage)
 - **Post-Acquisition Template**: Standardized template for creating new post-acquisition tools
@@ -21,7 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SLAP2 Meta Annotation Details**: Operator prompts now capture intended green/red channel targets (once per experiment) and SLAP2 acquisition mode (once per acquisition shared across DMD1/DMD2)
 
 ### Changed
-- **BREAKING**: Session creation moved from launchers to post-acquisition workflow
+- **BREAKING**: Python 3.10 is now the minimum supported version.
+- **SLAP2 Upload Dependencies**: The `slap2` extra now installs the modern on-prem metadata ETL and transfer client.
 - **File Organization**: 
   - `end_state.json` moved to `launcher_metadata/end_state.json`
   - `debug_state.json` moved to `launcher_metadata/debug_state.json`
@@ -39,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Software Field Population**: Session.json now includes complete Software field with launcher metadata
 
 ### Removed
+- **Legacy Session Metadata**: Removed the obsolete `session.json` creator and enhancer modules; modern SLAP2 metadata is represented by `acquisition.json` and `instrument.json`.
 - **Legacy Session Creation**: Removed session creation methods from launcher classes
 - **Old State Persistence**: Removed legacy state persistence system in favor of new metadata approach
 - **Obsolete Tests**: Cleaned up outdated test files and skipped tests

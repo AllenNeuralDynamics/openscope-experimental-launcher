@@ -44,3 +44,15 @@ def test_slap2_annotation_args_forwarded_to_matlab(tmp_path):
     assert pairs["post_acquisition_annotation"] is True
     assert pairs["giant_path"] == params["script_parameters"]["giant_path"]
     assert "{" not in pairs["giant_path"]
+
+
+def test_slap2_upload_runs_only_after_successful_archive(tmp_path):
+    launcher = _load_slap2_launcher(tmp_path)
+    pipeline = launcher.params["post_acquisition_pipeline"]
+    entries = {entry["module_path"]: entry for entry in pipeline}
+    module_order = [entry["module_path"] for entry in pipeline]
+
+    assert entries["session_archiver"]["on_failure"] == "abort"
+    assert module_order.index("slap2_uploader") == (
+        module_order.index("session_archiver") + 1
+    )

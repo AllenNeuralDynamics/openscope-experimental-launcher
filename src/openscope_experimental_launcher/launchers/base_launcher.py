@@ -770,6 +770,12 @@ class BaseLauncher:
         pipeline = params.get(pipeline_key, [])
         repo_path = git_manager.get_repository_path(params)
         session_folder = params.get("output_session_folder") or self.output_session_folder
+        parameter_file_source = self.original_param_file or param_file
+        parameter_file_directory = (
+            str(Path(parameter_file_source).resolve().parent)
+            if parameter_file_source
+            else None
+        )
         all_success = True
         failed_steps = []
         abort_stage = False
@@ -955,6 +961,10 @@ class BaseLauncher:
                 legacy_kwargs = raw_entry.get('kwargs', {}) or {}
                 merged = dict(params)
                 merged.update(legacy_kwargs)
+                if parameter_file_directory:
+                    merged.setdefault(
+                        "_parameter_file_directory", parameter_file_directory
+                    )
                 if session_folder:
                     merged.setdefault('output_session_folder', session_folder)
                 if legacy_func:
@@ -980,6 +990,10 @@ class BaseLauncher:
             module_params = entry.get('module_parameters', {}) or {}
             merged = dict(params)
             merged.update(module_params)
+            if parameter_file_directory:
+                merged.setdefault(
+                    "_parameter_file_directory", parameter_file_directory
+                )
             if session_folder:
                 merged.setdefault('output_session_folder', session_folder)
             if module_type == 'launcher_module':

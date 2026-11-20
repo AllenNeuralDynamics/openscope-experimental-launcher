@@ -1,7 +1,7 @@
 # openscope-experimental-launcher
 
 [![License](https://img.shields.io/badge/license-MIT-brightgreen)](LICENSE)
-![Python](https://img.shields.io/badge/python->=3.8-blue?logo=python)
+![Python](https://img.shields.io/badge/python->=3.10-blue?logo=python)
 ![Platform](https://img.shields.io/badge/platform-Windows-blue?logo=windows)
 [![Documentation](https://img.shields.io/badge/docs-latest-blue)](https://allenneuraldynamics.github.io/openscope-experimental-launcher/)
 
@@ -33,7 +33,7 @@ To update the pinned `slap2_onprem_handling` commit after it changes upstream:
 uv lock --upgrade-package slap2_onprem_handling
 ```
 
-Requirements: Python 3.8+ (3.10+ for the `slap2` extra), Windows 10 or 11,
+Requirements: Python 3.10+, Windows 10 or 11,
 rig configuration TOML, and a parameter JSON file.
 
 ## Run a Session

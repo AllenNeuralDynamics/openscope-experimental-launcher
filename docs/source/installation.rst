@@ -10,7 +10,7 @@ System Requirements
 **Required:**
 
 - Windows 10 or Windows 11
-- Python 3.8 or higher
+- Python 3.10 or higher
 - Git (for repository management)
 
 **Optional Dependencies:**
@@ -22,7 +22,7 @@ Pre-Installation Setup
 
 1. **Install Python**
 
-   Download and install Python 3.8+ from `python.org <https://www.python.org/downloads/>`_
+   Download and install Python 3.10+ from `python.org <https://www.python.org/downloads/>`_
    
    .. note::
       Make sure to check "Add Python to PATH" during installation.

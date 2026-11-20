@@ -22,7 +22,6 @@ Structure Example
 
   output_session_folder/
   ├── experiment.log
-  ├── session.json            # Generated post-acquisition (optional)
   ├── launcher_metadata/
   │   ├── processed_parameters.json
   │   ├── end_state.json
@@ -47,7 +46,8 @@ Best Practices
 Downstream Consumption
 ----------------------
 
-The ``session_creator`` tool consumes both ``processed_parameters.json`` and ``end_state.json``. Missing optional fields are handled gracefully with warnings.
+Post-acquisition modules consume ``processed_parameters.json`` and
+``end_state.json`` for archival, metadata generation, and upload decisions.
 
 Reference Implementation
 ------------------------

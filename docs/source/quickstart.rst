@@ -6,7 +6,7 @@ Launch a basic OpenScope experiment, then layer in optional metadata validation 
 Prerequisites
 -------------
 
-* Windows 10 or 11 with Python 3.8 or newer
+* Windows 10 or 11 with Python 3.10 or newer
 * Rig configuration ``.toml`` describing hardware defaults
 * Experiment parameter ``.json`` (start with ``params/example_minimalist_params.json``)
 
@@ -76,7 +76,7 @@ Every run produces:
 * ``launcher_metadata/end_state.json`` – flattened end-state summary
 * ``launcher_metadata/debug_state.json`` when a crash occurs
 
-Post-acquisition modules may add artifacts such as ``session.json`` or archived data manifests.
+Post-acquisition modules may add finalized metadata, archived data manifests, and upload logs.
 
 Next Steps
 ----------

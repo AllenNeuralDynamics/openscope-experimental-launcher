@@ -9,7 +9,6 @@ Files Generated
 * ``processed_parameters.json`` – final merged parameters (rig config + JSON + runtime prompts).
 * ``end_state.json`` – final experiment outcome and core identifiers.
 * ``debug_state.json`` – only created when an unexpected exception/crash occurs.
-* ``session.json`` – created by post-acquisition tools (e.g. ``session_creator``) from the above.
 
 End State Schema (Flattened)
 ----------------------------
@@ -57,11 +56,6 @@ The debug file captures a crash snapshot with a dedicated ``crash_info`` block a
      }
 
 Crash handling automatically writes this file before termination.
-
-Session Creation (Post-Acquisition)
------------------------------------
-
-The ``session_creator`` module reads ``end_state.json`` + ``processed_parameters.json`` to build a standards-compliant ``session.json``. If missing timestamps, it falls back gracefully and logs warnings.
 
 Why Flatten?
 ------------
