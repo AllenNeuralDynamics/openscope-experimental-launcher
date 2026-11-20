@@ -14,7 +14,7 @@ OpenScope Experimental Launcher Documentation
 .. image:: https://img.shields.io/badge/platform-Windows-blue?logo=windows
    :alt: Platform
 
-.. image:: https://img.shields.io/badge/python->=3.8-blue?logo=python
+.. image:: https://img.shields.io/badge/python->=3.10-blue?logo=python
    :alt: Python Version
 
 **Modular, pipeline-driven experimental launcher for OpenScope. Pre- and post-acquisition work runs via pipeline modules, while the launcher core also provides built-in session synchronization and orchestration.**
@@ -31,7 +31,7 @@ Key Features
 * **End/Debug State** – Each run writes ``end_state.json`` and (on crash) ``debug_state.json``.
 * **Rig Placeholders** – Use ``{rig_param:<key>}`` in ``script_parameters`` for dynamic injection.
 * **Unified Parameters** – Rig config + param file + prompts are merged into ``processed_parameters.json``.
-* **Post-Acquisition Generation** – Optional modules (for example ``session_creator``) can generate artifacts like ``session.json``.
+* **Post-Acquisition Processing** – Optional modules can annotate, archive, and dispatch completed sessions.
 
 Quick Start
 -----------
@@ -70,7 +70,7 @@ Quick Start
         "script_path": "path/to/workflow.bonsai",
         "output_root_folder": "C:/experiment_data",
         "pre_acquisition_pipeline": ["mouse_weight_pre_prompt"],
-        "post_acquisition_pipeline": ["session_creator"]
+      "post_acquisition_pipeline": ["experiment_notes_finalize"]
       }
 
 Architecture
@@ -100,7 +100,7 @@ System Requirements
    Primary support is for **Windows** with untested cross-platform compatibility:
    
    - Windows 10 or Windows 11 (primary platform)
-   - Python 3.8 or higher
+   - Python 3.10 or higher
    - Interface-specific requirements:
    
      - **Bonsai**: Bonsai installation for Bonsai workflows

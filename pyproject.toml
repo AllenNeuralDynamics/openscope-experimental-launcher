@@ -6,14 +6,12 @@ build-backend = "setuptools.build_meta"
 name = "openscope-experimental-launcher"
 description = "Windows-only experimental launcher for OpenScope Bonsai workflows with metadata generation and session tracking."
 license = {text = "MIT"}
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 authors = [
     {name = "Allen Institute for Neural Dynamics"}
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Operating System :: Microsoft :: Windows",
@@ -30,8 +28,8 @@ version = "0.2.57"
 dependencies = [
     'pandas',
     'h5py',  # SLAP2 .meta content classification (MATLAB 7.3 = HDF5)
-    'aind-data-schema==1.4.0',
-    'aind-data-schema-models',
+    'aind-data-schema>=2.8.1,<3',
+    'aind-data-schema-models>=6,<7',
     'packaging',  # enforce the packs' launcher_version PEP 440 specifiers
     'psutil',
     'pywin32; sys_platform == "win32"',  # Only install on Windows
@@ -61,11 +59,13 @@ matlab = [
 # SLAP2 rig installs: the slap2_meta_annotator opens the metadata editor GUI
 # from slap2_onprem_handling (in-process import; pipeline modules always run
 # in the launcher's own environment). The base install of that package is
-# deliberately light (requests only) and has no conflict with the launcher's
-# aind-data-schema==1.4.0 pin. Pinned to a branch here; uv.lock resolves it
+# deliberately light (requests only). The upload extra adds the current AIND
+# metadata ETL and transfer clients. Pinned to a branch here; uv.lock resolves it
 # to an exact commit — update with: uv lock --upgrade-package slap2_onprem_handling
 slap2 = [
-    'slap2_onprem_handling @ git+https://github.com/AllenNeuralDynamics/slap2_onprem_handling@main ; python_version >= "3.10"'
+    'slap2_onprem_handling[upload] @ git+https://github.com/AllenNeuralDynamics/slap2_onprem_handling@main',
+    # Compatibility guard until all consumed on-prem releases carry this pin.
+    'PyQt5-Qt5==5.15.2; sys_platform == "win32"'
 ]
 
 [tool.setuptools.packages.find]

@@ -69,6 +69,14 @@
                 "max_retries": 3,
                 "copy_to_backup": false
             }
+        },
+        {
+            "module_type": "launcher_module",
+            "module_path": "slap2_uploader",
+            "on_failure": "abort",
+            "module_parameters": {
+                "automatic_upload": true
+            }
         }
     ],
     "description": "Standalone SLAP2 session with the MATLAB shared-engine launcher, based on the openscope-params indicator_testing SLAP2 pack (without session sync). Runs GIAnT post-acquisition soma annotation after End SLAP2 acquisition, with GIAnT-MATLAB pinned by repository_commit_hash."
