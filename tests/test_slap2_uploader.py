@@ -127,6 +127,45 @@ def test_failed_acquisition_or_incomplete_archive_blocks_upload(tmp_path):
     ) == 2
 
 
+def test_network_selected_non_data_file_failure_blocks_upload(tmp_path, monkeypatch):
+    local_session, _, _ = _ready_session(tmp_path)
+    calls = _install_fake_onprem(monkeypatch)
+    manifest_path = (
+        local_session / "launcher_metadata" / "session_archiver_manifest.json"
+    )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["files"]["notes/experiment_notes.txt"] = {
+        "status": "error",
+        "error": "network share unavailable",
+    }
+    _write_json(manifest_path, manifest)
+
+    assert slap2_uploader.run_post_acquisition(
+        {"automatic_upload": True, "output_session_folder": str(local_session)}
+    ) == 2
+    assert calls.get("upload", []) == []
+
+
+def test_backup_only_non_data_file_does_not_block_upload(tmp_path, monkeypatch):
+    local_session, _, _ = _ready_session(tmp_path)
+    calls = _install_fake_onprem(monkeypatch)
+    manifest_path = (
+        local_session / "launcher_metadata" / "session_archiver_manifest.json"
+    )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["files"]["notes/experiment_notes.txt"] = {
+        "status": "complete",
+        "network_copy": False,
+        "backup_copy": True,
+    }
+    _write_json(manifest_path, manifest)
+
+    assert slap2_uploader.run_post_acquisition(
+        {"automatic_upload": True, "output_session_folder": str(local_session)}
+    ) == 0
+    assert calls["upload"]
+
+
 def test_pending_backup_is_accepted_and_default_upload_is_dispatched(tmp_path, monkeypatch):
     local_session, archive_root, slap2_dir = _ready_session(
         tmp_path, data_status="pending_backup"

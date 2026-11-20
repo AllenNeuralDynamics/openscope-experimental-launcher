@@ -75,31 +75,35 @@ def _verify_archived_inputs(manifest: Mapping[str, Any], slap2_dir: Path) -> Non
         if not isinstance(raw_entry, dict):
             raise ValueError(f"Invalid archiver record for {relative_name!r}")
 
-        relative_path = Path(str(relative_name))
-        is_slap2_data = bool(relative_path.parts) and (
-            relative_path.parts[0] in _DATA_DIRS
-        )
-        if not is_slap2_data:
+        network_copy = raw_entry.get("network_copy")
+        if network_copy is False:
             continue
+        if network_copy is not True:
+            raise ValueError(
+                f"Archive record {relative_name!r} has no verified network-copy status"
+            )
 
         status = raw_entry.get("status")
         if status not in {"complete", "pending_backup"}:
             raise ValueError(
-                f"SLAP2 archive record {relative_name!r} has status {status!r}"
-            )
-        if raw_entry.get("network_copy") is not True:
-            raise ValueError(
-                f"SLAP2 archive record {relative_name!r} has no verified network copy"
+                f"Network-selected archive record {relative_name!r} has status "
+                f"{status!r}"
             )
 
+        relative_path = Path(str(relative_name))
         network_path = raw_entry.get("network_path")
         expected_path = slap2_dir / relative_path
         copied_path = Path(str(network_path)) if network_path else expected_path
         if not copied_path.is_file():
             raise FileNotFoundError(
-                f"Archived SLAP2 file is missing for {relative_name!r}: {copied_path}"
+                f"Network-selected archive file is missing for {relative_name!r}: "
+                f"{copied_path}"
             )
-        if relative_path.suffix.casefold() in _REQUIRED_DATA_SUFFIXES:
+        if (
+            relative_path.parts
+            and relative_path.parts[0] in _DATA_DIRS
+            and relative_path.suffix.casefold() in _REQUIRED_DATA_SUFFIXES
+        ):
             copied_suffixes.add(relative_path.suffix.casefold())
 
     missing = sorted(_REQUIRED_DATA_SUFFIXES - copied_suffixes)
