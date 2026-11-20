@@ -155,12 +155,13 @@ are resolved from the directory containing the original parameter pack. Its
 contents are partial overrides recursively merged over the on-prem package's
 defaults, and can select either a Code Ocean capsule or pipeline.
 
-Place this entry immediately after ``session_archiver``. The uploader performs
-its own archive-manifest and network-copy checks, so it safely rejects a partial
-archive if the archiver reports failure and the pipeline continues. The upload
-log is written to ``launcher_metadata/upload.log`` in the archived session.
-Success means the transfer service accepted the job, not that transfer or Code
-Ocean processing has completed.
+Place this entry immediately after ``session_archiver`` and configure the
+archiver with ``"on_failure": "abort"``. This prevents transfer submission
+after any partial archive; the uploader also retains its own archive-manifest
+and network-copy checks as defense in depth. The upload log is written to
+``launcher_metadata/upload.log`` in the archived session. Success means the
+transfer service accepted the job, not that transfer or Code Ocean processing
+has completed.
 
 Reference
 ---------

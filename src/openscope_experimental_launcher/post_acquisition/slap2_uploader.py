@@ -184,9 +184,9 @@ def run_post_acquisition(
         return 2
 
     upload_log = session_root / "launcher_metadata" / "upload.log"
-    upload_log.parent.mkdir(parents=True, exist_ok=True)
 
     try:
+        upload_log.parent.mkdir(parents=True, exist_ok=True)
         with upload_log.open("a", encoding="utf-8", buffering=1) as handle:
             _write_event(handle, "Automatic SLAP2 upload started")
             _write_event(handle, f"Archived session root: {session_root}")

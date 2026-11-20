@@ -279,3 +279,27 @@ def test_metadata_or_transfer_failure_is_logged(tmp_path, monkeypatch):
     assert "submission rejected" in log_text
     assert "HTTP status: 400" in log_text
     assert "invalid payload" in log_text
+
+
+def test_upload_log_directory_failure_returns_upload_error(
+    tmp_path, monkeypatch, caplog
+):
+    local_session, archive_root, _ = _ready_session(tmp_path)
+    calls = _install_fake_onprem(monkeypatch)
+    upload_log_parent = archive_root / "launcher_metadata"
+    original_mkdir = Path.mkdir
+
+    def fail_upload_log_mkdir(path, *args, **kwargs):
+        if path == upload_log_parent:
+            raise OSError("network share unavailable")
+        return original_mkdir(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "mkdir", fail_upload_log_mkdir)
+
+    result = slap2_uploader.run_post_acquisition(
+        {"automatic_upload": True, "output_session_folder": str(local_session)}
+    )
+
+    assert result == 3
+    assert calls.get("upload", []) == []
+    assert "upload.log could not be updated" in caplog.text
